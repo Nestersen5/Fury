@@ -25,7 +25,10 @@ process.on('message',m=>{if(m==='minimize'){win.once('minimize',()=>process.send
     const start = (label, profile = 'shared profile') => {
         const env = { ...process.env, FURY_DATA_DIR: path.join(root, profile) };
         delete env.ELECTRON_RUN_AS_NODE; delete env.NODE_OPTIONS;
-        const child = spawn(executable, [path.join(root, label, 'main.cjs')], { env, cwd: root, windowsHide: true, stdio: ['ignore','ignore','pipe','ipc'] });
+        // Bare Electron on macOS can treat different entry scripts as different
+        // apps. Packaged ZIP/DMG cross-path ownership is checked separately.
+        const entry = process.platform === 'darwin' ? 'Installed App' : label;
+        const child = spawn(executable, [path.join(root, entry, 'main.cjs')], { env, cwd: root, windowsHide: true, stdio: ['ignore','ignore','pipe','ipc'] });
         child.messages = []; child.output = ''; child.stderr.on('data', x => child.output += x);
         child.on('message', m => child.messages.push(m)); children.push(child); return child;
     };
