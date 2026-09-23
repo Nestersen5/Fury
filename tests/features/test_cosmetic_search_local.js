@@ -149,7 +149,7 @@ if (process.env.FURY_COSMETIC_TEST_PRELOAD === '1') {
                 players: [{ name: 'Expired', uuid: 'expired', killMessage: 'expired_value' }] }));
             const third = await start();
             assert.equal((await search('killMessage=killmessages_counter')).body.totalMatches, 2);
-            assert.deepEqual(third.requests, ['key-a']);
+            await eventually(() => assert.deepEqual(third.requests, ['key-a']), 'Expired cache refetch notification');
             await stop(third);
             console.log('PASS local Cosmetic Search exact filters, cache, key refresh, errors, concurrency and F7 restart');
         } finally {
