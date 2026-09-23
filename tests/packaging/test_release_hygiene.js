@@ -48,7 +48,7 @@ const gitignore = read('.gitignore');
 
 const envExample = read('.env.example');
 [
-    'COSMETIC_SEARCH_API_URL',
+    'COSMETIC_SEARCH_PORT',
     'COSMETIC_SEARCH_TOKEN'
 ].forEach(name => {
     assert(envExample.includes(name), `.env.example should document ${name}`);
@@ -74,14 +74,10 @@ const privateCosmeticSearchIp = ['92', '5', '52', '168'].join('.');
     assert(!read(relativePath).includes(privateCosmeticSearchIp), `${relativePath} should not contain a private cosmetic-search IP`);
 });
 
-assert(
-    read('launcher.js').includes("process.env.COSMETIC_SEARCH_API_URL || 'http://127.0.0.1:3210'"),
-    'launcher cosmetic search should default to localhost and allow env override'
-);
-assert(
-    read('proxy.js').includes("process.env.COSMETIC_SEARCH_API_URL || 'http://127.0.0.1:3210'"),
-    'proxy cosmetic search should default to localhost and allow env override'
-);
+for (const source of ['launcher.js', 'proxy.js']) {
+    assert(read(source).includes('localCosmeticSearchUrl()'), `${source} must use the local Cosmetic Search address`);
+    assert(!read(source).includes('COSMETIC_SEARCH_API_URL'), `${source} must not select a hosted Cosmetic Search URL`);
+}
 assert(
     read('package.json').includes('node tests/packaging/test_release_hygiene.js'),
     'npm test should include release hygiene checks'

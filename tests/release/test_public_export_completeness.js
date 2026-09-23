@@ -10,6 +10,7 @@ for (const file of [
     'src/launcher/launcher_auth_worker.js',
     'src/launcher/renderer/launcher_updates.js',
     'src/launcher/styles/launcher_theme.css',
+    'src/net/cosmeticSearchAddress.js',
     'src/storage/json_writer_worker.js'
 ]) {
     assert(included.some(entry => entry.file === file), `Export must include ${file}`);
@@ -19,4 +20,6 @@ for (const file of [
         `Completeness gate must reject an omitted ${file}`
     );
 }
+assert(included.some(entry => entry.file === 'tests/features/test_cosmetic_search_local.js'),
+    'Export must include the permanent local Cosmetic Search regression test');
 console.log('Public export completeness checks passed.');

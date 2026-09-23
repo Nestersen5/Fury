@@ -51,7 +51,8 @@ async function cosmeticService(lan) {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'fury-local-services-'));
     const children = [];
     try {
-        const preload = path.join(root, 'cloud-fixture.cjs');
+        fs.writeFileSync(path.join(root, 'statmod_key.txt'), 'Aurora API key: synthetic-key\n');
+        const preload = path.join(root, 'aurora-fixture.cjs');
         fs.writeFileSync(preload, `require(${JSON.stringify(require.resolve('axios'))}).get=async(url,options)=>{
 require('assert/strict').equal(url,'https://bordic.xyz/api/v2/resources/superstar');
 require('assert/strict').equal(options.params.key,'synthetic-key');
@@ -59,7 +60,7 @@ process.send({type:'fixture:outbound'});return {data:{success:true,data:[]}};};`
         for (const desktop of [true, false]) {
             const [port, blocked] = await unusedPorts(2);
             const env = cleanEnvironment(root, REPOSITORY_ROOT, port, blocked);
-            env.COSMETIC_SEARCH_PORT = String(port); env.AURORA_API_KEY = 'synthetic-key';
+            env.COSMETIC_SEARCH_PORT = String(port); env.AURORA_API_KEY = desktop ? 'wrong-environment-key' : 'synthetic-key';
             env.COSMETIC_SEARCH_BIND_HOST = '0.0.0.0';
             if (desktop) env.FURY_SERVICE_INSTANCE = require('crypto').randomUUID();
             else delete env.FURY_SERVICE_INSTANCE;
@@ -87,21 +88,21 @@ process.send({type:'fixture:outbound'});return {data:{success:true,data:[]}};};`
     const source=fs.readFileSync(require.resolve('../../launcher'),'utf8');
     const body=source.slice(source.indexOf('async function searchDenickCosmetics('),source.indexOf('async function auroraStatLookup('));
     const calls=[];
-    const search=vm.runInNewContext(body+';searchDenickCosmetics',{COSMETIC_SEARCH_API_URL:'https://cloud-fixture.invalid',COSMETIC_SEARCH_TOKEN:'synthetic-token',LAUNCHER_DENICK_MAX_RESULTS:100,axios:{get:async(url,options)=>{calls.push({url,options});return {data:{success:true,totalMatches:1,data:[{name:'Fixture'}]}};}}});
+    const localUrl='http://127.0.0.1:3210';
+    const search=vm.runInNewContext(body+';searchDenickCosmetics',{LOCAL_COSMETIC_SEARCH_URL:localUrl,COSMETIC_SEARCH_TOKEN:'synthetic-token',LAUNCHER_DENICK_MAX_RESULTS:100,axios:{get:async(url,options)=>{calls.push({url,options});return {data:{success:true,totalMatches:1,data:[{name:'Fixture'}]}};}}});
     assert.equal((await search([],10)).candidates[0].name,'Fixture');
-    assert.equal(calls[0].url,'https://cloud-fixture.invalid/api/cosmetics/search');
+    assert.equal(calls[0].url,localUrl+'/api/cosmetics/search');
     assert.equal(calls[0].options.params.token,'synthetic-token');
     assert.equal(calls[0].options.params.limit,10);
     const noop=()=>{};
-    const commands=require('../../src/denick/commands').createDenickCommands({axios:{get:async(url,options)=>{calls.push({url,options});return {data:{success:true,data:[]}};}},sendChat:noop,getKeys:()=>({}),hasHypixelApiKeyConfigured:()=>false,cosmeticSearchApiUrl:'https://cloud-fixture.invalid',getCosmeticSearchToken:()=> 'synthetic-token',denickRange:1,formatInt:String,getPlayerData:noop,getRealNameFromSkin:noop,isMinecraftUsername:()=>true,appendDenickHistory:noop,parseDenickFilters:noop});
+    const commands=require('../../src/denick/commands').createDenickCommands({axios:{get:async(url,options)=>{calls.push({url,options});return {data:{success:true,data:[]}};}},sendChat:noop,getKeys:()=>({}),hasHypixelApiKeyConfigured:()=>false,cosmeticSearchApiUrl:localUrl,getCosmeticSearchToken:()=> 'synthetic-token',denickRange:1,formatInt:String,getPlayerData:noop,getRealNameFromSkin:noop,isMinecraftUsername:()=>true,appendDenickHistory:noop,parseDenickFilters:noop});
     await commands.findDenickCandidatesByCosmetics({killMessage:'synthetic'});
-    assert.equal(calls[1].url,'https://cloud-fixture.invalid/api/cosmetics/search');
+    assert.equal(calls[1].url,localUrl+'/api/cosmetics/search');
     assert.equal(calls[1].options.params.token,'synthetic-token');
-    const local=source.slice(source.indexOf('function cosmeticSearchIsLocal()'),source.indexOf('function cosmeticSearchEnvironment()'));
-    for(const [url,expected] of [['http://[::1]:3210',true],['http://localhost:3210',true],['https://cloud-fixture.invalid',false]]) {
-        assert.equal(vm.runInNewContext(local+';cosmeticSearchIsLocal()',{URL,COSMETIC_SEARCH_API_URL:url}),expected);
-    }
-    console.log('PASS actual Cosmetic Search: forced desktop loopback, standalone remote opt-in, mocked outbound vendor/Main API and F7 stop');
+    const { localCosmeticSearchUrl }=require('../../src/net/cosmeticSearchAddress');
+    assert.equal(localCosmeticSearchUrl({COSMETIC_SEARCH_PORT:'3210',COSMETIC_SEARCH_API_URL:'https://cloud-fixture.invalid'}),localUrl);
+    assert.throws(()=>localCosmeticSearchUrl({COSMETIC_SEARCH_PORT:'3210@remote.invalid'}),/valid TCP port/);
+    console.log('PASS actual Cosmetic Search: forced desktop loopback, standalone bind opt-in, local Main/proxy API and F7 stop');
 }
 function refused(host, port) {
     return new Promise((resolve, reject) => {

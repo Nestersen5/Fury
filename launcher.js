@@ -127,7 +127,7 @@ const COSMETIC_API_NAMES_FILE = dataPath('cosmetic_api_names.json');
 // accounts with FURY_DEV_PINNED_ACCOUNTS=Name1,Name2 rather than committing them.
 const PINNED_AUTH_USERS = app.isPackaged ? []
     : (process.env.FURY_DEV_PINNED_ACCOUNTS || 'Nestersen').split(',').map(name => name.trim()).filter(Boolean);
-const COSMETIC_SEARCH_API_URL = (process.env.COSMETIC_SEARCH_API_URL || 'http://127.0.0.1:3210').replace(/\/+$/, '');
+const LOCAL_COSMETIC_SEARCH_URL = require('./src/net/cosmeticSearchAddress').localCosmeticSearchUrl();
 const COSMETIC_SEARCH_TOKEN = process.env.COSMETIC_SEARCH_TOKEN || '';
 const SESSION_DATA_FILE = dataPath('session_data.json');
 const LAUNCHER_DENICK_LOOKUP_RANGE = 800;
@@ -137,33 +137,6 @@ const services = {
     proxy: { label: 'Proxy', script: 'proxy.js', child: null, logs: [] },
     cosmeticSearch: { label: 'Cosmetic Search API', script: 'cosmetic_search_api.js', child: null, logs: [] }
 };
-
-// The cosmetic reverse-search backend that /denick talks to. We only manage a
-// local copy when COSMETIC_SEARCH_API_URL still points at this machine; if the
-// operator repointed it at a remote backend, leave that one alone.
-function cosmeticSearchIsLocal() {
-    try {
-        const host = new URL(COSMETIC_SEARCH_API_URL).hostname.replace(/^\[|\]$/g, '');
-        return host === '127.0.0.1' || host === 'localhost' || host === '::1' || host === '0.0.0.0';
-    } catch (e) {
-        return false;
-    }
-}
-
-function cosmeticSearchEnvironment() {
-    const env = {};
-    try {
-        const aurora = String(loadAllSettings().keys?.aurora || '').trim();
-        if (aurora) env.AURORA_API_KEY = aurora;
-    } catch (e) { /* settings unreadable; service will report a missing key per-query */ }
-    if (COSMETIC_SEARCH_TOKEN) env.COSMETIC_SEARCH_TOKEN = COSMETIC_SEARCH_TOKEN;
-    try {
-        env.COSMETIC_SEARCH_PORT = String(new URL(COSMETIC_SEARCH_API_URL).port || 3210);
-    } catch (e) {
-        env.COSMETIC_SEARCH_PORT = '3210';
-    }
-    return env;
-}
 
 let win = null;
 let apiStatusCache = { at: 0, data: null };
@@ -345,7 +318,6 @@ async function startService(name) {
             // of requiring the player to install Node.js separately.
             ...(app.isPackaged ? { ELECTRON_RUN_AS_NODE: '1' } : {}),
             ...(app.isPackaged ? { FURY_RESOURCES_PATH: process.resourcesPath } : {}),
-            ...(name === 'cosmeticSearch' ? cosmeticSearchEnvironment() : {})
         }
     });
 
@@ -370,10 +342,9 @@ async function startService(name) {
         if (!child.pid && service.child === child) service.child = null;
     });
 
-    // /denick's cosmetic reverse-search needs the local search backend up, so
-    // bring it along whenever the proxy starts (best-effort; failure here must
-    // not block the proxy itself).
-    if (name === 'proxy' && cosmeticSearchIsLocal()) {
+    // /denick's cosmetic reverse-search needs the local service alongside the
+    // proxy (best-effort; failure here must not block the proxy itself).
+    if (name === 'proxy') {
         startService('cosmeticSearch').catch((e) => {
             pushLog('cosmeticSearch', `[Launcher] Could not start Cosmetic Search API: ${e.message}`);
         });
@@ -922,7 +893,7 @@ async function searchDenickCosmetics(cosmetics = [], limit = 100) {
         labels.push(`${field.label}: ${item.value}`);
     });
     if (COSMETIC_SEARCH_TOKEN) params.token = COSMETIC_SEARCH_TOKEN;
-    const res = await axios.get(`${COSMETIC_SEARCH_API_URL}/api/cosmetics/search`, {
+    const res = await axios.get(`${LOCAL_COSMETIC_SEARCH_URL}/api/cosmetics/search`, {
         timeout: 12000,
         params
     });

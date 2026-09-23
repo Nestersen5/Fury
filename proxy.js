@@ -295,7 +295,7 @@ const MINECRAFT_CHAT_MESSAGE_MAX_LENGTH = 100;
 const AURORA_PING_CACHE_DURATION = 30 * 60 * 1000;
 const GLOBAL_PROFILE_CACHE_MAX_ENTRIES = 1000;
 const AURORA_PING_CACHE_MAX_ENTRIES = 2000;
-const COSMETIC_SEARCH_API_URL = (process.env.COSMETIC_SEARCH_API_URL || 'http://127.0.0.1:3210').replace(/\/+$/, '');
+const LOCAL_COSMETIC_SEARCH_URL = require('./src/net/cosmeticSearchAddress').localCosmeticSearchUrl();
 const COSMETIC_SEARCH_TOKEN = process.env.COSMETIC_SEARCH_TOKEN || '';
 const hypixelApiClient = createHypixelApiClient({
     axios,
@@ -2684,7 +2684,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
 
         function renderDenickController() {
             const hypixelConfigured = hasHypixelApiKeyConfigured();
-            const cosmeticConfigured = Boolean(COSMETIC_SEARCH_TOKEN || COSMETIC_SEARCH_API_URL);
+            const cosmeticConfigured = Boolean(keys.aurora);
             const panel = createFeatureStatus({
                 client, sendChat, title: 'Denick', subtitle: 'IDENTITY RESOLUTION',
                 section: 'safety', helpTopic: 'denick', width: 60, labelWidth: 18
@@ -2716,7 +2716,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             panel.row([
                 panel.label('Cosmetic'),
                 ...panel.flag(cosmeticConfigured ? 'configured' : 'missing', cosmeticConfigured, null,
-                    cosmeticConfigured ? 'Cosmetic lookup endpoint is set.' : 'Cosmetic lookup endpoint missing.')
+                    cosmeticConfigured ? 'Aurora API key is set.' : 'Set an Aurora API key in the launcher.')
             ]);
             panel.row([
                 panel.label('Mode'),
@@ -13523,7 +13523,7 @@ const {
     sendChat,
     getKeys: () => keys,
     hasHypixelApiKeyConfigured,
-    cosmeticSearchApiUrl: COSMETIC_SEARCH_API_URL,
+    cosmeticSearchApiUrl: LOCAL_COSMETIC_SEARCH_URL,
     getCosmeticSearchToken: () => COSMETIC_SEARCH_TOKEN,
     denickRange: DENICK_RANGE,
     formatInt,

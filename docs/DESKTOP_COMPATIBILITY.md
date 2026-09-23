@@ -21,7 +21,7 @@ retains its existing `127.0.0.1` binding. No wildcard desktop listener is
 intended. Other LAN devices cannot connect directly. Firewall prompts or
 outbound permissions remain OS/security-software concerns.
 
-`COSMETIC_SEARCH_API_URL` still selects the outbound local/cloud API; tokens,
+Desktop Cosmetic Search always uses its loopback service; tokens,
 request paths and parameters are unchanged. Standalone defaults to loopback;
 `COSMETIC_SEARCH_BIND_HOST` explicitly opts standalone deployments into another
 IP bind (for example `0.0.0.0`). Launcher-owned instances ignore that opt-in

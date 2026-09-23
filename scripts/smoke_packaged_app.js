@@ -159,7 +159,6 @@ function cleanEnvironment(tempDirectory, resources, cosmeticPort, blockedNetwork
         ...env,
         FURY_DATA_DIR: tempDirectory,
         FURY_RESOURCES_PATH: resources,
-        COSMETIC_SEARCH_API_URL: `http://127.0.0.1:${cosmeticPort}`,
         COSMETIC_SEARCH_PORT: String(cosmeticPort),
         STATMOD_AUTO_START_PROXY: '0',
         // Launcher status and avatar previews normally contact public services.

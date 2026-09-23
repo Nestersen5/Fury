@@ -1,8 +1,7 @@
 # Cosmetic Search API
 
-The local service defaults to `127.0.0.1` and `::1`. Desktop Fury may still use
-a separately hosted cloud backend through `COSMETIC_SEARCH_API_URL`; outbound
-requests are unchanged. Standalone server deployments can explicitly set
+The desktop service uses `127.0.0.1` and `::1` and fetches Aurora data directly
+with the user's configured Aurora key. Standalone deployments can explicitly set
 `COSMETIC_SEARCH_BIND_HOST=0.0.0.0` (IPv4) or a specific IPv4/IPv6 address.
 Launcher-owned services always stay on loopback and ignore that setting.
 Configure authentication, firewall and TLS/reverse proxy before exposing a
@@ -22,7 +21,8 @@ export COSMETIC_SEARCH_PORT=3210
 npm start
 ```
 
-`AURORA_API_KEY` is required. This API is standalone and does not read the main Nester launcher config.
+`AURORA_API_KEY` is required in standalone mode. Launcher-owned Fury reads its
+configured Aurora key and applies key changes while the service is running.
 
 ## Search
 

@@ -2,8 +2,9 @@ const express = require('express');
 const axios = require('axios');
 const fs = require('fs');
 const { dataPath } = require('./src/storage/runtimePaths.js');
+const { cosmeticSearchPort } = require('./src/net/cosmeticSearchAddress');
 
-const PORT = Number(process.env.COSMETIC_SEARCH_PORT || 3210);
+const PORT = cosmeticSearchPort();
 const BIND_HOST = require('./src/net/cosmeticBind').cosmeticBindHost();
 const RESOURCE = String(process.env.AURORA_COSMETIC_RESOURCE || 'superstar').toLowerCase();
 const CACHE_TTL_MS = Number(process.env.COSMETIC_SEARCH_CACHE_TTL_MS || 15 * 60 * 1000);
@@ -97,8 +98,12 @@ function writeDiskCache() {
 }
 
 function auroraKey() {
-    return process.env.AURORA_API_KEY || '';
+    return process.env.FURY_SERVICE_INSTANCE
+        ? require('./app_config.js').loadKeys().aurora
+        : process.env.AURORA_API_KEY || '';
 }
+
+let activeAuroraKey = auroraKey();
 
 function requireAccess(req, res, next) {
     const token = process.env.COSMETIC_SEARCH_TOKEN || '';
@@ -112,12 +117,16 @@ function requireAccess(req, res, next) {
 }
 
 async function fetchAuroraPlayers(force = false) {
+    const key = auroraKey();
+    if (key !== activeAuroraKey) {
+        activeAuroraKey = key;
+        memoryCache.at = 0;
+    }
     const now = Date.now();
     if (!force && memoryCache.players.length && now - memoryCache.at < CACHE_TTL_MS) {
         return memoryCache;
     }
 
-    const key = auroraKey();
     if (!key) throw new Error('Aurora API key is missing. Set AURORA_API_KEY or /apikey aurora.');
 
     // No trailing slash — Bordic's router 404s on paths ending in "/".
@@ -131,6 +140,8 @@ async function fetchAuroraPlayers(force = false) {
     if (response.data?.success === false) {
         throw new Error(response.data?.message || response.data?.error || 'Aurora request failed.');
     }
+
+    if (key !== auroraKey()) return fetchAuroraPlayers(true);
 
     const players = Array.isArray(response.data?.data) ? response.data.data : [];
     memoryCache = {
