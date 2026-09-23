@@ -14,7 +14,8 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-        node: [22.x, 24.x]
+        # Node 24.20.0 crashes in Windows fs.watch on 8.3 paths (nodejs/node#65118).
+        node: [22.x, 24.21.0]
 
     steps:
       - uses: actions/checkout@v4
