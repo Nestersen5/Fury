@@ -25,7 +25,7 @@ function harness(options = {}) {
     const sent = [], messages = [], failures = [], events = [];
     let lookups = 0;
     const q = createQuickBuy({ presetDir: dir, canStart: () => null, minimumStillMs: 0,
-        timeoutMs: 100, totalTimeoutMs: 3000, settleMs: 0,
+        timeoutMs: options.stallPlace ? 100 : 8000, totalTimeoutMs: 3000, settleMs: 0,
         fetchPlayer: async () => { lookups++; return options.player; },
         sendChat: m => messages.push(m), sendClient: () => {}, disconnect: m => failures.push(m),
         sendUpstream(name, d) {

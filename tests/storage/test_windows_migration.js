@@ -8,7 +8,7 @@ const { performance } = require('perf_hooks');
 const { spawnSync } = require('child_process');
 const migration = require('../../src/storage/windowsMigration');
 const { defaultDataDir } = require('../../src/storage/runtimePaths');
-const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'fury-migration-tests-'));
+const sandbox = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'fury-migration-tests-')));
 let count = 0;
 function fixture(name) {
     const root = path.join(sandbox, name.replace(/[^a-zA-Z0-9 -]/g, '_'));
