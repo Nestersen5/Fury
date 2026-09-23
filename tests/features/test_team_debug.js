@@ -1,0 +1,71 @@
+'use strict';
+
+const assert = require('assert');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const { compactPacket, createPacketView, createTeamDebugRecorder, observeClientWrites } = require('../../src/diagnostics/teamDebug');
+const { PROXY_COMMANDS, HIDDEN_PROXY_COMMANDS, createProxyTabCompleter } = require('../../features/command_completion');
+
+(async () => {
+    assert.strictEqual(compactPacket('chat', { message: 'private text' }), null);
+    assert.strictEqual(compactPacket('custom_payload', { data: Buffer.from('secret') }), null);
+    assert.strictEqual(compactPacket('player_info', { action: 2, data: [{ ping: 30 }] }), null);
+    const tab = compactPacket('player_info', { action: 'add_player', data: [{ UUID: 'uuid', name: 'Player', displayName: '\u00a7cR Player', properties: [{ value: 'secret texture' }], accessToken: 'secret token' }] });
+    assert.deepStrictEqual(tab, { action: 0, data: [{ uuid: 'uuid', name: 'Player', displayName: '\u00a7cR Player' }] });
+
+    const view = createPacketView();
+    const send = packet => view.observe('scoreboard_team', compactPacket('scoreboard_team', packet));
+    send({ team: 'Red1', mode: 0, prefix: '\u00a7cR ', players: ['Alice'] });
+    send({ team: 'Blue1', mode: 0, prefix: '\u00a79B ', players: ['Bob'] });
+    send({ team: 'Blue1', mode: 3, players: ['Alice'] });
+    send({ team: 'Red1', mode: 2, prefix: '\u00a7cR ' });
+    send({ team: 'Red1', mode: 4, players: ['Alice'] });
+    send({ team: 'Red1', mode: 1 });
+    assert.deepStrictEqual(view.snapshot().entries, [['Alice', 'Blue1'], ['Bob', 'Blue1']], 'Old-team refreshes/removals must not erase newer membership');
+    send({ team: 'Blue1', mode: 0, players: ['Bob'] });
+    assert.deepStrictEqual(view.snapshot().entries, [['Bob', 'Blue1']], 'Recreating a team replaces its member list');
+    for (let i = 0; i < 2200; i++) send({ team: `team${i}`, mode: 0, players: [`player${i}`] });
+    assert(view.snapshot().teams.length <= 512 && view.snapshot().entries.length <= 2048);
+    assert(view.snapshot().evicted > 0);
+
+    let time = 1000;
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'fury-team-debug-test-'));
+    const recorder = createTeamDebugRecorder({ directory, now: () => time, maxEvents: 3, maxBytes: 1200, maxAgeMs: 2000 });
+    const packet = { team: 'Red1', mode: 0, prefix: 'original', players: ['Alice'] };
+    recorder.observe('server', 'scoreboard_team', packet);
+    packet.players.push('ChangedAfterObservation');
+    packet.prefix = 'changed';
+    assert.deepStrictEqual(recorder.snapshot().server.entries, [['Alice', 'Red1']]);
+    const calls = [];
+    const client = { marker: 'receiver', write(...args) { assert.strictEqual(this.marker, 'receiver'); calls.push(args); return 42; } };
+    observeClientWrites(client, recorder);
+    const clientPacket = { team: 'furyRed', mode: 0, prefix: '\u00a7cR ', players: ['RealAlias'] };
+    assert.strictEqual(client.write('scoreboard_team', clientPacket), 42);
+    assert.strictEqual(calls[0][1], clientPacket, 'Instrumentation must forward the same packet object');
+    assert.deepStrictEqual(recorder.snapshot().client.entries, [['RealAlias', 'furyRed']]);
+    client.write('chat', { message: 'another secret' });
+    assert(!JSON.stringify(recorder.snapshot()).includes('secret'));
+    assert.deepStrictEqual(fs.readdirSync(directory), [], 'No disk writes before an explicit capture');
+    for (let i = 0; i < 6; i++) { time += 10; recorder.mark('assignment', { player: 'Alice', team: 'Red' }); }
+    assert(recorder.snapshot().events.length <= 3 && recorder.snapshot().history.bytes <= 1200);
+    time += 3000;
+    assert.strictEqual(recorder.snapshot().events.length, 0);
+    assert.strictEqual(recorder.snapshot().server.entries[0][1], 'Red1', 'Current packet state survives history expiration');
+    recorder.mark('report_test');
+    const saved = await recorder.save({ gameActive: true }, { player: 'Alice', expectedTeam: 'Red' });
+    assert.strictEqual(path.dirname(saved.file), directory);
+    const report = JSON.parse(fs.readFileSync(saved.file, 'utf8'));
+    assert.strictEqual(report.annotation.expectedTeam, 'Red');
+    assert.strictEqual(report.state.gameActive, true);
+    assert.strictEqual(report.events.length, 1);
+    await assert.rejects(() => recorder.save({}), /five seconds/);
+    const broken = { write() { throw new Error('write failed'); } };
+    observeClientWrites(broken, recorder);
+    assert.throws(() => broken.write('scoreboard_team', clientPacket), /write failed/);
+    assert(!PROXY_COMMANDS.includes('/teamdebug') && HIDDEN_PROXY_COMMANDS.includes('/teamdebug'));
+    const complete = createProxyTabCompleter({ knownPlayerNames: () => ['Alice'] });
+    assert.deepStrictEqual(complete('/teamdebug Al'), ['Alice']);
+    assert.deepStrictEqual(complete('/teamdebug Alice R'), ['Red']);
+    console.log('Team debug tests passed: packet replay, transparent writes, bounded history, explicit capture, secret exclusion, and hidden command completion.');
+})().catch(error => { console.error(error); process.exitCode = 1; });

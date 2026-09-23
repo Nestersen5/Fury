@@ -1,0 +1,85 @@
+/* Overlay tab: Team Lobby player board (rendered by launcher_overlay_board.js). */
+
+/* The page fills the window and only the board scrolls. */
+html.fury-redesign .overlay-page.active { display:flex!important;flex-direction:column!important;height:100%!important;min-height:0!important; }
+html.fury-redesign .overlay-page > .page-title { flex:none; }
+html.fury-redesign .overlay-page .overlay-preview-panel.panel { flex:1 1 auto!important;min-height:0!important;display:flex!important;flex-direction:column!important;padding:0!important;background:transparent!important;border:0!important;border-radius:0!important;box-shadow:none!important; }
+html.fury-redesign .overlay-page .overlay-preview-header { flex:none;margin:0 0 12px!important;padding:0!important;border-bottom:0!important; }
+html.fury-redesign .overlay-preview-heading h2 { display:none!important; }
+html.fury-redesign #overlay-summary { display:flex;align-items:center;gap:10px;margin:0!important;font-size:13px;color:var(--fury-muted); }
+html.fury-redesign #overlay-summary::before { content:"";width:8px;height:8px;border-radius:50%;flex:none;background:var(--fury-muted);opacity:.6; }
+html.fury-redesign #overlay-summary.is-live::before { background:#43cfa0;opacity:1;box-shadow:0 0 0 4px rgba(67,207,160,.16); }
+html.fury-redesign .overlay-page #overlay-table.overlay-shell { flex:1 1 auto!important;height:auto!important;min-height:0!important;margin:0!important;padding:0!important;overflow:auto!important;border:0!important;border-radius:0!important;background:none!important;box-shadow:none!important; }
+
+html.fury-redesign .overlay-view-toggle { display:inline-flex;border:1px solid var(--fury-border);border-radius:7px;overflow:hidden;flex:none; }
+html.fury-redesign .overlay-view-toggle button { min-height:34px!important;height:34px;padding:0 14px!important;border:0!important;border-radius:0!important;background:var(--fury-panel)!important;color:var(--fury-muted)!important;font-weight:600!important; }
+html.fury-redesign .overlay-view-toggle button + button { border-left:1px solid var(--fury-border)!important; }
+html.fury-redesign .overlay-view-toggle button.active { background:var(--fury-gold)!important;color:#16130a!important; }
+
+/* Board surfaces stay dark in light themes so Minecraft text colors remain readable. */
+.fury-board { min-width:var(--board-card-min,0px);--board-panel:var(--fury-panel,#191d21);--board-border:var(--fury-border,#303840);--board-line:color-mix(in srgb,var(--board-border),transparent 35%);--board-row-height:34px;--board-empty:#2b3238;
+    display:flex;flex-direction:column;gap:12px;
+    font-family:"Minecraft","Segoe UI Symbol",monospace;font-size:12px;line-height:16px;word-spacing:2px;letter-spacing:0;color:#fff;text-shadow:1px 1px 0 #0a0c0e;-webkit-font-smoothing:none; }
+html.fury-redesign[data-theme="light"] .fury-board,html.fury-redesign[data-theme="frost"] .fury-board { --board-panel:#191d21;--board-border:#303840;--board-line:#252b31; }
+.fury-board * { font-weight:400!important; }
+.fury-board [data-bold] { letter-spacing:1px;text-shadow:1px 0 0 currentColor,1px 1px 0 #0a0c0e,2px 1px 0 #0a0c0e; }
+
+.fury-board-summary { display:flex;flex-wrap:wrap;align-items:center;row-gap:8px;min-height:40px;padding:8px 16px;background:var(--board-panel);border:1px solid var(--board-border);border-radius:8px; }
+.fury-board-summary > span { display:inline-flex;align-items:center;gap:8px;margin-right:18px;padding-right:18px;border-right:1px solid var(--board-border);white-space:nowrap; }
+.fury-board-summary > span:last-child { margin-right:0;padding-right:0;border-right:0; }
+.fury-board-meter { display:inline-flex;gap:2px; }
+.fury-board-meter i { width:8px;height:8px;background:var(--board-empty); }
+
+.fury-board-cards { display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,var(--board-card-min)),1fr));gap:12px; }
+.fury-board[data-view="list"] .fury-board-cards { grid-template-columns:minmax(0,1fr); }
+.fury-board-card { min-width:0;background:var(--board-panel);border:1px solid var(--board-border);border-radius:8px;overflow:hidden; }
+.fury-board-card.is-mine { border-color:color-mix(in srgb,var(--fury-gold,#f3c64e) 60%,transparent); }
+.fury-board-card-head { display:flex;align-items:center;justify-content:space-between;gap:10px;height:34px;padding:0 14px;border-bottom:1px solid var(--board-border);white-space:nowrap; }
+.fury-board-card-head > span { display:inline-flex;align-items:center;gap:8px;min-width:0;overflow:hidden; }
+
+.fury-board-row { display:grid;grid-template-columns:var(--board-template);column-gap:10px;align-items:center;min-height:var(--board-row-height);padding:0 8px 0 14px;border-bottom:1px solid var(--board-line); }
+.fury-board-row:last-child { border-bottom:0; }
+.fury-board-labels { min-height:24px;color:#6f7882; }
+.fury-board-labels > span:nth-child(n+3),.fury-board-stat { text-align:right;white-space:nowrap; }
+.fury-board-stat { font-variant-numeric:tabular-nums; }
+.fury-board-player { min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis; }
+.fury-board-level .overlay-star-icon { font-family:"Segoe UI Symbol",sans-serif;font-size:11px; }
+.fury-board-head { position:relative;display:block;width:24px;height:24px;overflow:hidden;border-radius:2px;background:url("../../../assets/default-skin.png") 14.2857% 14.2857%/800% 800%;image-rendering:pixelated; }
+.fury-board-head img { display:block;width:100%;height:100%;image-rendering:pixelated; }
+
+html.fury-redesign .fury-board-remove { width:16px;height:16px;min-height:0!important;padding:0!important;border:0!important;border-radius:3px!important;background:transparent!important;color:#a1aab5!important;font-size:14px!important;line-height:16px;opacity:0;cursor:pointer; }
+.fury-board-row:hover .fury-board-remove,.fury-board-remove:focus-visible { opacity:1; }
+html.fury-redesign .fury-board-remove:hover { color:#ff5555!important; }
+.fury-board-row.fury-filtered { display:none!important; }
+
+/* Minecraft chat colors; the dark ones are lifted so they read on the panel. */
+.fury-board .fury-mc-black,.fury-board .overlay-color-black { color:#7a7a7a;text-shadow:1px 1px 0 #0a0c0e; }
+.fury-board .fury-mc-dark-blue,.fury-board .overlay-color-dark-blue { color:#4a4ae0; }
+.fury-board .fury-mc-dark-green,.fury-board .overlay-color-dark-green { color:#00aa00; }
+.fury-board .fury-mc-dark-aqua,.fury-board .overlay-color-dark-aqua { color:#00aaaa; }
+.fury-board .fury-mc-dark-red,.fury-board .overlay-color-dark-red { color:#d42a2a; }
+.fury-board .fury-mc-dark-purple,.fury-board .overlay-color-dark-purple { color:#b43cb4; }
+.fury-board .fury-mc-gold,.fury-board .overlay-color-gold { color:#ffaa00; }
+.fury-board .fury-mc-gray,.fury-board .overlay-color-gray { color:#aaaaaa; }
+.fury-board .fury-mc-dark-gray,.fury-board .overlay-color-dark-gray { color:#6f7882; }
+.fury-board .fury-mc-blue,.fury-board .overlay-color-blue { color:#7b7bff; }
+.fury-board .fury-mc-green,.fury-board .overlay-color-green { color:#55ff55; }
+.fury-board .fury-mc-aqua,.fury-board .overlay-color-aqua { color:#55ffff; }
+.fury-board .fury-mc-red,.fury-board .overlay-color-red { color:#ff5555; }
+.fury-board .fury-mc-pink,.fury-board .overlay-color-pink,.fury-board .fury-mc-light-purple { color:#ff55ff; }
+.fury-board .fury-mc-yellow,.fury-board .overlay-color-yellow { color:#ffff55; }
+.fury-board .fury-mc-white,.fury-board .overlay-color-white { color:#ffffff; }
+.fury-board .fury-mc-muted { color:#a1aab5; }
+.fury-mc-bg-green { background:#55ff55!important; }
+.fury-mc-bg-dark-green { background:#00aa00!important; }
+.fury-mc-bg-yellow { background:#ffff55!important; }
+.fury-mc-bg-gold { background:#ffaa00!important; }
+.fury-mc-bg-red { background:#ff5555!important; }
+.fury-mc-bg-dark-red { background:#d42a2a!important; }
+.fury-mc-bg-pink { background:#ff55ff!important; }
+.fury-mc-bg-dark-purple { background:#b43cb4!important; }
+.fury-mc-bg-gray { background:#aaaaaa!important; }
+.fury-mc-bg-white { background:#ffffff!important; }
+
+.fury-board-empty { display:grid;place-items:center;min-height:260px;padding:24px;text-align:center;background:var(--board-panel);border:1px solid var(--board-border);border-radius:8px; }
+.fury-board-empty p { margin:6px 0 0;color:#a1aab5; }

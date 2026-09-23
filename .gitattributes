@@ -1,0 +1,31 @@
+# Fury is stored and checked out with LF on every platform.
+#
+# This is a release-correctness requirement, not a style preference. The source
+# snapshot digest (`sourceSha256` in scripts/verify_packaged_sources.js) is taken
+# over raw file bytes, and scripts/release_plan.js asserts that all three
+# PAIR-*.json reports share exactly one digest. Without this file a Windows
+# checkout under core.autocrlf=true produces CRLF while a macOS or Linux runner
+# produces LF, so the Windows and Mac halves of the same commit would report
+# different snapshots and PREPARE would fail closed.
+#
+# The index already stores LF, so this changes no content: it only makes every
+# checkout agree with the index.
+* text=auto eol=lf
+
+# Binary payloads must never be line-ending converted.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.icns binary
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+*.zip binary
+*.exe binary
+*.dmg binary
+*.jar binary
+*.pdf binary

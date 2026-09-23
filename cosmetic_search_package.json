@@ -1,0 +1,12 @@
+{
+  "name": "statmod-cosmetic-search-api",
+  "version": "1.0.0",
+  "main": "cosmetic_search_api.js",
+  "scripts": {
+    "start": "node cosmetic_search_api.js"
+  },
+  "dependencies": {
+    "axios": "^1.16.0",
+    "express": "^5.2.1"
+  }
+}

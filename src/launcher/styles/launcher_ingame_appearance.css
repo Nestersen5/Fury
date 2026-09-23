@@ -1,0 +1,144 @@
+/* Approved in-game appearance designs. All rules stay within this page. */
+/* These are layout wrappers, not cards; their old radius clipped child borders. */
+html.fury-redesign .ia-page :is(.tablist-designer,.world-label-designer) {overflow:visible!important;border-radius:0!important;}
+html.fury-redesign .ia-page .fury-ingame-tabs {width:max-content;max-width:100%;padding:4px;margin:8px 0 24px;border:1px solid var(--fury-border);border-radius:9px;gap:4px;background:var(--fury-inset);}
+html.fury-redesign .ia-page .fury-ingame-tabs button {border:0;border-radius:6px;padding:12px 22px;background:none;}
+html.fury-redesign .ia-page .fury-ingame-tabs button.active {background:var(--accent);color:#111;}
+html.fury-redesign .ia-page .tablist-control-row label {display:flex!important;flex-direction:column;align-items:stretch!important;gap:8px!important;}
+html.fury-redesign .ia-page .tablist-control-row select {min-height:42px!important;}
+html.fury-redesign .ia-page .tablist-field-section {display:block!important;padding:0!important;background:none!important;border:0!important;}
+html.fury-redesign .ia-page .tablist-order-item {display:flex!important;width:100%!important;}
+html.fury-redesign .ia-page .tablist-order-label {font-size:12px!important;white-space:nowrap;}
+html.fury-redesign .ia-page .tablist-section-copy {margin:0 0 12px!important;display:flex;flex-wrap:wrap;gap:6px;}
+html.fury-redesign .ia-page .ia-setting-row {width:100%;box-sizing:border-box;}
+html.fury-redesign .ia-page .settings-subgroup-head,
+html.fury-redesign .ia-page .world-label-layout:empty { display:none!important; }
+html.fury-redesign .ia-page .ia-section-title { font-size:16px!important;font-weight:650;margin:0 0 16px!important;color:var(--fury-text); }
+html.fury-redesign .ia-page .ia-setting-row { display:flex!important;align-items:center;justify-content:space-between;gap:20px;min-width:0;padding:20px 22px; }
+html.fury-redesign .ia-page .ia-setting-row h3 { margin:0!important;font-size:15px!important;line-height:1.4; }
+.ia-page .ia-setting-row p,.ia-page .ia-note { margin:7px 0 0;color:var(--fury-muted);font-size:12px;line-height:1.5; }
+.ia-page .ia-setting-row .fury-binary-choice { flex:none; }
+html.fury-redesign .ia-page .tablist-master,html.fury-redesign .ia-page .world-label-master { display:block!important;padding:0!important;margin:0 0 24px!important;background:var(--fury-inset)!important;border:1px solid var(--fury-border)!important;border-radius:10px!important; }
+html.fury-redesign .ia-page .tablist-editor-layout { display:grid!important;grid-template-columns:minmax(230px,.85fr) minmax(0,2fr)!important;gap:24px!important;align-items:start; }
+html.fury-redesign .ia-page .tablist-editor-controls { grid-column:1;grid-row:1;display:flex;flex-direction:column;gap:18px;padding:20px!important;border:1px solid var(--fury-border);border-radius:10px;background:var(--fury-inset)!important;min-width:0; }
+html.fury-redesign .ia-page .tablist-control-row { display:grid;grid-template-columns:1fr!important;gap:16px; }
+html.fury-redesign .ia-page .tablist-preview-shell { grid-column:2;grid-row:1;min-width:0;padding:0!important;border:0!important;background:none!important;overflow:hidden; }
+html.fury-redesign .ia-page .tablist-preview-toolbar[hidden],.ia-page .minecraft-tablist-subtitle[hidden] {display:none!important;}
+html.fury-redesign .ia-page .tablist-mode-switch { display:flex;width:100%;padding:4px;gap:4px; }
+.ia-page .tablist-mode-switch button { flex:1; }
+html.fury-redesign .ia-page .tablist-order-item {padding:10px 12px!important;min-height:44px!important;gap:10px!important;}
+.ia-page .tablist-order-index {display:none!important;}
+.ia-page .tablist-order-label {flex:1;}
+html.fury-redesign .ia-page .ia-remove-field {background:none;border:0;min-width:26px;min-height:26px;padding:0;font-size:22px;color:var(--fury-muted);}
+.ia-page .ia-add-fields summary {padding:12px;cursor:pointer;border:1px solid var(--fury-border);border-radius:8px;list-style:none;}
+.ia-page .ia-add-fields[open] summary {margin-bottom:12px;}
+.ia-page .tablist-field-palette {display:flex;flex-wrap:wrap;gap:6px;}
+.ia-page .tablist-editor-hint {order:10;font-size:11px!important;}
+html.fury-redesign .ia-page .minecraft-tablist-preview { font-family:Minecraft,monospace!important;background:linear-gradient(#06090de8,#06090de8),url('../../../assets/ingame-night.png') center/cover!important;border:1px solid var(--fury-border);border-radius:9px;padding:16px 10px!important;min-height:0!important;overflow:auto;text-shadow:2px 2px #000;container-type:inline-size; }
+html.fury-redesign .ia-page .minecraft-tablist-title {font-family:Minecraft,monospace!important;font-size:clamp(12px,2.5cqw,24px)!important;letter-spacing:0!important;text-align:center;margin:0 0 18px!important;white-space:nowrap;}
+.ia-page .minecraft-tablist-rows {gap:0!important;}
+.ia-page .ia-tab-row {display:flex;align-items:center;gap:7px;background:#55555565;padding:3px 4px;margin:0;min-width:max-content;font-size:clamp(11px,2.1cqw,22px);line-height:1.5;}
+.ia-page .ia-tab-fields {display:flex;align-items:center;white-space:nowrap;flex:1;}
+.ia-page .ia-tab-divider {color:#555;white-space:pre;margin:0 .35em;}
+.ia-page .ia-tab-team-prefix {display:inline-block;margin-right:.5em;}
+.ia-page .ia-tab-prestige {display:inline-block;margin-left:.5em;}
+.ia-page .ia-tab-field {white-space:pre;}
+.ia-page .ia-health {color:#ffff55;margin-left:auto;padding-left:12px;}
+.ia-page .ia-sample-head {width:1.3em;height:1.3em;flex:none;background:url('../../../assets/default-skin.png');background-size:800% 800%;background-position:14.286% 14.286%;image-rendering:pixelated;}
+.ia-page .ia-head-1 {filter:hue-rotate(160deg);}.ia-page .ia-head-2 {filter:hue-rotate(75deg);}.ia-page .ia-head-4 {filter:grayscale(1) brightness(1.4);}
+html.fury-redesign .ia-page .minecraft-tablist-footer {font-family:Minecraft,monospace!important;font-size:clamp(11px,2cqw,20px)!important;text-align:center;line-height:1.65;margin-top:18px;white-space:nowrap;}
+html.fury-redesign .ia-page .preview-disabled {opacity:1!important;filter:none!important;}
+html.fury-redesign .ia-page .world-label-designer {display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr)!important;gap:24px!important;padding:0!important;background:none!important;border:0!important;}
+html.fury-redesign .ia-page .fury-nametag-controls >.feature-card {padding:0!important;background:var(--fury-inset)!important;border-radius:10px!important;}
+html.fury-redesign .ia-page .fury-nametag-controls >.feature-select-row {padding:20px 22px!important;}
+html.fury-redesign .ia-page .fury-nametag-controls >.feature-select-row select {min-height:42px!important;}
+.ia-page .ia-player-groups {margin-top:24px!important;}
+.ia-page .ia-audience-tabs {display:flex;gap:4px;padding:4px;background:var(--fury-inset);border:1px solid var(--fury-border);border-radius:9px;margin-bottom:14px;}
+.ia-page .ia-audience-tabs button {flex:1;min-width:0;padding:10px 5px!important;}
+.ia-page .ia-audience-tabs button.active {background:var(--accent)!important;color:#111!important;border-color:var(--accent)!important;}
+html.fury-redesign .ia-page .nametag-audience-card:not(.active) {display:none!important;}
+html.fury-redesign .ia-page .nametag-audience-card {padding:0 16px 20px!important;border-radius:10px!important;}
+html.fury-redesign .ia-page .nametag-audience-head {display:block!important;margin:0!important;}
+html.fury-redesign .ia-page .nametag-audience-head .ia-setting-row {padding:20px 0;gap:8px;}
+html.fury-redesign .ia-page .nametag-slot-grid {display:grid!important;grid-template-columns:1fr 1fr!important;gap:18px 12px!important;}
+html.fury-redesign .ia-page .nametag-slot-grid label {display:flex!important;flex-direction:column!important;gap:8px!important;min-width:0;font-size:12px;}
+html.fury-redesign .ia-page .nametag-slot-grid .stat-select-shell {width:100%;min-width:0;}
+html.fury-redesign .ia-page .ia-night-preview {position:relative!important;top:auto!important;min-height:560px!important;height:560px!important;max-height:none!important;background:linear-gradient(#02071333,#02071355),url('../../../assets/ingame-night.png') center/cover!important;border-radius:10px!important;overflow:hidden;}
+.ia-page .ia-night-preview:before,.ia-page .ia-night-preview:after {display:none!important;}
+.ia-page .fury-nametag-preview-header {border:0;background:#0b1013dd;padding:16px;font-size:16px;}
+.ia-page .nametag-preview-audience {display:none!important;}
+html.fury-redesign .ia-page .minecraft-character-wrap {position:relative!important;inset:auto!important;height:390px!important;min-height:390px!important;background:none!important;}
+html.fury-redesign .ia-page .minecraft-skin-canvas {height:390px!important;}
+.ia-page .minecraft-preview-controls,.ia-page .nametag-preview-mode,.ia-page .minecraft-preview-status {position:relative!important;bottom:auto!important;left:auto!important;right:auto!important;background:#0b1013d9!important;margin:0!important;padding:7px 12px!important;font-size:10px!important;}
+.ia-page .minecraft-preview-shadow {display:none!important;}
+/* Segments meet the outer border; preview tools stay together in the footer. */
+html.fury-redesign .ia-page :is(.ia-audience-tabs,.fury-ingame-tabs,.tablist-mode-switch,.nametag-preview-mode) {padding:0!important;gap:0!important;overflow:hidden;}
+html.fury-redesign .ia-page :is(.ia-audience-tabs,.fury-ingame-tabs,.tablist-mode-switch,.nametag-preview-mode) >button {flex:1;margin:0!important;border:0!important;border-radius:0!important;min-height:44px;}
+html.fury-redesign .ia-page :is(.ia-audience-tabs,.fury-ingame-tabs,.tablist-mode-switch,.nametag-preview-mode) >button+button {border-left:1px solid var(--fury-border)!important;}
+html.fury-redesign .ia-page .fury-ingame-tabs >button {flex:1 0 auto;white-space:nowrap;}
+html.fury-redesign .ia-page .minecraft-preview-controls {position:absolute!important;inset:auto 0 44px!important;box-sizing:border-box;height:48px;padding:6px 12px!important;}
+html.fury-redesign .ia-page .nametag-preview-mode {position:absolute!important;inset:auto 0 0!important;height:44px;box-sizing:border-box;border-radius:0!important;}
+.ia-page .ia-identity {margin-bottom:24px;}
+.ia-page .ia-panel {background:var(--fury-inset);border:1px solid var(--fury-border);border-radius:10px;}
+.ia-page .ia-note {margin:12px 0;}
+.ia-page .ia-preview-setting {display:grid;grid-template-columns:minmax(230px,.85fr) minmax(0,1.4fr);border:1px solid var(--fury-border);border-radius:10px;background:var(--fury-inset);margin-top:20px;overflow:hidden;}
+.ia-page .ia-preview-setting >.ia-setting-row {align-self:center;}
+.ia-page .ia-live-panel {padding:20px;min-width:0;border-left:1px solid var(--fury-border);}
+.ia-page .ia-accent-caption {display:flex;align-items:center;gap:12px;font-size:12px;margin-bottom:14px;color:var(--fury-text);}
+.ia-page .ia-accent-swatch {width:30px;height:15px;background:var(--ia-event-accent);border-radius:4px;transition:opacity 200ms ease;}
+.ia-page .ia-default .ia-accent-swatch {opacity:0;}
+.ia-page .ia-chat-sample,.ia-page .ia-scoreboard {font-family:Minecraft,monospace;font-size:15px;line-height:1.55;text-shadow:1px 1px #000;}
+.ia-page .ia-chat-sample {background:#080c10;border-radius:7px;padding:14px;}
+.ia-page .ia-chat-sample >div+div {margin-top:10px;}
+.ia-page .ia-event-label {font-weight:normal;transition:color 200ms ease;}
+.ia-page .ia-bed-label {color:#fff;}.ia-page .ia-final-label {color:#55ffff;}
+.ia-page .ia-enhanced .ia-event-label {color:var(--ia-event-accent);}
+.ia-page .ia-score-scene {display:flex;justify-content:center;padding:16px;background:linear-gradient(#04091388,#040913aa),url('../../../assets/ingame-night.png') center/cover;border-radius:8px;}
+.ia-page .ia-scoreboard {background:#080b10b8;padding:12px 16px;min-width:185px;color:#fff;}
+.ia-page .ia-scoreboard >strong {display:block;text-align:center;font-weight:normal;}
+.ia-page .ia-scoreboard p {margin:12px 0;}
+.ia-page .ia-scoreboard p:last-child {margin-bottom:0;}
+.ia-page .ia-team-letter {color:var(--team-color);display:inline-block;max-width:24px;overflow:hidden;vertical-align:bottom;white-space:pre;transition:max-width 200ms ease,opacity 200ms ease;}
+.ia-page .ia-team-name {color:#fff;transition:color 200ms ease;}
+.ia-page .ia-enhanced .ia-team-name {color:var(--team-color);}
+.ia-page .ia-enhanced .ia-team-letter {max-width:0;opacity:0;}
+.ia-page .ia-enhanced .ia-score-team[data-eliminated=true] .ia-team-name {color:#555;text-decoration:line-through;}
+.ia-page .ia-score-team[data-eliminated=true] .ia-team-alive {display:none;}
+.ia-page .ia-team-eliminated {display:none;}
+.ia-page .ia-live-panel:not(.ia-enhanced) .ia-score-team[data-eliminated=true] .ia-team-eliminated {display:inline;}
+@container (max-width:800px) {
+ html.fury-redesign .ia-page .tablist-editor-layout,html.fury-redesign .ia-page .world-label-designer,.ia-page .ia-preview-setting {grid-template-columns:1fr!important;}
+ html.fury-redesign .ia-page .tablist-preview-shell {grid-column:1;grid-row:1;}
+ html.fury-redesign .ia-page .tablist-editor-controls {grid-column:1;grid-row:2;}
+ .ia-page .ia-live-panel {border-left:0;border-top:1px solid var(--fury-border);}
+}
+@media(prefers-reduced-motion:reduce) {.ia-page * {transition:none!important;}}
+
+/* Shared, keyboard-accessible dropdowns instead of platform-native menus. */
+html.fury-redesign .ia-page select.stat-select-native {display:none!important;}
+html.fury-redesign .ia-page .feature-select-row >.stat-select-shell {width:55%;min-width:0;}
+html.fury-redesign .ia-modern-menu .stat-select-group[hidden] {display:none!important;}
+html.fury-redesign .ia-modern-menu {background:var(--fury-panel)!important;border:1px solid var(--fury-border)!important;border-radius:12px!important;box-shadow:0 14px 40px #0008!important;}
+html.fury-redesign .ia-modern-menu .stat-select-search-wrap {padding:10px!important;background:transparent!important;border-bottom:1px solid var(--fury-border)!important;}
+html.fury-redesign .ia-modern-menu .stat-select-search-wrap[hidden] {display:none!important;}
+html.fury-redesign .ia-modern-menu .stat-select-search-wrap input {box-sizing:border-box;min-height:40px!important;padding:9px 12px 9px 34px!important;background:var(--fury-inset)!important;border:1px solid var(--fury-border)!important;border-radius:7px!important;outline:none!important;box-shadow:none!important;font-size:12px!important;}
+html.fury-redesign .ia-modern-menu .stat-select-search-wrap input:focus {border-color:var(--accent)!important;}
+html.fury-redesign .ia-modern-menu .stat-select-list {display:block!important;padding:6px!important;scrollbar-color:var(--fury-border) transparent;}
+html.fury-redesign .ia-modern-menu .stat-select-group {display:block!important;border:0!important;margin:8px 0 0!important;padding:0!important;}
+html.fury-redesign .ia-modern-menu .stat-select-group-label {padding:10px 12px 6px!important;font-size:10px;font-weight:600;letter-spacing:.06em;color:var(--fury-muted);}
+html.fury-redesign .ia-modern-menu .stat-select-option {display:grid;grid-template-columns:minmax(0,1fr) 18px;align-items:center;min-height:38px!important;padding:9px 12px!important;margin:2px 0!important;border:0!important;border-radius:6px!important;background:transparent!important;box-shadow:none!important;color:var(--fury-text)!important;font-size:12px!important;font-weight:500!important;outline:none!important;}
+html.fury-redesign .ia-modern-menu .stat-select-option[hidden] {display:none!important;}
+html.fury-redesign .ia-modern-menu .stat-select-option:hover,html.fury-redesign .ia-modern-menu .stat-select-option:focus-visible {background:color-mix(in srgb,var(--fury-text) 7%,var(--fury-panel))!important;}
+html.fury-redesign .ia-modern-menu .stat-select-option[aria-selected=true] {background:color-mix(in srgb,var(--accent) 12%,var(--fury-panel))!important;color:var(--accent)!important;}
+html.fury-redesign .ia-modern-menu .stat-select-option i {background:none!important;}
+html.fury-redesign:is([data-theme=light],[data-theme=frost]) .ia-modern-menu .stat-select-option[aria-selected=true] {color:var(--fury-control-accent)!important;}
+html.fury-redesign:is([data-theme=light],[data-theme=frost]) .ia-modern-menu .stat-select-option i::before {border-color:var(--fury-control-accent)!important;}
+html.fury-redesign .ia-page .stat-select-trigger {min-height:42px!important;border-radius:8px!important;background:var(--fury-inset)!important;border:1px solid var(--fury-border)!important;box-shadow:none!important;}
+html.fury-redesign .ia-page .stat-select-trigger:focus-visible,html.fury-redesign .ia-page .stat-select-shell.open .stat-select-trigger {border-color:var(--accent)!important;outline:none!important;}
+html.fury-redesign .ia-page .stat-select-trigger-icon {background:none!important;}
+@media(prefers-reduced-motion:reduce) {.ia-modern-menu {animation:none!important;}}
+.ia-page .minecraft-character-wrap {opacity:1;transition:opacity 180ms ease!important;}
+.ia-page .minecraft-character-wrap.is-account-changing {opacity:0;}
+.fury-account-preview-enter {animation:fury-account-preview-enter 200ms ease-out;}
+@keyframes fury-account-preview-enter {from {opacity:0;} to {opacity:1;}}
+@media(prefers-reduced-motion:reduce) {.ia-page .minecraft-character-wrap {transition:none!important;}.fury-account-preview-enter {animation:none;}}

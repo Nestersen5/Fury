@@ -1,0 +1,1061 @@
+[
+  {
+    "blockId": -1
+  },
+  {
+    "blockId": -1
+  },
+  {
+    "blockId": -1
+  },
+  {
+    "blockId": -1
+  },
+  {
+    "blockId": -1
+  },
+  {
+    "blockId": -1
+  },
+  {
+    "blockId": -1
+  },
+  {
+    "blockId": -1
+  },
+  {
+    "blockId": -1
+  },
+  {
+    "blockId": -1
+  },
+  {
+    "blockId": 172,
+    "itemCount": 1,
+    "itemDamage": 0,
+    "nbtData": {
+      "type": "compound",
+      "name": "",
+      "value": {
+        "HideFlags": {
+          "type": "int",
+          "value": 255
+        },
+        "display": {
+          "type": "compound",
+          "value": {
+            "Lore": {
+              "type": "list",
+              "value": {
+                "type": "string",
+                "value": [
+                  "§7Drag this to a hotbar slot below to",
+                  "§7favor that slot when purchasing an",
+                  "§7item in this category or on spawn.",
+                  "",
+                  "§eClick to drag!"
+                ]
+              }
+            },
+            "Name": {
+              "type": "string",
+              "value": "§aBlocks"
+            }
+          }
+        },
+        "ExtraAttributes": {
+          "type": "compound",
+          "value": {
+            "hotbarCategory": {
+              "type": "string",
+              "value": "Blocks"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "blockId": 283,
+    "itemCount": 1,
+    "itemDamage": 0,
+    "nbtData": {
+      "type": "compound",
+      "name": "",
+      "value": {
+        "HideFlags": {
+          "type": "int",
+          "value": 255
+        },
+        "display": {
+          "type": "compound",
+          "value": {
+            "Lore": {
+              "type": "list",
+              "value": {
+                "type": "string",
+                "value": [
+                  "§7Drag this to a hotbar slot below to",
+                  "§7favor that slot when purchasing an",
+                  "§7item in this category or on spawn.",
+                  "",
+                  "§eClick to drag!"
+                ]
+              }
+            },
+            "Name": {
+              "type": "string",
+              "value": "§aMelee"
+            }
+          }
+        },
+        "ExtraAttributes": {
+          "type": "compound",
+          "value": {
+            "hotbarCategory": {
+              "type": "string",
+              "value": "Melee"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "blockId": 257,
+    "itemCount": 1,
+    "itemDamage": 0,
+    "nbtData": {
+      "type": "compound",
+      "name": "",
+      "value": {
+        "HideFlags": {
+          "type": "int",
+          "value": 255
+        },
+        "display": {
+          "type": "compound",
+          "value": {
+            "Lore": {
+              "type": "list",
+              "value": {
+                "type": "string",
+                "value": [
+                  "§7Drag this to a hotbar slot below to",
+                  "§7favor that slot when purchasing an",
+                  "§7item in this category or on spawn.",
+                  "",
+                  "§eClick to drag!"
+                ]
+              }
+            },
+            "Name": {
+              "type": "string",
+              "value": "§aPickaxe"
+            }
+          }
+        },
+        "ExtraAttributes": {
+          "type": "compound",
+          "value": {
+            "hotbarCategory": {
+              "type": "string",
+              "value": "Pickaxe"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "blockId": 258,
+    "itemCount": 1,
+    "itemDamage": 0,
+    "nbtData": {
+      "type": "compound",
+      "name": "",
+      "value": {
+        "HideFlags": {
+          "type": "int",
+          "value": 255
+        },
+        "display": {
+          "type": "compound",
+          "value": {
+            "Lore": {
+              "type": "list",
+              "value": {
+                "type": "string",
+                "value": [
+                  "§7Drag this to a hotbar slot below to",
+                  "§7favor that slot when purchasing an",
+                  "§7item in this category or on spawn.",
+                  "",
+                  "§eClick to drag!"
+                ]
+              }
+            },
+            "Name": {
+              "type": "string",
+              "value": "§aAxe"
+            }
+          }
+        },
+        "ExtraAttributes": {
+          "type": "compound",
+          "value": {
+            "hotbarCategory": {
+              "type": "string",
+              "value": "Axe"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "blockId": 359,
+    "itemCount": 1,
+    "itemDamage": 0,
+    "nbtData": {
+      "type": "compound",
+      "name": "",
+      "value": {
+        "HideFlags": {
+          "type": "int",
+          "value": 255
+        },
+        "display": {
+          "type": "compound",
+          "value": {
+            "Lore": {
+              "type": "list",
+              "value": {
+                "type": "string",
+                "value": [
+                  "§7Drag this to a hotbar slot below to",
+                  "§7favor that slot when purchasing an",
+                  "§7item in this category or on spawn.",
+                  "",
+                  "§eClick to drag!"
+                ]
+              }
+            },
+            "Name": {
+              "type": "string",
+              "value": "§aShears"
+            }
+          }
+        },
+        "ExtraAttributes": {
+          "type": "compound",
+          "value": {
+            "hotbarCategory": {
+              "type": "string",
+              "value": "Shears"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "blockId": 261,
+    "itemCount": 1,
+    "itemDamage": 0,
+    "nbtData": {
+      "type": "compound",
+      "name": "",
+      "value": {
+        "HideFlags": {
+          "type": "int",
+          "value": 255
+        },
+        "display": {
+          "type": "compound",
+          "value": {
+            "Lore": {
+              "type": "list",
+              "value": {
+                "type": "string",
+                "value": [
+                  "§7Drag this to a hotbar slot below to",
+                  "§7favor that slot when purchasing an",
+                  "§7item in this category or on spawn.",
+                  "",
+                  "§eClick to drag!"
+                ]
+              }
+            },
+            "Name": {
+              "type": "string",
+              "value": "§aRanged"
+            }
+          }
+        },
+        "ExtraAttributes": {
+          "type": "compound",
+          "value": {
+            "hotbarCategory": {
+              "type": "string",
+              "value": "Ranged"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "blockId": 379,
+    "itemCount": 1,
+    "itemDamage": 0,
+    "nbtData": {
+      "type": "compound",
+      "name": "",
+      "value": {
+        "HideFlags": {
+          "type": "int",
+          "value": 255
+        },
+        "display": {
+          "type": "compound",
+          "value": {
+            "Lore": {
+              "type": "list",
+              "value": {
+                "type": "string",
+                "value": [
+                  "§7Drag this to a hotbar slot below to",
+                  "§7favor that slot when purchasing an",
+                  "§7item in this category or on spawn.",
+                  "",
+                  "§eClick to drag!"
+                ]
+              }
+            },
+            "Name": {
+              "type": "string",
+              "value": "§aPotions"
+            }
+          }
+        },
+        "ExtraAttributes": {
+          "type": "compound",
+          "value": {
+            "hotbarCategory": {
+              "type": "string",
+              "value": "Potions"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "blockId": 46,
+    "itemCount": 1,
+    "itemDamage": 0,
+    "nbtData": {
+      "type": "compound",
+      "name": "",
+      "value": {
+        "HideFlags": {
+          "type": "int",
+          "value": 255
+        },
+        "display": {
+          "type": "compound",
+          "value": {
+            "Lore": {
+              "type": "list",
+              "value": {
+                "type": "string",
+                "value": [
+                  "§7Drag this to a hotbar slot below to",
+                  "§7favor that slot when purchasing an",
+                  "§7item in this category or on spawn.",
+                  "",
+                  "§eClick to drag!"
+                ]
+              }
+            },
+            "Name": {
+              "type": "string",
+              "value": "§aUtility"
+            }
+          }
+        },
+        "ExtraAttributes": {
+          "type": "compound",
+          "value": {
+            "hotbarCategory": {
+              "type": "string",
+              "value": "Utility"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "blockId": 160,
+    "itemCount": 1,
+    "itemDamage": 7,
+    "nbtData": {
+      "type": "compound",
+      "name": "",
+      "value": {
+        "display": {
+          "type": "compound",
+          "value": {
+            "Lore": {
+              "type": "list",
+              "value": {
+                "type": "string",
+                "value": [
+                  "§8⬇ §7Hotbar"
+                ]
+              }
+            },
+            "Name": {
+              "type": "string",
+              "value": "§8⬆ §7Categories"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "blockId": 160,
+    "itemCount": 1,
+    "itemDamage": 7,
+    "nbtData": {
+      "type": "compound",
+      "name": "",
+      "value": {
+        "display": {
+          "type": "compound",
+          "value": {
+            "Lore": {
+              "type": "list",
+              "value": {
+                "type": "string",
+                "value": [
+                  "§8⬇ §7Hotbar"
+                ]
+              }
+            },
+            "Name": {
+              "type": "string",
+              "value": "§8⬆ §7Categories"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "blockId": 160,
+    "itemCount": 1,
+    "itemDamage": 7,
+    "nbtData": {
+      "type": "compound",
+      "name": "",
+      "value": {
+        "display": {
+          "type": "compound",
+          "value": {
+            "Lore": {
+              "type": "list",
+              "value": {
+                "type": "string",
+                "value": [
+                  "§8⬇ §7Hotbar"
+                ]
+              }
+            },
+            "Name": {
+              "type": "string",
+              "value": "§8⬆ §7Categories"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "blockId": 160,
+    "itemCount": 1,
+    "itemDamage": 7,
+    "nbtData": {
+      "type": "compound",
+      "name": "",
+      "value": {
+        "display": {
+          "type": "compound",
+          "value": {
+            "Lore": {
+              "type": "list",
+              "value": {
+                "type": "string",
+                "value": [
+                  "§8⬇ §7Hotbar"
+                ]
+              }
+            },
+            "Name": {
+              "type": "string",
+              "value": "§8⬆ §7Categories"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "blockId": 160,
+    "itemCount": 1,
+    "itemDamage": 7,
+    "nbtData": {
+      "type": "compound",
+      "name": "",
+      "value": {
+        "display": {
+          "type": "compound",
+          "value": {
+            "Lore": {
+              "type": "list",
+              "value": {
+                "type": "string",
+                "value": [
+                  "§8⬇ §7Hotbar"
+                ]
+              }
+            },
+            "Name": {
+              "type": "string",
+              "value": "§8⬆ §7Categories"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "blockId": 160,
+    "itemCount": 1,
+    "itemDamage": 7,
+    "nbtData": {
+      "type": "compound",
+      "name": "",
+      "value": {
+        "display": {
+          "type": "compound",
+          "value": {
+            "Lore": {
+              "type": "list",
+              "value": {
+                "type": "string",
+                "value": [
+                  "§8⬇ §7Hotbar"
+                ]
+              }
+            },
+            "Name": {
+              "type": "string",
+              "value": "§8⬆ §7Categories"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "blockId": 160,
+    "itemCount": 1,
+    "itemDamage": 7,
+    "nbtData": {
+      "type": "compound",
+      "name": "",
+      "value": {
+        "display": {
+          "type": "compound",
+          "value": {
+            "Lore": {
+              "type": "list",
+              "value": {
+                "type": "string",
+                "value": [
+                  "§8⬇ §7Hotbar"
+                ]
+              }
+            },
+            "Name": {
+              "type": "string",
+              "value": "§8⬆ §7Categories"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "blockId": 160,
+    "itemCount": 1,
+    "itemDamage": 7,
+    "nbtData": {
+      "type": "compound",
+      "name": "",
+      "value": {
+        "display": {
+          "type": "compound",
+          "value": {
+            "Lore": {
+              "type": "list",
+              "value": {
+                "type": "string",
+                "value": [
+                  "§8⬇ §7Hotbar"
+                ]
+              }
+            },
+            "Name": {
+              "type": "string",
+              "value": "§8⬆ §7Categories"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "blockId": 160,
+    "itemCount": 1,
+    "itemDamage": 7,
+    "nbtData": {
+      "type": "compound",
+      "name": "",
+      "value": {
+        "display": {
+          "type": "compound",
+          "value": {
+            "Lore": {
+              "type": "list",
+              "value": {
+                "type": "string",
+                "value": [
+                  "§8⬇ §7Hotbar"
+                ]
+              }
+            },
+            "Name": {
+              "type": "string",
+              "value": "§8⬆ §7Categories"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "blockId": 283,
+    "itemCount": 1,
+    "itemDamage": 0,
+    "nbtData": {
+      "type": "compound",
+      "name": "",
+      "value": {
+        "HideFlags": {
+          "type": "int",
+          "value": 255
+        },
+        "display": {
+          "type": "compound",
+          "value": {
+            "Lore": {
+              "type": "list",
+              "value": {
+                "type": "string",
+                "value": [
+                  "§7Melee items will prioritize this slot!",
+                  "",
+                  "§eClick to remove!"
+                ]
+              }
+            },
+            "Name": {
+              "type": "string",
+              "value": "§aMelee"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "blockId": 172,
+    "itemCount": 1,
+    "itemDamage": 0,
+    "nbtData": {
+      "type": "compound",
+      "name": "",
+      "value": {
+        "HideFlags": {
+          "type": "int",
+          "value": 255
+        },
+        "display": {
+          "type": "compound",
+          "value": {
+            "Lore": {
+              "type": "list",
+              "value": {
+                "type": "string",
+                "value": [
+                  "§7Blocks items will prioritize this slot!",
+                  "",
+                  "§eClick to remove!"
+                ]
+              }
+            },
+            "Name": {
+              "type": "string",
+              "value": "§aBlocks"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "blockId": 257,
+    "itemCount": 1,
+    "itemDamage": 0,
+    "nbtData": {
+      "type": "compound",
+      "name": "",
+      "value": {
+        "HideFlags": {
+          "type": "int",
+          "value": 255
+        },
+        "display": {
+          "type": "compound",
+          "value": {
+            "Lore": {
+              "type": "list",
+              "value": {
+                "type": "string",
+                "value": [
+                  "§7Pickaxe items will prioritize this slot!",
+                  "",
+                  "§eClick to remove!"
+                ]
+              }
+            },
+            "Name": {
+              "type": "string",
+              "value": "§aPickaxe"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "blockId": 258,
+    "itemCount": 1,
+    "itemDamage": 0,
+    "nbtData": {
+      "type": "compound",
+      "name": "",
+      "value": {
+        "HideFlags": {
+          "type": "int",
+          "value": 255
+        },
+        "display": {
+          "type": "compound",
+          "value": {
+            "Lore": {
+              "type": "list",
+              "value": {
+                "type": "string",
+                "value": [
+                  "§7Axe items will prioritize this slot!",
+                  "",
+                  "§eClick to remove!"
+                ]
+              }
+            },
+            "Name": {
+              "type": "string",
+              "value": "§aAxe"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "blockId": 46,
+    "itemCount": 1,
+    "itemDamage": 0,
+    "nbtData": {
+      "type": "compound",
+      "name": "",
+      "value": {
+        "HideFlags": {
+          "type": "int",
+          "value": 255
+        },
+        "display": {
+          "type": "compound",
+          "value": {
+            "Lore": {
+              "type": "list",
+              "value": {
+                "type": "string",
+                "value": [
+                  "§7Utility items will prioritize this slot!",
+                  "",
+                  "§eClick to remove!"
+                ]
+              }
+            },
+            "Name": {
+              "type": "string",
+              "value": "§aUtility"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "blockId": 359,
+    "itemCount": 1,
+    "itemDamage": 0,
+    "nbtData": {
+      "type": "compound",
+      "name": "",
+      "value": {
+        "HideFlags": {
+          "type": "int",
+          "value": 255
+        },
+        "display": {
+          "type": "compound",
+          "value": {
+            "Lore": {
+              "type": "list",
+              "value": {
+                "type": "string",
+                "value": [
+                  "§7Shears items will prioritize this slot!",
+                  "",
+                  "§eClick to remove!"
+                ]
+              }
+            },
+            "Name": {
+              "type": "string",
+              "value": "§aShears"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "blockId": 379,
+    "itemCount": 1,
+    "itemDamage": 0,
+    "nbtData": {
+      "type": "compound",
+      "name": "",
+      "value": {
+        "HideFlags": {
+          "type": "int",
+          "value": 255
+        },
+        "display": {
+          "type": "compound",
+          "value": {
+            "Lore": {
+              "type": "list",
+              "value": {
+                "type": "string",
+                "value": [
+                  "§7Potions items will prioritize this slot!",
+                  "",
+                  "§eClick to remove!"
+                ]
+              }
+            },
+            "Name": {
+              "type": "string",
+              "value": "§aPotions"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "blockId": -1
+  },
+  {
+    "blockId": 46,
+    "itemCount": 1,
+    "itemDamage": 0,
+    "nbtData": {
+      "type": "compound",
+      "name": "",
+      "value": {
+        "HideFlags": {
+          "type": "int",
+          "value": 255
+        },
+        "display": {
+          "type": "compound",
+          "value": {
+            "Lore": {
+              "type": "list",
+              "value": {
+                "type": "string",
+                "value": [
+                  "§7Utility items will prioritize this slot!",
+                  "",
+                  "§eClick to remove!"
+                ]
+              }
+            },
+            "Name": {
+              "type": "string",
+              "value": "§aUtility"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "blockId": -1
+  },
+  {
+    "blockId": -1
+  },
+  {
+    "blockId": -1
+  },
+  {
+    "blockId": -1
+  },
+  {
+    "blockId": -1
+  },
+  {
+    "blockId": -1
+  },
+  {
+    "blockId": -1
+  },
+  {
+    "blockId": -1
+  },
+  {
+    "blockId": -1
+  },
+  {
+    "blockId": -1
+  },
+  {
+    "blockId": -1
+  },
+  {
+    "blockId": -1
+  },
+  {
+    "blockId": 262,
+    "itemCount": 1,
+    "itemDamage": 0,
+    "nbtData": {
+      "type": "compound",
+      "name": "",
+      "value": {
+        "overrideMeta": {
+          "type": "byte",
+          "value": 1
+        },
+        "display": {
+          "type": "compound",
+          "value": {
+            "Lore": {
+              "type": "list",
+              "value": {
+                "type": "string",
+                "value": [
+                  "§7To Bed Wars Settings"
+                ]
+              }
+            },
+            "Name": {
+              "type": "string",
+              "value": "§aGo Back"
+            }
+          }
+        },
+        "AttributeModifiers": {
+          "type": "list",
+          "value": {
+            "type": "end",
+            "value": []
+          }
+        }
+      }
+    }
+  },
+  {
+    "blockId": -1
+  },
+  {
+    "blockId": 166,
+    "itemCount": 1,
+    "itemDamage": 0,
+    "nbtData": {
+      "type": "compound",
+      "name": "",
+      "value": {
+        "display": {
+          "type": "compound",
+          "value": {
+            "Lore": {
+              "type": "list",
+              "value": {
+                "type": "string",
+                "value": [
+                  "§7Reset your hotbar to the default."
+                ]
+              }
+            },
+            "Name": {
+              "type": "string",
+              "value": "§cReset to Default"
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    "blockId": -1
+  },
+  {
+    "blockId": -1
+  },
+  {
+    "blockId": -1
+  }
+]

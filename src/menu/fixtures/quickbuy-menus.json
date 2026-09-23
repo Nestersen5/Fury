@@ -1,0 +1,1016 @@
+{
+  "Bed Wars Settings": {
+    "size": 54,
+    "items": [
+      {
+        "slot": 29,
+        "id": 399,
+        "type": "nether_star",
+        "dmg": 0,
+        "n": 1,
+        "name": "§aEdit Quick Buy",
+        "lore": [
+          "§7Edit the layout of your Quick Buy",
+          "§7menu in-game.",
+          "",
+          "§7§eClick to edit!"
+        ]
+      }
+    ]
+  },
+  "Edit Quick Buy": {
+    "size": 54,
+    "items": [
+      {
+        "slot": 10,
+        "id": 35,
+        "type": "wool",
+        "dmg": 0,
+        "n": 16,
+        "name": "§aWool x16",
+        "lore": [
+          "§7This is a Quick Buy Slot!",
+          "",
+          "§eLeft Click §7to replace the item in this slot.",
+          "§eRight Click §7to remove this item."
+        ],
+        "databaseName": "wool"
+      },
+      {
+        "slot": 11,
+        "id": 5,
+        "type": "planks",
+        "dmg": 0,
+        "n": 16,
+        "name": "§aWood x16",
+        "lore": [
+          "§7This is a Quick Buy Slot!",
+          "",
+          "§eLeft Click §7to replace the item in this slot.",
+          "§eRight Click §7to remove this item."
+        ],
+        "databaseName": "wood"
+      },
+      {
+        "slot": 12,
+        "id": 121,
+        "type": "end_stone",
+        "dmg": 0,
+        "n": 12,
+        "name": "§aEnd Stone x12",
+        "lore": [
+          "§7This is a Quick Buy Slot!",
+          "",
+          "§eLeft Click §7to replace the item in this slot.",
+          "§eRight Click §7to remove this item."
+        ],
+        "databaseName": "end_stone"
+      },
+      {
+        "slot": 13,
+        "id": 309,
+        "type": "iron_boots",
+        "dmg": 0,
+        "n": 1,
+        "name": "§aIron Boots",
+        "lore": [
+          "§7This is a Quick Buy Slot!",
+          "",
+          "§eLeft Click §7to replace the item in this slot.",
+          "§eRight Click §7to remove this item."
+        ],
+        "databaseName": "iron_boots"
+      },
+      {
+        "slot": 14,
+        "id": 20,
+        "type": "glass",
+        "dmg": 0,
+        "n": 4,
+        "name": "§aBlast-Proof Glass",
+        "lore": [
+          "§7This is a Quick Buy Slot!",
+          "",
+          "§eLeft Click §7to replace the item in this slot.",
+          "§eRight Click §7to remove this item."
+        ],
+        "databaseName": "blast-proof_glass"
+      },
+      {
+        "slot": 15,
+        "id": 373,
+        "type": "potion",
+        "dmg": 8203,
+        "n": 1,
+        "name": "§aJump V Potion (45 seconds)",
+        "lore": [
+          "§7This is a Quick Buy Slot!",
+          "",
+          "§eLeft Click §7to replace the item in this slot.",
+          "§eRight Click §7to remove this item."
+        ],
+        "databaseName": "jump_v_potion_(45_seconds)"
+      },
+      {
+        "slot": 16,
+        "id": 373,
+        "type": "potion",
+        "dmg": 8206,
+        "n": 1,
+        "name": "§aInvisibility Potion (30 seconds)",
+        "lore": [
+          "§7This is a Quick Buy Slot!",
+          "",
+          "§eLeft Click §7to replace the item in this slot.",
+          "§eRight Click §7to remove this item."
+        ],
+        "databaseName": "invisibility_potion_(30_seconds)"
+      },
+      {
+        "slot": 19,
+        "id": 272,
+        "type": "stone_sword",
+        "dmg": 0,
+        "n": 1,
+        "name": "§aStone Sword",
+        "lore": [
+          "§7This is a Quick Buy Slot!",
+          "",
+          "§eLeft Click §7to replace the item in this slot.",
+          "§eRight Click §7to remove this item."
+        ],
+        "databaseName": "stone_sword"
+      },
+      {
+        "slot": 20,
+        "id": 267,
+        "type": "iron_sword",
+        "dmg": 0,
+        "n": 1,
+        "name": "§aIron Sword",
+        "lore": [
+          "§7This is a Quick Buy Slot!",
+          "",
+          "§eLeft Click §7to replace the item in this slot.",
+          "§eRight Click §7to remove this item."
+        ],
+        "databaseName": "iron_sword"
+      },
+      {
+        "slot": 21,
+        "id": 280,
+        "type": "stick",
+        "dmg": 0,
+        "n": 1,
+        "name": "§aStick (Knockback I)",
+        "lore": [
+          "§7This is a Quick Buy Slot!",
+          "",
+          "§eLeft Click §7to replace the item in this slot.",
+          "§eRight Click §7to remove this item."
+        ],
+        "databaseName": "stick_(knockback_i)"
+      },
+      {
+        "slot": 22,
+        "id": 359,
+        "type": "shears",
+        "dmg": 0,
+        "n": 1,
+        "name": "§aPermanent Shears",
+        "lore": [
+          "§7This is a Quick Buy Slot!",
+          "",
+          "§eLeft Click §7to replace the item in this slot.",
+          "§eRight Click §7to remove this item."
+        ],
+        "databaseName": "shears"
+      },
+      {
+        "slot": 23,
+        "id": 271,
+        "type": "wooden_axe",
+        "dmg": 0,
+        "n": 1,
+        "name": "§aWooden Axe (Efficiency I)",
+        "lore": [
+          "§7This is a Quick Buy Slot!",
+          "",
+          "§eLeft Click §7to replace the item in this slot.",
+          "§eRight Click §7to remove this item."
+        ],
+        "databaseName": "wooden_axe"
+      },
+      {
+        "slot": 24,
+        "id": 270,
+        "type": "wooden_pickaxe",
+        "dmg": 0,
+        "n": 1,
+        "name": "§aWooden Pickaxe (Efficiency I)",
+        "lore": [
+          "§7This is a Quick Buy Slot!",
+          "",
+          "§eLeft Click §7to replace the item in this slot.",
+          "§eRight Click §7to remove this item."
+        ],
+        "databaseName": "wooden_pickaxe"
+      },
+      {
+        "slot": 25,
+        "id": 373,
+        "type": "potion",
+        "dmg": 8195,
+        "n": 1,
+        "name": "§aSpeed II Potion (45 seconds)",
+        "lore": [
+          "§7This is a Quick Buy Slot!",
+          "",
+          "§eLeft Click §7to replace the item in this slot.",
+          "§eRight Click §7to remove this item."
+        ],
+        "databaseName": "speed_ii_potion_(45_seconds)"
+      },
+      {
+        "slot": 28,
+        "id": 335,
+        "type": "milk_bucket",
+        "dmg": 0,
+        "n": 1,
+        "name": "§aMagic Milk",
+        "lore": [
+          "§7This is a Quick Buy Slot!",
+          "",
+          "§eLeft Click §7to replace the item in this slot.",
+          "§eRight Click §7to remove this item."
+        ],
+        "databaseName": "magic_milk"
+      },
+      {
+        "slot": 29,
+        "id": 344,
+        "type": "egg",
+        "dmg": 0,
+        "n": 1,
+        "name": "§aBridge Egg",
+        "lore": [
+          "§7This is a Quick Buy Slot!",
+          "",
+          "§eLeft Click §7to replace the item in this slot.",
+          "§eRight Click §7to remove this item."
+        ],
+        "databaseName": "bridge_egg"
+      },
+      {
+        "slot": 30,
+        "id": 65,
+        "type": "ladder",
+        "dmg": 0,
+        "n": 8,
+        "name": "§aLadder x8",
+        "lore": [
+          "§7This is a Quick Buy Slot!",
+          "",
+          "§eLeft Click §7to replace the item in this slot.",
+          "§eRight Click §7to remove this item."
+        ],
+        "databaseName": "ladder"
+      },
+      {
+        "slot": 31,
+        "id": 368,
+        "type": "ender_pearl",
+        "dmg": 0,
+        "n": 1,
+        "name": "§aEnder Pearl",
+        "lore": [
+          "§7This is a Quick Buy Slot!",
+          "",
+          "§eLeft Click §7to replace the item in this slot.",
+          "§eRight Click §7to remove this item."
+        ],
+        "databaseName": "ender_pearl"
+      },
+      {
+        "slot": 32,
+        "id": 46,
+        "type": "tnt",
+        "dmg": 0,
+        "n": 1,
+        "name": "§aTNT",
+        "lore": [
+          "§7This is a Quick Buy Slot!",
+          "",
+          "§eLeft Click §7to replace the item in this slot.",
+          "§eRight Click §7to remove this item."
+        ],
+        "databaseName": "tnt"
+      },
+      {
+        "slot": 33,
+        "id": 322,
+        "type": "golden_apple",
+        "dmg": 0,
+        "n": 1,
+        "name": "§aGolden Apple",
+        "lore": [
+          "§7This is a Quick Buy Slot!",
+          "",
+          "§eLeft Click §7to replace the item in this slot.",
+          "§eRight Click §7to remove this item."
+        ],
+        "databaseName": "golden_apple"
+      },
+      {
+        "slot": 34,
+        "id": 385,
+        "type": "fire_charge",
+        "dmg": 0,
+        "n": 1,
+        "name": "§aFireball",
+        "lore": [
+          "§7This is a Quick Buy Slot!",
+          "",
+          "§eLeft Click §7to replace the item in this slot.",
+          "§eRight Click §7to remove this item."
+        ],
+        "databaseName": "fireball"
+      },
+      {
+        "slot": 45,
+        "id": 351,
+        "type": "dye",
+        "dmg": 8,
+        "n": 1,
+        "name": "§aQuick Buy Share Privacy",
+        "lore": [
+          "§7Anyone can share their Quick Buy",
+          "§7with you.",
+          "",
+          "§7Options:",
+          "§c   Max",
+          "§6   High",
+          "§a   Medium",
+          "§8➠ None",
+          "",
+          "§7§eClick to change to §cMax§e!"
+        ]
+      },
+      {
+        "slot": 49,
+        "id": 262,
+        "type": "arrow",
+        "dmg": 0,
+        "n": 1,
+        "name": "§aGo Back",
+        "lore": [
+          "§7To Bed Wars Settings"
+        ]
+      },
+      {
+        "slot": 53,
+        "id": 159,
+        "type": "stained_hardened_clay",
+        "dmg": 13,
+        "n": 1,
+        "name": "§aShare Quick Buy Layout",
+        "lore": [
+          "§7§eClick to share this layout with",
+          "§esomeone in your lobby!"
+        ]
+      }
+    ]
+  },
+  "Adding to Quick Buy...": {
+    "size": 54,
+    "items": [
+      {
+        "slot": 10,
+        "id": 35,
+        "type": "wool",
+        "dmg": 0,
+        "n": 16,
+        "name": "§aWool x16",
+        "lore": [
+          "§7Great for bridging across islands.",
+          "§7Turns into your team's color.",
+          "",
+          "§7§eClick to add this item to your Quick",
+          "§eBuy!"
+        ],
+        "databaseName": "wool"
+      },
+      {
+        "slot": 11,
+        "id": 172,
+        "type": "hardened_clay",
+        "dmg": 0,
+        "n": 16,
+        "name": "§aHardened Clay x16",
+        "lore": [
+          "§7Basic block to defend your bed.",
+          "",
+          "§7§eClick to add this item to your Quick",
+          "§eBuy!"
+        ],
+        "databaseName": "hardened_clay"
+      },
+      {
+        "slot": 12,
+        "id": 20,
+        "type": "glass",
+        "dmg": 0,
+        "n": 4,
+        "name": "§aBlast-Proof Glass",
+        "lore": [
+          "§7Immune to explosions.",
+          "",
+          "§7§eClick to add this item to your Quick",
+          "§eBuy!"
+        ],
+        "databaseName": "blast-proof_glass"
+      },
+      {
+        "slot": 13,
+        "id": 121,
+        "type": "end_stone",
+        "dmg": 0,
+        "n": 12,
+        "name": "§aEnd Stone x12",
+        "lore": [
+          "§7Solid block to defend your bed.",
+          "",
+          "§7§eClick to add this item to your Quick",
+          "§eBuy!"
+        ],
+        "databaseName": "end_stone"
+      },
+      {
+        "slot": 14,
+        "id": 65,
+        "type": "ladder",
+        "dmg": 0,
+        "n": 8,
+        "name": "§aLadder x8",
+        "lore": [
+          "§7Useful to save cats stuck in trees.",
+          "",
+          "§7§eClick to add this item to your Quick",
+          "§eBuy!"
+        ],
+        "databaseName": "ladder"
+      },
+      {
+        "slot": 15,
+        "id": 5,
+        "type": "planks",
+        "dmg": 0,
+        "n": 16,
+        "name": "§aWood x16",
+        "lore": [
+          "§7Good block to defend your bed.",
+          "§7Strong against pickaxes.",
+          "",
+          "§7§eClick to add this item to your Quick",
+          "§eBuy!"
+        ],
+        "databaseName": "wood"
+      },
+      {
+        "slot": 16,
+        "id": 49,
+        "type": "obsidian",
+        "dmg": 0,
+        "n": 4,
+        "name": "§aObsidian x4",
+        "lore": [
+          "§7Extreme protection for your bed.",
+          "",
+          "§7§eClick to add this item to your Quick",
+          "§eBuy!"
+        ],
+        "databaseName": "obsidian"
+      },
+      {
+        "slot": 19,
+        "id": 174,
+        "type": "packed_ice",
+        "dmg": 0,
+        "n": 8,
+        "name": "§aPacked Ice x8",
+        "lore": [
+          "§7Just normal ice. Good way to make a",
+          "§7speedway.",
+          "",
+          "§7§eClick to add this item to your Quick",
+          "§eBuy!"
+        ],
+        "databaseName": "packed_ice"
+      },
+      {
+        "slot": 20,
+        "id": 272,
+        "type": "stone_sword",
+        "dmg": 0,
+        "n": 1,
+        "name": "§aStone Sword",
+        "lore": [
+          "§7§eClick to add this item to your Quick",
+          "§eBuy!"
+        ],
+        "databaseName": "stone_sword"
+      },
+      {
+        "slot": 21,
+        "id": 267,
+        "type": "iron_sword",
+        "dmg": 0,
+        "n": 1,
+        "name": "§aIron Sword",
+        "lore": [
+          "§7§eClick to add this item to your Quick",
+          "§eBuy!"
+        ],
+        "databaseName": "iron_sword"
+      },
+      {
+        "slot": 22,
+        "id": 276,
+        "type": "diamond_sword",
+        "dmg": 0,
+        "n": 1,
+        "name": "§aDiamond Sword",
+        "lore": [
+          "§7§eClick to add this item to your Quick",
+          "§eBuy!"
+        ],
+        "databaseName": "diamond_sword"
+      },
+      {
+        "slot": 23,
+        "id": 280,
+        "type": "stick",
+        "dmg": 0,
+        "n": 1,
+        "name": "§aStick (Knockback I)",
+        "lore": [
+          "§7§eClick to add this item to your Quick",
+          "§eBuy!"
+        ],
+        "databaseName": "stick_(knockback_i)"
+      },
+      {
+        "slot": 24,
+        "id": 305,
+        "type": "chainmail_boots",
+        "dmg": 0,
+        "n": 1,
+        "name": "§aChainmail Boots",
+        "lore": [
+          "§7Chainmail leggings and boots which",
+          "§7you will always spawn with.",
+          "",
+          "§7§eClick to add this item to your Quick",
+          "§eBuy!"
+        ],
+        "databaseName": "chainmail_boots"
+      },
+      {
+        "slot": 25,
+        "id": 309,
+        "type": "iron_boots",
+        "dmg": 0,
+        "n": 1,
+        "name": "§aIron Boots",
+        "lore": [
+          "§7Iron leggings and boots which you",
+          "§7will always spawn with.",
+          "",
+          "§7§eClick to add this item to your Quick",
+          "§eBuy!"
+        ],
+        "databaseName": "iron_boots"
+      },
+      {
+        "slot": 28,
+        "id": 313,
+        "type": "diamond_boots",
+        "dmg": 0,
+        "n": 1,
+        "name": "§aDiamond Boots",
+        "lore": [
+          "§7Diamond leggings and boots which",
+          "§7you will always crush with.",
+          "",
+          "§7§eClick to add this item to your Quick",
+          "§eBuy!"
+        ],
+        "databaseName": "diamond_boots"
+      },
+      {
+        "slot": 29,
+        "id": 270,
+        "type": "wooden_pickaxe",
+        "dmg": 0,
+        "n": 1,
+        "name": "§aWooden Pickaxe (Efficiency I)",
+        "lore": [
+          "§7§7This is an upgradable item. It will lose",
+          "§7§71 tier upon death!",
+          "§7",
+          "§7§7You will permanently respawn with at",
+          "§7§7least the lowest tier.",
+          "",
+          "§7§eClick to add this item to your Quick",
+          "§eBuy!"
+        ],
+        "databaseName": "wooden_pickaxe"
+      },
+      {
+        "slot": 30,
+        "id": 271,
+        "type": "wooden_axe",
+        "dmg": 0,
+        "n": 1,
+        "name": "§aWooden Axe (Efficiency I)",
+        "lore": [
+          "§7§7This is an upgradable item. It will lose",
+          "§7§71 tier upon death!",
+          "§7",
+          "§7§7You will permanently respawn with at",
+          "§7§7least the lowest tier.",
+          "",
+          "§7§eClick to add this item to your Quick",
+          "§eBuy!"
+        ],
+        "databaseName": "wooden_axe"
+      },
+      {
+        "slot": 31,
+        "id": 359,
+        "type": "shears",
+        "dmg": 0,
+        "n": 1,
+        "name": "§aPermanent Shears",
+        "lore": [
+          "§7§7Great to get rid of wool. You will",
+          "§7§7always spawn with these shears.",
+          "",
+          "§7§eClick to add this item to your Quick",
+          "§eBuy!"
+        ],
+        "databaseName": "shears"
+      },
+      {
+        "slot": 32,
+        "id": 262,
+        "type": "arrow",
+        "dmg": 0,
+        "n": 6,
+        "name": "§aArrow x6",
+        "lore": [
+          "§7§eClick to add this item to your Quick",
+          "§eBuy!"
+        ],
+        "databaseName": "arrow"
+      },
+      {
+        "slot": 33,
+        "id": 261,
+        "type": "bow",
+        "dmg": 0,
+        "n": 1,
+        "name": "§aBow",
+        "lore": [
+          "§7§eClick to add this item to your Quick",
+          "§eBuy!"
+        ],
+        "databaseName": "bow"
+      },
+      {
+        "slot": 34,
+        "id": 261,
+        "type": "bow",
+        "dmg": 0,
+        "n": 1,
+        "name": "§aBow (Power I)",
+        "lore": [
+          "§7§eClick to add this item to your Quick",
+          "§eBuy!"
+        ],
+        "databaseName": "bow_(power_i)"
+      },
+      {
+        "slot": 49,
+        "id": 262,
+        "type": "arrow",
+        "dmg": 0,
+        "n": 1,
+        "name": "§aGo Back",
+        "lore": [
+          "§7To Edit Quick Buy"
+        ]
+      },
+      {
+        "slot": 53,
+        "id": 262,
+        "type": "arrow",
+        "dmg": 0,
+        "n": 1,
+        "name": "§eLeft-click for next page!",
+        "lore": [
+          "§bRight-click for last page!"
+        ]
+      }
+    ]
+  },
+  "Game Settings": {
+    "size": 54,
+    "items": [
+      {
+        "slot": 6,
+        "id": 355,
+        "type": "bed",
+        "dmg": 0,
+        "n": 1,
+        "name": "§aBed Wars Settings",
+        "lore": [
+          "§eClick to view!"
+        ]
+      }
+    ]
+  },
+  "emptySlot": {
+    "slot": 33,
+    "id": 160,
+    "type": "stained_glass_pane",
+    "dmg": 14,
+    "n": 1,
+    "name": "§cEmpty slot!",
+    "lore": [
+      "§7This is a Quick Buy Slot!",
+      "",
+      "§eLeft Click §7to set an item in this slot."
+    ]
+  },
+  "(2/2) Adding to Quick Buy...": {
+    "size": 54,
+    "items": [
+      {
+        "slot": 10,
+        "id": 261,
+        "type": "bow",
+        "dmg": 0,
+        "n": 1,
+        "name": "§aBow (Power I, Punch I)",
+        "lore": [
+          "§7§eClick to add this item to your Quick",
+          "§eBuy!"
+        ],
+        "databaseName": "bow_(power_i__punch_i)"
+      },
+      {
+        "slot": 11,
+        "id": 373,
+        "type": "potion",
+        "dmg": 8195,
+        "n": 1,
+        "name": "§aSpeed II Potion (45 seconds)",
+        "lore": [
+          "§7§9Speed II (0:45)",
+          "",
+          "§7§eClick to add this item to your Quick",
+          "§eBuy!"
+        ],
+        "databaseName": "speed_ii_potion_(45_seconds)"
+      },
+      {
+        "slot": 12,
+        "id": 373,
+        "type": "potion",
+        "dmg": 8203,
+        "n": 1,
+        "name": "§aJump V Potion (45 seconds)",
+        "lore": [
+          "§7§9Jump Boost V (0:45)",
+          "",
+          "§7§eClick to add this item to your Quick",
+          "§eBuy!"
+        ],
+        "databaseName": "jump_v_potion_(45_seconds)"
+      },
+      {
+        "slot": 13,
+        "id": 373,
+        "type": "potion",
+        "dmg": 8206,
+        "n": 1,
+        "name": "§aInvisibility Potion (30 seconds)",
+        "lore": [
+          "§7§9Complete Invisibility (0:30)",
+          "",
+          "§7§eClick to add this item to your Quick",
+          "§eBuy!"
+        ],
+        "databaseName": "invisibility_potion_(30_seconds)"
+      },
+      {
+        "slot": 14,
+        "id": 322,
+        "type": "golden_apple",
+        "dmg": 0,
+        "n": 1,
+        "name": "§aGolden Apple",
+        "lore": [
+          "§7Well-rounded healing.",
+          "",
+          "§7§eClick to add this item to your Quick",
+          "§eBuy!"
+        ],
+        "databaseName": "golden_apple"
+      },
+      {
+        "slot": 15,
+        "id": 332,
+        "type": "snowball",
+        "dmg": 0,
+        "n": 1,
+        "name": "§aBedbug",
+        "lore": [
+          "§7Spawns silverfish where the snowball",
+          "§7lands to distract your enemies.",
+          "§7Lasts 15 seconds.",
+          "",
+          "§7§eClick to add this item to your Quick",
+          "§eBuy!"
+        ],
+        "databaseName": "bedbug"
+      },
+      {
+        "slot": 16,
+        "id": 383,
+        "type": "spawn_egg",
+        "dmg": 99,
+        "n": 1,
+        "name": "§aDream Defender",
+        "lore": [
+          "§7Iron Golem to help defend your",
+          "§7base. Lasts 4 minutes.",
+          "",
+          "§7§eClick to add this item to your Quick",
+          "§eBuy!"
+        ],
+        "databaseName": "dream_defender"
+      },
+      {
+        "slot": 19,
+        "id": 385,
+        "type": "fire_charge",
+        "dmg": 0,
+        "n": 1,
+        "name": "§aFireball",
+        "lore": [
+          "§7Right-click to launch! Great to knock",
+          "§7back enemies walking on thin bridges.",
+          "",
+          "§7§eClick to add this item to your Quick",
+          "§eBuy!"
+        ],
+        "databaseName": "fireball"
+      },
+      {
+        "slot": 20,
+        "id": 46,
+        "type": "tnt",
+        "dmg": 0,
+        "n": 1,
+        "name": "§aTNT",
+        "lore": [
+          "§7Instantly ignites, appropriate to",
+          "§7explode things!",
+          "",
+          "§7§eClick to add this item to your Quick",
+          "§eBuy!"
+        ],
+        "databaseName": "tnt"
+      },
+      {
+        "slot": 21,
+        "id": 368,
+        "type": "ender_pearl",
+        "dmg": 0,
+        "n": 1,
+        "name": "§aEnder Pearl",
+        "lore": [
+          "§7The quickest way to invade enemy",
+          "§7bases.",
+          "",
+          "§7§eClick to add this item to your Quick",
+          "§eBuy!"
+        ],
+        "databaseName": "ender_pearl"
+      },
+      {
+        "slot": 22,
+        "id": 326,
+        "type": "water_bucket",
+        "dmg": 0,
+        "n": 1,
+        "name": "§aWater Bucket",
+        "lore": [
+          "§7Great to slow down approaching",
+          "§7enemies. Can also protect against",
+          "§7TNT.",
+          "",
+          "§7§eClick to add this item to your Quick",
+          "§eBuy!"
+        ],
+        "databaseName": "water_bucket"
+      },
+      {
+        "slot": 23,
+        "id": 344,
+        "type": "egg",
+        "dmg": 0,
+        "n": 1,
+        "name": "§aBridge Egg",
+        "lore": [
+          "§7This egg creates a bridge in its trail",
+          "§7after being thrown.",
+          "",
+          "§7§eClick to add this item to your Quick",
+          "§eBuy!"
+        ],
+        "databaseName": "bridge_egg"
+      },
+      {
+        "slot": 24,
+        "id": 335,
+        "type": "milk_bucket",
+        "dmg": 0,
+        "n": 1,
+        "name": "§aMagic Milk",
+        "lore": [
+          "§7Avoid triggering traps for 30",
+          "§7seconds after consuming.",
+          "",
+          "§7§eClick to add this item to your Quick",
+          "§eBuy!"
+        ],
+        "databaseName": "magic_milk"
+      },
+      {
+        "slot": 25,
+        "id": 19,
+        "type": "sponge",
+        "dmg": 0,
+        "n": 4,
+        "name": "§aSponge x4",
+        "lore": [
+          "§7Great for soaking up water.",
+          "",
+          "§7§eClick to add this item to your Quick",
+          "§eBuy!"
+        ],
+        "databaseName": "sponge"
+      },
+      {
+        "slot": 28,
+        "id": 146,
+        "type": "trapped_chest",
+        "dmg": 0,
+        "n": 1,
+        "name": "§aCompact Pop-up Tower",
+        "lore": [
+          "§7Place a pop-up defence!",
+          "",
+          "§7§eClick to add this item to your Quick",
+          "§eBuy!"
+        ],
+        "databaseName": "compact_pop-up_tower"
+      },
+      {
+        "slot": 45,
+        "id": 262,
+        "type": "arrow",
+        "dmg": 0,
+        "n": 1,
+        "name": "§eLeft-click for previous page!",
+        "lore": [
+          "§bRight-click for first page!"
+        ]
+      },
+      {
+        "slot": 49,
+        "id": 262,
+        "type": "arrow",
+        "dmg": 0,
+        "n": 1,
+        "name": "§aGo Back",
+        "lore": [
+          "§7To Edit Quick Buy"
+        ]
+      }
+    ]
+  }
+}

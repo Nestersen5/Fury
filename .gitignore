@@ -1,0 +1,133 @@
+# Dependencies
+node_modules/
+statmod-overlay/node_modules/
+.venv-whisper/
+__pycache__/
+*.pyc
+
+# Runtime accounts, auth, browser, and launcher data
+auth_tokens/
+launcher_data/
+packet_logs/
+statmod_debug.log
+statmod_sniffer.log
+statmod_summary.txt
+
+# Local secrets and mutable config
+statmod_key.txt
+features_config.json
+scan_config.json
+server_config.json
+chat_triggers.json
+*.bak
+*.env
+.env.*
+!.env.example
+
+# Local/generated player data
+recordings/
+denicked.json
+friend_aliases.json
+session_data.json
+tag_tracker.log
+encounter_data.json
+presets.json
+own_cosmetics.json
+anticheat_history.json
+anticheat/population_baseline.json
+src/cosmetics/effect_library.json
+cosmetic_accuracy.json
+cosmetic_packet_captures.json
+cosmetic_search_cache.json
+
+# Generated cosmetic training/model artifacts
+cosmetic_api_names.json
+cosmetic_dataset.json
+cosmetic_direct_samples.json
+cosmetic_model.json
+cosmetic_model_backup.json
+cosmetic_profiles.json
+cosmetic_sample_reviews.json
+cosmetic_signatures.json
+cosmetic_signatures_backup.json
+kill_message_patterns.json
+cosmetic_reset_backup_*/
+
+# Build and installer output
+dist/
+build/*
+!build/installer.nsh
+release/
+!tests/release/
+release-*/
+out/
+website/downloads/
+output/
+tmp/
+.wrangler/
+.dev.vars
+.dev.vars.*
+*.dmg
+*.exe
+*.msi
+*.zip
+
+# Local environment files
+.env
+.env.local
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs and crash dumps (catch-all)
+*.log
+*.stackdump
+core
+/diagnostics/
+
+# Local backup directories
+backups/
+cosmetic_reset_backup_*/
+
+# Local notes (not for public repo)
+*.local.md
+
+# Unrelated sibling projects kept in this folder
+NesterForge189/
+statmod-overlay/
+
+# Local Quick Buy layouts
+quickbuy_presets/
+
+# Mutable local session features
+/game_clips.json
+/rank_book.json
+/json-data.json
+
+# Agent/assistant local state
+.claude/
+
+# Signing and deployment material. Signing is a future release step; nothing
+# here belongs in Git, including the public repository.
+*.pem
+*.p12
+*.pfx
+*.cer
+*.keystore
+*.jks
+id_rsa
+id_rsa.*
+*.local.json
+**/wrangler.local.*
+
+# Windows storage-migration recovery copies made outside %APPDATA%
+.Fury-migration-*/
+APPDATA-Fury-backup/

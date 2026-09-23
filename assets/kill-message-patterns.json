@@ -1,0 +1,420 @@
+[
+  {
+    "key": "woofwoof",
+    "name": "Woof Woof",
+    "apiValue": "killmessages_woof_woof",
+    "lines": [
+      "ExampleVictim was bitten by ExampleKiller.",
+      "ExampleVictim howled into the void for ExampleKiller.",
+      "ExampleVictim caught the ball thrown by ExampleKiller.",
+      "ExampleVictim was distracted by a puppy placed by ExampleKiller.",
+      "ExampleVictim played too rough with ExampleKiller's Golem.",
+      "Green Bed was ripped apart by ExampleKiller!"
+    ]
+  },
+  {
+    "key": "glorious",
+    "name": "Glorious",
+    "apiValue": "killmessages_glorious",
+    "lines": [
+      "ExampleVictim was stomped by ExampleKiller.",
+      "ExampleVictim was ExampleKiller's final #1.",
+      "ExampleVictim was thrown down a pit by ExampleKiller.",
+      "ExampleVictim was shot by ExampleKiller.",
+      "ExampleVictim was thrown to the ground by ExampleKiller.",
+      "ExampleVictim was outclassed by ExampleKiller's Golem.",
+      "Green Bed was bed #1 destroyed by ExampleKiller!"
+    ]
+  },
+  {
+    "key": "oldman",
+    "name": "Old Man",
+    "apiValue": "killmessages_old_man",
+    "lines": [
+      "ExampleVictim was yelled at by ExampleKiller.",
+      "ExampleVictim was thrown off the lawn by ExampleKiller.",
+      "ExampleVictim was accidentally spit on by ExampleKiller.",
+      "ExampleVictim slipped on the fake teeth of ExampleKiller.",
+      "ExampleVictim was chased away by ExampleKiller's Golem.",
+      "Green Bed was sold in a garage sale by ExampleKiller!"
+    ]
+  },
+  {
+    "key": "socialdistance",
+    "name": "Social Distance",
+    "apiValue": "killmessages_social_distance",
+    "lines": [
+      "ExampleVictim was too shy to meet ExampleKiller.",
+      "ExampleVictim didn't distance themselves properly from ExampleKiller.",
+      "ExampleVictim was coughed at by ExampleKiller.",
+      "ExampleVictim tripped while trying to run away from ExampleKiller.",
+      "ExampleVictim got too close to ExampleKiller's Golem.",
+      "Green Bed was contaminated by ExampleKiller!"
+    ]
+  },
+  {
+    "key": "bridgingfordummies",
+    "name": "Bridging for Dummies",
+    "apiValue": "killmessages_bridging_for_dummies",
+    "lines": [
+      "ExampleVictim had a small brain moment while fighting ExampleKiller.",
+      "ExampleVictim was not able to block clutch against ExampleKiller.",
+      "ExampleVictim got 360 no-scoped by ExampleKiller.",
+      "ExampleVictim forgot how many blocks they had left while fighting ExampleKiller.",
+      "ExampleVictim got absolutely destroyed by ExampleKiller's Golem.",
+      "Green Bed has left the game after seeing ExampleKiller!"
+    ]
+  },
+  {
+    "key": "triumph",
+    "name": "Triumph",
+    "apiValue": "killmessages_triumph",
+    "lines": [
+      "ExampleVictim was bested by ExampleKiller.",
+      "ExampleVictim was ExampleKiller's final #1.",
+      "ExampleVictim was knocked into the void by ExampleKiller.",
+      "ExampleVictim was shot by ExampleKiller.",
+      "ExampleVictim was knocked off an edge by ExampleKiller.",
+      "ExampleVictim was bested by ExampleKiller's Golem.",
+      "Green Bed was bed #1 destroyed by ExampleKiller!"
+    ]
+  },
+  {
+    "key": "roar",
+    "name": "Roar",
+    "apiValue": "killmessages_roar",
+    "lines": [
+      "ExampleVictim was ripped to shreds by ExampleKiller.",
+      "ExampleVictim was charged by ExampleKiller.",
+      "ExampleVictim was pounced on by ExampleKiller.",
+      "ExampleVictim was ripped and thrown by ExampleKiller.",
+      "ExampleVictim was ripped to shreds by ExampleKiller's Golem.",
+      "Green Bed was ripped to shreds by ExampleKiller."
+    ]
+  },
+  {
+    "key": "festive",
+    "name": "Festive",
+    "apiValue": "killmessages_festive",
+    "lines": [
+      "ExampleVictim was smothered in holiday cheer by ExampleKiller.",
+      "ExampleVictim was banished into the ether by ExampleKiller's holiday spirit.",
+      "ExampleVictim was sniped by a missile of festivity by ExampleKiller.",
+      "ExampleVictim was pushed by ExampleKiller's holiday spirit.",
+      "ExampleVictim was sung holiday tunes to by ExampleKiller's Golem.",
+      "Green Bed was melted by ExampleKiller's holiday spirit!"
+    ]
+  },
+  {
+    "key": "tothemoon",
+    "name": "To The Moon",
+    "apiValue": "killmessages_to_the_moon",
+    "lines": [
+      "ExampleVictim was crushed into moon dust by ExampleKiller.",
+      "ExampleVictim was sent the wrong way by ExampleKiller.",
+      "ExampleVictim was hit by an asteroid from ExampleKiller.",
+      "ExampleVictim was blasted to the moon by ExampleKiller.",
+      "ExampleVictim was blown up by ExampleKiller's Golem.",
+      "Green Bed was blasted to dust by ExampleKiller!"
+    ]
+  },
+  {
+    "key": "wrappedup",
+    "name": "Wrapped Up",
+    "apiValue": "killmessages_wrapped_up",
+    "lines": [
+      "ExampleVictim was wrapped up by ExampleKiller.",
+      "ExampleVictim was tied into a bow by ExampleKiller.",
+      "ExampleVictim was glued up by ExampleKiller.",
+      "ExampleVictim tripped over a present placed by ExampleKiller.",
+      "ExampleVictim was taped together by ExampleKiller's Golem.",
+      "Green Bed was stuffed with tissue paper by ExampleKiller!"
+    ]
+  },
+  {
+    "key": "celebratory",
+    "name": "Celebratory",
+    "apiValue": "killmessages_celebratory",
+    "lines": [
+      "ExampleVictim was whacked with a party balloon by ExampleKiller.",
+      "ExampleVictim was popped into the void by ExampleKiller.",
+      "ExampleVictim was shot with a roman candle by ExampleKiller.",
+      "ExampleVictim was launched like a firework by ExampleKiller.",
+      "ExampleVictim was lit up by ExampleKiller's Golem.",
+      "Green Bed exploded from a firework by ExampleKiller!"
+    ]
+  },
+  {
+    "key": "eggy",
+    "name": "Eggy",
+    "apiValue": "killmessages_eggy",
+    "lines": [
+      "ExampleVictim was painted pretty by ExampleKiller.",
+      "ExampleVictim was deviled into the void by ExampleKiller.",
+      "ExampleVictim slipped into a pan placed by ExampleKiller.",
+      "ExampleVictim was flipped off the edge by ExampleKiller.",
+      "ExampleVictim was made sunny side up by ExampleKiller's Golem.",
+      "Green Bed was scrambled by ExampleKiller!"
+    ]
+  },
+  {
+    "key": "snowstorm",
+    "name": "Snow Storm",
+    "apiValue": "killmessages_snow_storm",
+    "lines": [
+      "ExampleVictim was locked outside during a snow storm by ExampleKiller.",
+      "ExampleVictim was pushed into a snowbank by ExampleKiller.",
+      "ExampleVictim was hit with a snowball from ExampleKiller.",
+      "ExampleVictim was shoved down an icy slope by ExampleKiller.",
+      "ExampleVictim got snowed in by ExampleKiller's Golem.",
+      "Green Bed was made into a snowman by ExampleKiller!"
+    ]
+  },
+  {
+    "key": "dramatic",
+    "name": "Dramatic",
+    "apiValue": "killmessages_dramatic",
+    "lines": [
+      "ExampleVictim was tragically backstabbed by ExampleKiller.",
+      "ExampleVictim was heartlessly let go by ExampleKiller.",
+      "ExampleVictim's heart was pierced by ExampleKiller.",
+      "ExampleVictim was delivered into nothingness by ExampleKiller.",
+      "ExampleVictim was dismembered by ExampleKiller's Golem.",
+      "Green Bed was dreadfully corrupted by ExampleKiller!"
+    ]
+  },
+  {
+    "key": "memed",
+    "name": "Memed",
+    "apiValue": "killmessages_memed",
+    "lines": [
+      "ExampleVictim got rekt by ExampleKiller.",
+      "ExampleVictim took the L to ExampleKiller.",
+      "ExampleVictim got smacked by ExampleKiller.",
+      "ExampleVictim got roasted by ExampleKiller.",
+      "ExampleVictim got bamboozled by ExampleKiller's Golem.",
+      "Green Bed got memed by ExampleKiller!"
+    ]
+  },
+  {
+    "key": "literallyspooky",
+    "name": "Literally Spooky",
+    "apiValue": "killmessages_spooky",
+    "lines": [
+      "ExampleVictim was spooked by ExampleKiller.",
+      "ExampleVictim was spooked off the map by ExampleKiller.",
+      "ExampleVictim was remotely spooked by ExampleKiller.",
+      "ExampleVictim was totally spooked by ExampleKiller.",
+      "ExampleVictim was spooked by ExampleKiller's Golem.",
+      "Green Bed was spooked by ExampleKiller!"
+    ]
+  },
+  {
+    "key": "pirate",
+    "name": "Pirate",
+    "apiValue": "killmessages_pirate",
+    "lines": [
+      "ExampleVictim be sent to Davy Jones' locker by ExampleKiller.",
+      "ExampleVictim be cannonballed to death by ExampleKiller.",
+      "ExampleVictim be shot and killed by ExampleKiller.",
+      "ExampleVictim be killed with magic by ExampleKiller.",
+      "ExampleVictim be killed with metal by ExampleKiller's Golem.",
+      "Green Bed be shot with cannon by ExampleKiller!"
+    ]
+  },
+  {
+    "key": "oxd",
+    "name": "Ox'd",
+    "apiValue": "killmessages_oxd",
+    "lines": [
+      "ExampleVictim was trampled by ExampleKiller.",
+      "ExampleVictim was back kicked into the void by ExampleKiller.",
+      "ExampleVictim was impaled from a distance by ExampleKiller.",
+      "ExampleVictim was headbutted off a cliff by ExampleKiller.",
+      "ExampleVictim was trampled by ExampleKiller's Golem.",
+      "Green Bed was impaled by ExampleKiller!"
+    ]
+  },
+  {
+    "key": "buzz",
+    "name": "Buzz",
+    "apiValue": "killmessages_buzz",
+    "lines": [
+      "ExampleVictim was buzzed to death by ExampleKiller.",
+      "ExampleVictim was bzzz'd into the void by ExampleKiller.",
+      "ExampleVictim was startled by ExampleKiller.",
+      "ExampleVictim was stung off the edge by ExampleKiller.",
+      "ExampleVictim was bee'd by ExampleKiller's Golem.",
+      "Green Bed was stung by ExampleKiller!"
+    ]
+  },
+  {
+    "key": "squeak",
+    "name": "Squeak",
+    "apiValue": "killmessages_squeak",
+    "lines": [
+      "ExampleVictim was chewed up by ExampleKiller.",
+      "ExampleVictim was scared into the void by ExampleKiller.",
+      "ExampleVictim stepped in a mouse trap placed by ExampleKiller.",
+      "ExampleVictim was distracted by a rat dragging pizza from ExampleKiller.",
+      "ExampleVictim squeaked around with ExampleKiller's Golem.",
+      "Green Bed was squeaked apart by ExampleKiller!"
+    ]
+  },
+  {
+    "key": "oink",
+    "name": "Oink",
+    "apiValue": "killmessages_oink",
+    "lines": [
+      "ExampleVictim was oinked by ExampleKiller.",
+      "ExampleVictim slipped into void for ExampleKiller.",
+      "ExampleVictim got attacked by a carrot from ExampleKiller.",
+      "ExampleVictim was distracted by a piglet from ExampleKiller.",
+      "ExampleVictim was oinked by ExampleKiller's Golem.",
+      "Green Bed was gulped by ExampleKiller!"
+    ]
+  },
+  {
+    "key": "primal",
+    "name": "Primal",
+    "apiValue": "killmessages_primal",
+    "lines": [
+      "ExampleVictim was hunted down by ExampleKiller.",
+      "ExampleVictim stumbled on a trap set by ExampleKiller.",
+      "ExampleVictim got skewered by ExampleKiller.",
+      "ExampleVictim was thrown into a volcano by ExampleKiller.",
+      "ExampleVictim was mauled by ExampleKiller's Golem.",
+      "Green Bed was sacrificed by ExampleKiller!"
+    ]
+  },
+  {
+    "key": "santasworkshop",
+    "name": "Santa's Workshop",
+    "apiValue": "killmessages_santas_workshop",
+    "lines": [
+      "ExampleVictim was wrapped into a gift by ExampleKiller.",
+      "ExampleVictim hit the hard-wood floor because of ExampleKiller.",
+      "ExampleVictim was put on the naughty list by ExampleKiller.",
+      "ExampleVictim was pushed down a slope by ExampleKiller.",
+      "ExampleVictim was turned to gingerbread by ExampleKiller's Golem.",
+      "Green Bed was traded in for milk and cookies by ExampleKiller!"
+    ]
+  },
+  {
+    "key": "bbq",
+    "name": "BBQ",
+    "apiValue": "killmessages_bbq",
+    "lines": [
+      "ExampleVictim was glazed in BBQ sauce by ExampleKiller.",
+      "ExampleVictim slipped in BBQ sauce off the edge spilled by ExampleKiller.",
+      "ExampleVictim was thrown chili powder at by ExampleKiller.",
+      "ExampleVictim was not spicy enough for ExampleKiller.",
+      "ExampleVictim was sliced up by ExampleKiller's Golem.",
+      "Green Bed was deep fried by ExampleKiller!"
+    ]
+  },
+  {
+    "key": "love",
+    "name": "Love",
+    "apiValue": "killmessages_love",
+    "lines": [
+      "ExampleVictim was given the cold shoulder by ExampleKiller.",
+      "ExampleVictim was hit off by a love bomb from ExampleKiller.",
+      "ExampleVictim was struck with Cupid's arrow by ExampleKiller.",
+      "ExampleVictim was out of the league of ExampleKiller.",
+      "ExampleVictim was no match for ExampleKiller's Golem.",
+      "Green Bed was dismantled by ExampleKiller!"
+    ]
+  },
+  {
+    "key": "limbo",
+    "name": "Limbo",
+    "apiValue": "killmessages_limbo",
+    "lines": [
+      "ExampleVictim was sent to limbo by ExampleKiller.",
+      "ExampleVictim was pushed into limbo by ExampleKiller.",
+      "ExampleVictim was shot into limbo by ExampleKiller.",
+      "ExampleVictim was pushed into limbo by ExampleKiller.",
+      "ExampleVictim was launched into limbo by ExampleKiller's Golem.",
+      "Green Bed was sent to limbo by ExampleKiller."
+    ]
+  },
+  {
+    "key": "multiverse",
+    "name": "Multiverse",
+    "apiValue": "killmessages_multiverse",
+    "lines": [
+      "ExampleVictim was distorted by ExampleKiller.",
+      "ExampleVictim was thrown into the singularity by ExampleKiller.",
+      "ExampleVictim was shot into another dimension by ExampleKiller.",
+      "ExampleVictim was thrown into a black hole by ExampleKiller.",
+      "ExampleVictim was launched into a wormhole by ExampleKiller's Golem.",
+      "Green Bed was sucked into a black hole by ExampleKiller."
+    ]
+  },
+  {
+    "key": "honourable",
+    "name": "Honourable",
+    "apiValue": "killmessages_honourable",
+    "lines": [
+      "ExampleVictim died in close combat to ExampleKiller.",
+      "ExampleVictim fought to the edge with ExampleKiller.",
+      "ExampleVictim fell to the great marksmanship of ExampleKiller.",
+      "ExampleVictim stumbled off a ledge with help by ExampleKiller.",
+      "ExampleVictim tangoed with ExampleKiller's Golem.",
+      "Green Bed had to raise the white flag to ExampleKiller!"
+    ]
+  },
+  {
+    "key": "western",
+    "name": "Western",
+    "apiValue": "killmessages_western",
+    "lines": [
+      "ExampleVictim was filled full of lead by ExampleKiller.",
+      "ExampleVictim met their end by ExampleKiller.",
+      "ExampleVictim was killed with dynamite by ExampleKiller.",
+      "ExampleVictim lost a drinking contest with ExampleKiller.",
+      "ExampleVictim lost the draw to ExampleKiller's Golem.",
+      "Green Bed was iced by ExampleKiller!"
+    ]
+  },
+  {
+    "key": "fire",
+    "name": "Fire",
+    "apiValue": "killmessages_fire",
+    "lines": [
+      "ExampleVictim was struck down by ExampleKiller.",
+      "ExampleVictim was turned to dust by ExampleKiller.",
+      "ExampleVictim was melted by ExampleKiller.",
+      "ExampleVictim was turned to ash by ExampleKiller.",
+      "ExampleVictim was fried by ExampleKiller's Golem.",
+      "Green Bed was incinerated by ExampleKiller!"
+    ]
+  },
+  {
+    "key": "lucid",
+    "name": "Lucid",
+    "apiValue": "killmessages_lucid",
+    "lines": [
+      "ExampleVictim was put to bed by ExampleKiller.",
+      "ExampleVictim fell asleep and was then knocked into the void by ExampleKiller.",
+      "ExampleVictim was knocked unconscious by ExampleKiller's arrow.",
+      "ExampleVictim wishes they hit the hay instead of the ground after being pushed by ExampleKiller.",
+      "ExampleVictim fell asleep to ExampleKiller's Golem.",
+      "Green Bed was destroyed by a half-awake ExampleKiller."
+    ]
+  },
+  {
+    "key": "noble",
+    "name": "Noble",
+    "apiValue": "killmessages_noble",
+    "lines": [
+      "ExampleVictim was crushed by ExampleKiller.",
+      "ExampleVictim was ExampleKiller's final #1.",
+      "ExampleVictim was dominated by ExampleKiller.",
+      "ExampleVictim was assassinated by ExampleKiller.",
+      "ExampleVictim was thrown off their high horse by ExampleKiller.",
+      "ExampleVictim was degraded by ExampleKiller's Golem."
+    ]
+  }
+]

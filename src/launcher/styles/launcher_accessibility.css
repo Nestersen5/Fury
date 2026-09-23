@@ -1,0 +1,52 @@
+/* Final accessibility cascade ------------------------------------------------
+   This file loads after the legacy theme layers so readable type remains
+   consistent even where older page-specific rules declare smaller values. */
+
+.runtime-strip .runtime-status-copy span,
+.runtime-strip .runtime-note span,
+.runtime-strip .service-kicker {
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+.runtime-strip .runtime-status-copy strong,
+.runtime-strip .service strong {
+    font-size: 14px;
+}
+
+.runtime-strip .service button,
+.runtime-strip .service .pill {
+    font-size: 12px;
+}
+
+aside.app-rail .nav-tab-copy strong {
+    font-size: 14px;
+}
+
+aside.app-rail .nav-tab-copy small {
+    font-size: 11px;
+}
+
+.workspace-shell main .settings-directory .settings-subnav-button strong {
+    font-size: 13px;
+}
+
+.workspace-shell main .settings-directory .settings-subnav-button small {
+    font-size: 11px;
+}
+
+@media (max-width: 1100px) {
+    aside.app-rail .nav-tab-copy strong {
+        font-size: 13px;
+    }
+
+    .workspace-shell main .settings-directory .settings-subnav-button strong {
+        font-size: 12.5px;
+    }
+}
+
+@media (max-width: 720px) {
+    .runtime-strip .runtime-note span {
+        font-size: 11px;
+    }
+}

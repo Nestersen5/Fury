@@ -1,0 +1,1446 @@
+{
+  "menus": {
+    "Bed Wars Menu": {
+      "slotCount": 36,
+      "items": [
+        {
+          "slot": 11,
+          "id": 12,
+          "dmg": 0,
+          "name": "§3The Slumber Hotel",
+          "lore": [
+            "§7§7Progress through the hotel to earn",
+            "§7more §drewards§7, §bxp§7, and new §acosmetics§7!",
+            "",
+            "§7§eClick to open!"
+          ]
+        },
+        {
+          "slot": 13,
+          "id": 416,
+          "dmg": 0,
+          "name": "§aMy Cosmetics",
+          "lore": [
+            "§7Browse and equip all the available",
+            "§7in-game Bed Wars cosmetics.",
+            "§7",
+            "§7§eClick to browse!"
+          ]
+        },
+        {
+          "slot": 15,
+          "id": 404,
+          "dmg": 0,
+          "name": "§aGame Settings",
+          "lore": [
+            "§7Adjust game settings for Bed Wars.",
+            "§7",
+            "§7§eClick to open!"
+          ]
+        },
+        {
+          "slot": 31,
+          "id": 166,
+          "dmg": 0,
+          "name": "§cClose",
+          "lore": []
+        }
+      ]
+    },
+    "My Cosmetics": {
+      "slotCount": 54,
+      "items": [
+        {
+          "slot": 10,
+          "id": 355,
+          "dmg": 0,
+          "name": "§aBed Destroys ",
+          "lore": [
+            "§7Select from various Bed Destroy",
+            "§7effects, which will occur when you",
+            "§7break a bed!",
+            "",
+            "§7Unlocked: §a3/23 §8(13%)",
+            "§7Currently Selected:",
+            "§aTornado",
+            "",
+            "§eClick to view!"
+          ]
+        },
+        {
+          "slot": 12,
+          "id": 370,
+          "dmg": 0,
+          "name": "§aDeath Cries ",
+          "lore": [
+            "§7Let others know just how salty your",
+            "§7tears are every time you die with",
+            "§7these death cries!",
+            "",
+            "§7Unlocked: §a0/39 §8(0%)",
+            "§7Currently Selected:",
+            "§aNONE",
+            "",
+            "§eClick to view!"
+          ]
+        },
+        {
+          "slot": 14,
+          "id": 416,
+          "dmg": 0,
+          "name": "§aFigurines ",
+          "lore": [
+            "§7Choose which of your figurines is",
+            "§7showcased at your base in games!",
+            "",
+            "§7Unlocked: §a0/52 §8(0%)",
+            "§7Currently Selected:",
+            "§aNONE",
+            "",
+            "§eClick to view!"
+          ]
+        },
+        {
+          "slot": 16,
+          "id": 331,
+          "dmg": 0,
+          "name": "§aFinal Kill Effects ",
+          "lore": [
+            "§7A selection of various effects to",
+            "§7choose from that will trigger",
+            "§7whenever you final kill an enemy!",
+            "",
+            "§7Unlocked: §a3/68 §8(4%)",
+            "§7Currently Selected:",
+            "§aCookie Fountain",
+            "",
+            "§eClick to view!"
+          ]
+        },
+        {
+          "slot": 18,
+          "id": 264,
+          "dmg": 0,
+          "name": "§aGlyphs ",
+          "lore": [
+            "§7Select a Glyph image which will",
+            "§7appear when picking up diamonds and",
+            "§7emeralds!",
+            "",
+            "§7Unlocked: §a0/117 §8(0%)",
+            "§7Currently Selected:",
+            "§aNONE",
+            "",
+            "§eClick to view!"
+          ]
+        },
+        {
+          "slot": 20,
+          "id": 397,
+          "dmg": 3,
+          "name": "§aIsland Toppers ",
+          "lore": [
+            "§7Select an Island Topper to decorate",
+            "§7your island with! In Doubles and",
+            "§7Teams Modes a random player's",
+            "§7choice from each team is chosen.",
+            "",
+            "§7Unlocked: §a0/175 §8(0%)",
+            "§7Currently Selected:",
+            "§aNONE",
+            "",
+            "§eClick to view!"
+          ]
+        },
+        {
+          "slot": 22,
+          "id": 323,
+          "dmg": 0,
+          "name": "§aKill Messages ",
+          "lore": [
+            "§7Select a Kill Message package to",
+            "§7replace chat messages when you kill",
+            "§7players, Teams and break Beds!",
+            "",
+            "§7Unlocked: §a1/32 §8(3%)",
+            "§7Currently Selected:",
+            "§aLove",
+            "",
+            "§eClick to view!"
+          ]
+        },
+        {
+          "slot": 24,
+          "id": 421,
+          "dmg": 0,
+          "name": "§aPrestige Customizer",
+          "lore": [
+            "§7Choose the colors, star, and",
+            "§7brackets of your prestige!",
+            "",
+            "§7Preview: §7[25✫]",
+            "",
+            "§7§eClick to view!"
+          ]
+        },
+        {
+          "slot": 26,
+          "id": 262,
+          "dmg": 0,
+          "name": "§aProjectile Trails ",
+          "lore": [
+            "§7Change your projectile particle trail",
+            "§7effect.",
+            "",
+            "§7Unlocked: §a0/68 §8(0%)",
+            "§7Currently Selected:",
+            "§aNone",
+            "",
+            "§eClick to view!"
+          ]
+        },
+        {
+          "slot": 28,
+          "id": 383,
+          "dmg": 120,
+          "name": "§aShopkeeper Skins ",
+          "lore": [
+            "§7Select from various Shopkeeper",
+            "§7skins, which will replace how the",
+            "§7Shopkeepers look in-game! In",
+            "§7Doubles and Teams Modes a random",
+            "§7player's choice from each team is",
+            "§7chosen.",
+            "",
+            "§7Unlocked: §a0/100 §8(0%)",
+            "§7Currently Selected:",
+            "§aBlacksmith",
+            "",
+            "§eClick to view!"
+          ]
+        },
+        {
+          "slot": 30,
+          "id": 358,
+          "dmg": 0,
+          "name": "§aSprays ",
+          "lore": [
+            "§7Select a spray to show off all over",
+            "§7the place! Spray slots can be found",
+            "§7on every spawn island and some",
+            "§7center islands.",
+            "",
+            "§7Unlocked: §a2/162 §8(1%)",
+            "§7Currently Selected:",
+            "§aHypixel Logo",
+            "",
+            "§eClick to view!"
+          ]
+        },
+        {
+          "slot": 32,
+          "id": 397,
+          "dmg": 3,
+          "name": "§aVictory Dances ",
+          "lore": [
+            "§7Celebrate by gloating and showing",
+            "§7off to other players whenever you",
+            "§7win!",
+            "",
+            "§7Unlocked: §a0/53 §8(0%)",
+            "§7Currently Selected:",
+            "§aNone",
+            "",
+            "§eClick to view!"
+          ]
+        },
+        {
+          "slot": 34,
+          "id": 5,
+          "dmg": 5,
+          "name": "§aWood Skins ",
+          "lore": [
+            "§7Change the Skin of Wood in-game.",
+            "",
+            "§7Unlocked: §a2/11 §8(18%)",
+            "§7Currently Selected:",
+            "§aOak Plank",
+            "",
+            "§eClick to view!"
+          ]
+        },
+        {
+          "slot": 48,
+          "id": 262,
+          "dmg": 0,
+          "name": "§aGo Back",
+          "lore": [
+            "§7To Bed Wars Menu"
+          ]
+        },
+        {
+          "slot": 49,
+          "id": 388,
+          "dmg": 0,
+          "name": "§7Total Tokens: §20",
+          "lore": [
+            "§6https://store.hypixel.net"
+          ]
+        },
+        {
+          "slot": 50,
+          "id": 345,
+          "dmg": 0,
+          "name": "§aSearch",
+          "lore": [
+            "§7Use this feature to easily find a",
+            "§7specific cosmetic item."
+          ]
+        }
+      ]
+    },
+    "Kill Messages": {
+      "slotCount": 54,
+      "items": [
+        {
+          "slot": 10,
+          "id": 166,
+          "dmg": 0,
+          "name": "§aDEFAULT",
+          "lore": [
+            "§8Kill Messages",
+            "",
+            "§7Select the DEFAULT Kill Messages!",
+            "§eClick to select!"
+          ]
+        },
+        {
+          "slot": 11,
+          "id": 54,
+          "dmg": 0,
+          "name": "§aRandom Kill Messages",
+          "lore": [
+            "§7Use random Kill Messages!",
+            "",
+            "§eClick to select!"
+          ]
+        },
+        {
+          "slot": 12,
+          "id": 130,
+          "dmg": 0,
+          "name": "§aRandom Favorite Kill Messages",
+          "lore": [
+            "§7Use Random §6✯ Favorite §7Kill Messages!",
+            "",
+            "§eClick to select!"
+          ]
+        },
+        {
+          "slot": 13,
+          "id": 377,
+          "dmg": 0,
+          "name": "§aFire",
+          "lore": [
+            "§8Kill Messages",
+            "",
+            "§7Select the Fire Kill Messages!",
+            "",
+            "§eRight-Click to preview!",
+            "",
+            "§7Rarity: §aCOMMON",
+            "",
+            "§7Cost: §25,000 Tokens",
+            "",
+            "§eClick to purchase!"
+          ]
+        },
+        {
+          "slot": 14,
+          "id": 261,
+          "dmg": 0,
+          "name": "§aWestern",
+          "lore": [
+            "§8Kill Messages",
+            "",
+            "§7Select the Western Kill Messages!",
+            "",
+            "§eRight-Click to preview!",
+            "",
+            "§7Rarity: §aCOMMON",
+            "",
+            "§7Cost: §25,000 Tokens",
+            "",
+            "§eClick to purchase!"
+          ]
+        },
+        {
+          "slot": 15,
+          "id": 264,
+          "dmg": 0,
+          "name": "§aHonourable",
+          "lore": [
+            "§8Kill Messages",
+            "",
+            "§7Select the Honourable Kill Messages!",
+            "",
+            "§eRight-Click to preview!",
+            "",
+            "§7Rarity: §aCOMMON",
+            "",
+            "§7Cost: §25,000 Tokens",
+            "",
+            "§eClick to purchase!"
+          ]
+        },
+        {
+          "slot": 16,
+          "id": 120,
+          "dmg": 0,
+          "name": "§cMultiverse",
+          "lore": [
+            "§8Kill Messages",
+            "",
+            "§7Select the Multiverse Kill Messages!",
+            "",
+            "§eRight-Click to preview!",
+            "",
+            "§7§3Unlocked through the Slumber Hotel!"
+          ]
+        },
+        {
+          "slot": 19,
+          "id": 368,
+          "dmg": 0,
+          "name": "§cLimbo",
+          "lore": [
+            "§8Kill Messages",
+            "",
+            "§7Select the Limbo Kill Messages!",
+            "",
+            "§eRight-Click to preview!",
+            "",
+            "§7§3Unlocked through the Slumber Hotel!"
+          ]
+        },
+        {
+          "slot": 20,
+          "id": 397,
+          "dmg": 3,
+          "name": "§aLove",
+          "lore": [
+            "§8Kill Messages",
+            "",
+            "§7Select the Love Kill Messages!",
+            "",
+            "§eRight-Click to preview!",
+            "§aSELECTED!",
+            "§eShift-click to toggle favorite!"
+          ]
+        },
+        {
+          "slot": 21,
+          "id": 397,
+          "dmg": 3,
+          "name": "§aBBQ",
+          "lore": [
+            "§8Kill Messages",
+            "",
+            "§7Select the BBQ Kill Messages!",
+            "",
+            "§eRight-Click to preview!",
+            "",
+            "§7Rarity: §bRARE",
+            "",
+            "§7Cost: §210,000 Tokens",
+            "",
+            "§eClick to purchase!"
+          ]
+        },
+        {
+          "slot": 22,
+          "id": 352,
+          "dmg": 0,
+          "name": "§aWoof Woof",
+          "lore": [
+            "§8Kill Messages",
+            "",
+            "§7Select the Woof Woof Kill Messages!",
+            "",
+            "§eRight-Click to preview!",
+            "",
+            "§7Rarity: §bRARE",
+            "",
+            "§7Cost: §210,000 Tokens",
+            "",
+            "§eClick to purchase!"
+          ]
+        },
+        {
+          "slot": 23,
+          "id": 332,
+          "dmg": 0,
+          "name": "§cSanta's Workshop",
+          "lore": [
+            "§8Kill Messages",
+            "",
+            "§7Select the Santa's Workshop Kill",
+            "§7Messages!",
+            "",
+            "§eRight-Click to preview!",
+            "",
+            "§cAvailable during the Holidays Event!"
+          ]
+        },
+        {
+          "slot": 24,
+          "id": 275,
+          "dmg": 0,
+          "name": "§cPrimal",
+          "lore": [
+            "§8Kill Messages",
+            "",
+            "§7Select the Primal Kill Messages!",
+            "",
+            "§eRight-Click to preview!",
+            "",
+            "§cAvailable during the Halloween Event!"
+          ]
+        },
+        {
+          "slot": 25,
+          "id": 398,
+          "dmg": 0,
+          "name": "§aOink",
+          "lore": [
+            "§8Kill Messages",
+            "",
+            "§7Select the Oink Kill Messages!",
+            "",
+            "§eRight-Click to preview!",
+            "",
+            "§7Rarity: §bRARE",
+            "",
+            "§7Cost: §210,000 Tokens",
+            "",
+            "§eClick to purchase!"
+          ]
+        },
+        {
+          "slot": 28,
+          "id": 397,
+          "dmg": 3,
+          "name": "§aSqueak",
+          "lore": [
+            "§8Kill Messages",
+            "",
+            "§7Select the Squeak Kill Messages!",
+            "",
+            "§eRight-Click to preview!",
+            "",
+            "§7Rarity: §bRARE",
+            "",
+            "§7Cost: §210,000 Tokens",
+            "",
+            "§eClick to purchase!"
+          ]
+        },
+        {
+          "slot": 29,
+          "id": 397,
+          "dmg": 3,
+          "name": "§cBuzz",
+          "lore": [
+            "§8Kill Messages",
+            "",
+            "§7Select the Buzz Kill Messages!",
+            "",
+            "§eRight-Click to preview!",
+            "",
+            "§cAvailable during the Easter Event!"
+          ]
+        },
+        {
+          "slot": 30,
+          "id": 397,
+          "dmg": 3,
+          "name": "§aOx'd",
+          "lore": [
+            "§8Kill Messages",
+            "",
+            "§7Select the Ox'd Kill Messages!",
+            "",
+            "§eRight-Click to preview!",
+            "",
+            "§7Rarity: §bRARE",
+            "",
+            "§7Cost: §210,000 Tokens",
+            "",
+            "§eClick to purchase!"
+          ]
+        },
+        {
+          "slot": 31,
+          "id": 397,
+          "dmg": 3,
+          "name": "§aPirate",
+          "lore": [
+            "§8Kill Messages",
+            "",
+            "§7Select the Pirate Kill Messages!",
+            "",
+            "§eRight-Click to preview!",
+            "",
+            "§7Rarity: §5EPIC",
+            "",
+            "§7Cost: §225,000 Tokens",
+            "",
+            "§eClick to purchase!"
+          ]
+        },
+        {
+          "slot": 32,
+          "id": 86,
+          "dmg": 0,
+          "name": "§cLiterally Spooky",
+          "lore": [
+            "§8Kill Messages",
+            "",
+            "§7Select the Literally Spooky Kill",
+            "§7Messages!",
+            "",
+            "§eRight-Click to preview!",
+            "",
+            "§cAvailable during the Halloween Event!"
+          ]
+        },
+        {
+          "slot": 33,
+          "id": 397,
+          "dmg": 3,
+          "name": "§cMemed",
+          "lore": [
+            "§8Kill Messages",
+            "",
+            "§7Select the Memed Kill Messages!",
+            "",
+            "§eRight-Click to preview!",
+            "",
+            "§cAvailable during the Holidays Event!"
+          ]
+        },
+        {
+          "slot": 34,
+          "id": 397,
+          "dmg": 3,
+          "name": "§cDramatic",
+          "lore": [
+            "§8Kill Messages",
+            "",
+            "§7Select the Dramatic Kill Messages!",
+            "",
+            "§eRight-Click to preview!",
+            "",
+            "§cAvailable during the Halloween Event!"
+          ]
+        },
+        {
+          "slot": 48,
+          "id": 262,
+          "dmg": 0,
+          "name": "§aGo Back",
+          "lore": [
+            "§7To My Cosmetics"
+          ]
+        },
+        {
+          "slot": 49,
+          "id": 388,
+          "dmg": 0,
+          "name": "§7Total Tokens: §20",
+          "lore": [
+            "§6https://store.hypixel.net"
+          ]
+        },
+        {
+          "slot": 50,
+          "id": 154,
+          "dmg": 0,
+          "name": "§6Sorted by: §aLowest rarity first",
+          "lore": [
+            "§7Sorts by rarity: Lowest rarity first",
+            "",
+            "§7Next sort: §aHighest rarity first",
+            "§eLeft click to use!",
+            "",
+            "§7Owned items first: §cNo",
+            "§eRight click to toggle!"
+          ]
+        },
+        {
+          "slot": 53,
+          "id": 262,
+          "dmg": 0,
+          "name": "§eLeft-click for next page!",
+          "lore": [
+            "§bRight-click for last page!"
+          ]
+        }
+      ]
+    },
+    "Kill Messages (Page 2)": {
+      "slotCount": 54,
+      "items": [
+        {
+          "slot": 10,
+          "id": 286,
+          "dmg": 0,
+          "name": "§cNoble",
+          "lore": [
+            "§8Kill Messages",
+            "",
+            "§7Select the Noble Kill Messages!",
+            "",
+            "§bThis kill message shouts your",
+            "§bnumber of final kills and bed",
+            "§bdestroys.",
+            "",
+            "§eRight-Click to preview!",
+            "",
+            "§7Rarity: §5EPIC",
+            "",
+            "§7§6Unlocked in Battle Pass: Season 1!"
+          ]
+        },
+        {
+          "slot": 11,
+          "id": 397,
+          "dmg": 3,
+          "name": "§cSnow Storm",
+          "lore": [
+            "§8Kill Messages",
+            "",
+            "§7Select the Snow Storm Kill Messages!",
+            "",
+            "§eRight-Click to preview!",
+            "",
+            "§cAvailable during the Holidays Event!"
+          ]
+        },
+        {
+          "slot": 12,
+          "id": 344,
+          "dmg": 0,
+          "name": "§cEggy",
+          "lore": [
+            "§8Kill Messages",
+            "",
+            "§7Select the Eggy Kill Messages!",
+            "",
+            "§eRight-Click to preview!",
+            "",
+            "§cAvailable during the Easter Event!"
+          ]
+        },
+        {
+          "slot": 13,
+          "id": 352,
+          "dmg": 0,
+          "name": "§cCelebratory",
+          "lore": [
+            "§8Kill Messages",
+            "",
+            "§7Select the Celebratory Kill Messages!",
+            "",
+            "§eRight-Click to preview!",
+            "",
+            "§cAvailable during the Holidays Event!"
+          ]
+        },
+        {
+          "slot": 14,
+          "id": 397,
+          "dmg": 3,
+          "name": "§cWrapped Up",
+          "lore": [
+            "§8Kill Messages",
+            "",
+            "§7Select the Wrapped Up Kill Messages!",
+            "",
+            "§eRight-Click to preview!",
+            "",
+            "§cAvailable during the Holidays Event!"
+          ]
+        },
+        {
+          "slot": 15,
+          "id": 402,
+          "dmg": 0,
+          "name": "§aTo The Moon",
+          "lore": [
+            "§8Kill Messages",
+            "",
+            "§7Select the To The Moon Kill Messages!",
+            "",
+            "§eRight-Click to preview!",
+            "",
+            "§7Rarity: §5EPIC",
+            "",
+            "§7Cost: §225,000 Tokens",
+            "",
+            "§eClick to purchase!"
+          ]
+        },
+        {
+          "slot": 16,
+          "id": 401,
+          "dmg": 0,
+          "name": "§cFestive",
+          "lore": [
+            "§8Kill Messages",
+            "",
+            "§7Select the Festive Kill Messages!",
+            "",
+            "§eRight-Click to preview!",
+            "",
+            "§cAvailable during the Holidays Event!"
+          ]
+        },
+        {
+          "slot": 19,
+          "id": 351,
+          "dmg": 14,
+          "name": "§aRoar",
+          "lore": [
+            "§8Kill Messages",
+            "",
+            "§7Select the Roar Kill Messages!",
+            "",
+            "§eRight-Click to preview!",
+            "",
+            "§7Rarity: §5EPIC",
+            "",
+            "§7Cost: §225,000 Tokens",
+            "",
+            "§eClick to purchase!"
+          ]
+        },
+        {
+          "slot": 20,
+          "id": 283,
+          "dmg": 0,
+          "name": "§cTriumph",
+          "lore": [
+            "§8Kill Messages",
+            "",
+            "§7Select the Triumph Kill Messages!",
+            "",
+            "§bThis kill message shouts your",
+            "§bnumber of final kills and bed",
+            "§bdestroys.",
+            "",
+            "§eRight-Click to preview!",
+            "",
+            "§cAvailable during the Halloween Event!"
+          ]
+        },
+        {
+          "slot": 21,
+          "id": 19,
+          "dmg": 0,
+          "name": "§cBridging for Dummies",
+          "lore": [
+            "§8Kill Messages",
+            "",
+            "§7Select the Bridging for Dummies Kill",
+            "§7Messages!",
+            "",
+            "§eRight-Click to preview!",
+            "",
+            "§7Rarity: §6LEGENDARY",
+            "",
+            "§7§6Unlocked through Challenges"
+          ]
+        },
+        {
+          "slot": 22,
+          "id": 280,
+          "dmg": 0,
+          "name": "§cSocial Distance",
+          "lore": [
+            "§8Kill Messages",
+            "",
+            "§7Select the Social Distance Kill",
+            "§7Messages!",
+            "",
+            "§eRight-Click to preview!",
+            "",
+            "§7Rarity: §6LEGENDARY",
+            "",
+            "§7§6Unlocked through Challenges"
+          ]
+        },
+        {
+          "slot": 23,
+          "id": 301,
+          "dmg": 0,
+          "name": "§cOld Man",
+          "lore": [
+            "§8Kill Messages",
+            "",
+            "§7Select the Old Man Kill Messages!",
+            "",
+            "§eRight-Click to preview!",
+            "",
+            "§7Rarity: §6LEGENDARY",
+            "",
+            "§7§6Unlocked through Challenges"
+          ]
+        },
+        {
+          "slot": 24,
+          "id": 314,
+          "dmg": 0,
+          "name": "§cGlorious",
+          "lore": [
+            "§8Kill Messages",
+            "",
+            "§7Select the Glorious Kill Messages!",
+            "",
+            "§bThis kill message shouts your",
+            "§bnumber of final kills and bed",
+            "§bdestroys.",
+            "",
+            "§eRight-Click to preview!",
+            "",
+            "§7Rarity: §6LEGENDARY",
+            "",
+            "§7§9Unlocked in the Dreamfeast"
+          ]
+        },
+        {
+          "slot": 25,
+          "id": 355,
+          "dmg": 0,
+          "name": "§cLucid",
+          "lore": [
+            "§8Kill Messages",
+            "",
+            "§7Select the Lucid Kill Messages!",
+            "",
+            "§eRight-Click to preview!",
+            "",
+            "§7Rarity: §6LEGENDARY",
+            "",
+            "§7§9Unlocked in the Dreamfeast"
+          ]
+        },
+        {
+          "slot": 45,
+          "id": 262,
+          "dmg": 0,
+          "name": "§eLeft-click for previous page!",
+          "lore": [
+            "§bRight-click for first page!"
+          ]
+        },
+        {
+          "slot": 48,
+          "id": 262,
+          "dmg": 0,
+          "name": "§aGo Back",
+          "lore": [
+            "§7To My Cosmetics"
+          ]
+        },
+        {
+          "slot": 49,
+          "id": 388,
+          "dmg": 0,
+          "name": "§7Total Tokens: §20",
+          "lore": [
+            "§6https://store.hypixel.net"
+          ]
+        },
+        {
+          "slot": 50,
+          "id": 154,
+          "dmg": 0,
+          "name": "§6Sorted by: §aLowest rarity first",
+          "lore": [
+            "§7Sorts by rarity: Lowest rarity first",
+            "",
+            "§7Next sort: §aHighest rarity first",
+            "§eLeft click to use!",
+            "",
+            "§7Owned items first: §cNo",
+            "§eRight click to toggle!"
+          ]
+        }
+      ]
+    }
+  },
+  "previews": {
+    "Western": [
+      {
+        "extra": [
+          {
+            "color": "green",
+            "text": "Player "
+          },
+          {
+            "color": "gray",
+            "text": "was filled full of lead by "
+          },
+          {
+            "color": "green",
+            "text": "ExampleKiller"
+          },
+          {
+            "color": "gray",
+            "text": "."
+          }
+        ],
+        "text": ""
+      },
+      {
+        "extra": [
+          {
+            "color": "green",
+            "text": "Player "
+          },
+          {
+            "color": "gray",
+            "text": "met their end by "
+          },
+          {
+            "color": "green",
+            "text": "ExampleKiller"
+          },
+          {
+            "color": "gray",
+            "text": "."
+          }
+        ],
+        "text": ""
+      },
+      {
+        "extra": [
+          {
+            "color": "green",
+            "text": "Player "
+          },
+          {
+            "color": "gray",
+            "text": "was killed with dynamite by "
+          },
+          {
+            "color": "green",
+            "text": "ExampleKiller"
+          },
+          {
+            "color": "gray",
+            "text": "."
+          }
+        ],
+        "text": ""
+      },
+      {
+        "extra": [
+          {
+            "color": "green",
+            "text": "Player "
+          },
+          {
+            "color": "gray",
+            "text": "lost a drinking contest with "
+          },
+          {
+            "color": "green",
+            "text": "ExampleKiller"
+          },
+          {
+            "color": "gray",
+            "text": "."
+          }
+        ],
+        "text": ""
+      },
+      {
+        "extra": [
+          {
+            "color": "green",
+            "text": "Player "
+          },
+          {
+            "color": "gray",
+            "text": "lost the draw to "
+          },
+          {
+            "color": "green",
+            "text": "ExampleKiller"
+          },
+          {
+            "color": "gray",
+            "text": "'s Golem."
+          }
+        ],
+        "text": ""
+      },
+      {
+        "extra": [
+          {
+            "color": "green",
+            "text": "Green Bed "
+          },
+          {
+            "color": "gray",
+            "text": "was iced by "
+          },
+          {
+            "color": "green",
+            "text": "ExampleKiller"
+          },
+          {
+            "color": "gray",
+            "text": "!"
+          }
+        ],
+        "text": ""
+      }
+    ],
+    "Glorious": [
+      {
+        "extra": [
+          {
+            "color": "green",
+            "text": "Player "
+          },
+          {
+            "color": "gray",
+            "text": "was "
+          },
+          {
+            "color": "gold",
+            "text": "stomped "
+          },
+          {
+            "color": "gray",
+            "text": "by "
+          },
+          {
+            "color": "green",
+            "text": "ExampleKiller"
+          },
+          {
+            "color": "gray",
+            "text": "."
+          }
+        ],
+        "text": ""
+      },
+      {
+        "extra": [
+          {
+            "color": "green",
+            "text": "Player "
+          },
+          {
+            "color": "gray",
+            "text": "was "
+          },
+          {
+            "color": "green",
+            "text": "ExampleKiller"
+          },
+          {
+            "color": "gray",
+            "text": "'s final "
+          },
+          {
+            "color": "yellow",
+            "text": "#1"
+          },
+          {
+            "color": "gray",
+            "text": "."
+          }
+        ],
+        "text": ""
+      },
+      {
+        "extra": [
+          {
+            "color": "green",
+            "text": "Player "
+          },
+          {
+            "color": "gray",
+            "text": "was thrown down a "
+          },
+          {
+            "color": "gold",
+            "text": "pit "
+          },
+          {
+            "color": "gray",
+            "text": "by "
+          },
+          {
+            "color": "green",
+            "text": "ExampleKiller"
+          },
+          {
+            "color": "gray",
+            "text": "."
+          }
+        ],
+        "text": ""
+      },
+      {
+        "extra": [
+          {
+            "color": "green",
+            "text": "Player "
+          },
+          {
+            "color": "gray",
+            "text": "was "
+          },
+          {
+            "color": "gold",
+            "text": "shot "
+          },
+          {
+            "color": "gray",
+            "text": "by "
+          },
+          {
+            "color": "green",
+            "text": "ExampleKiller"
+          },
+          {
+            "color": "gray",
+            "text": "."
+          }
+        ],
+        "text": ""
+      },
+      {
+        "extra": [
+          {
+            "color": "green",
+            "text": "Player "
+          },
+          {
+            "color": "gray",
+            "text": "was thrown to the "
+          },
+          {
+            "color": "gold",
+            "text": "ground "
+          },
+          {
+            "color": "gray",
+            "text": "by "
+          },
+          {
+            "color": "green",
+            "text": "ExampleKiller"
+          },
+          {
+            "color": "gray",
+            "text": "."
+          }
+        ],
+        "text": ""
+      },
+      {
+        "extra": [
+          {
+            "color": "green",
+            "text": "Player "
+          },
+          {
+            "color": "gray",
+            "text": "was "
+          },
+          {
+            "color": "gold",
+            "text": "outclassed "
+          },
+          {
+            "color": "gray",
+            "text": "by "
+          },
+          {
+            "color": "green",
+            "text": "ExampleKiller"
+          },
+          {
+            "color": "gray",
+            "text": "'s Golem."
+          }
+        ],
+        "text": ""
+      },
+      {
+        "extra": [
+          {
+            "color": "green",
+            "text": "Green Bed "
+          },
+          {
+            "color": "gray",
+            "text": "was bed "
+          },
+          {
+            "color": "yellow",
+            "text": "#1 "
+          },
+          {
+            "color": "gray",
+            "text": "destroyed by "
+          },
+          {
+            "color": "green",
+            "text": "ExampleKiller"
+          },
+          {
+            "color": "gray",
+            "text": "!"
+          }
+        ],
+        "text": ""
+      }
+    ],
+    "Fire": [
+      {
+        "extra": [
+          {
+            "color": "green",
+            "text": "Player "
+          },
+          {
+            "color": "gray",
+            "text": "was struck down by "
+          },
+          {
+            "color": "green",
+            "text": "ExampleKiller"
+          },
+          {
+            "color": "gray",
+            "text": "."
+          }
+        ],
+        "text": ""
+      },
+      {
+        "extra": [
+          {
+            "color": "green",
+            "text": "Player "
+          },
+          {
+            "color": "gray",
+            "text": "was turned to dust by "
+          },
+          {
+            "color": "green",
+            "text": "ExampleKiller"
+          },
+          {
+            "color": "gray",
+            "text": "."
+          }
+        ],
+        "text": ""
+      },
+      {
+        "extra": [
+          {
+            "color": "green",
+            "text": "Player "
+          },
+          {
+            "color": "gray",
+            "text": "was melted by "
+          },
+          {
+            "color": "green",
+            "text": "ExampleKiller"
+          },
+          {
+            "color": "gray",
+            "text": "."
+          }
+        ],
+        "text": ""
+      },
+      {
+        "extra": [
+          {
+            "color": "green",
+            "text": "Player "
+          },
+          {
+            "color": "gray",
+            "text": "was turned to ash by "
+          },
+          {
+            "color": "green",
+            "text": "ExampleKiller"
+          },
+          {
+            "color": "gray",
+            "text": "."
+          }
+        ],
+        "text": ""
+      },
+      {
+        "extra": [
+          {
+            "color": "green",
+            "text": "Player "
+          },
+          {
+            "color": "gray",
+            "text": "was fried by "
+          },
+          {
+            "color": "green",
+            "text": "ExampleKiller"
+          },
+          {
+            "color": "gray",
+            "text": "'s Golem."
+          }
+        ],
+        "text": ""
+      },
+      {
+        "extra": [
+          {
+            "color": "green",
+            "text": "Green Bed "
+          },
+          {
+            "color": "gray",
+            "text": "was incinerated by "
+          },
+          {
+            "color": "green",
+            "text": "ExampleKiller"
+          },
+          {
+            "color": "gray",
+            "text": "!"
+          }
+        ],
+        "text": ""
+      }
+    ]
+  }
+}

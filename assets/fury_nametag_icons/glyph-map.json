@@ -1,0 +1,110 @@
+{
+  "blatant_cheater": {
+    "acronym": "BC",
+    "codePoints": [
+      "U+E000",
+      "U+E001"
+    ],
+    "characters": [
+      "",
+      ""
+    ],
+    "character": ""
+  },
+  "closet_cheater": {
+    "acronym": "CC",
+    "codePoints": [
+      "U+E002",
+      "U+E003"
+    ],
+    "characters": [
+      "",
+      ""
+    ],
+    "character": ""
+  },
+  "confirmed_cheater": {
+    "acronym": "CF",
+    "codePoints": [
+      "U+E004",
+      "U+E005"
+    ],
+    "characters": [
+      "",
+      ""
+    ],
+    "character": ""
+  },
+  "caution": {
+    "acronym": "CA",
+    "codePoints": [
+      "U+E006",
+      "U+E007"
+    ],
+    "characters": [
+      "",
+      ""
+    ],
+    "character": ""
+  },
+  "sniper": {
+    "acronym": "SN",
+    "codePoints": [
+      "U+E008",
+      "U+E009"
+    ],
+    "characters": [
+      "",
+      ""
+    ],
+    "character": ""
+  },
+  "legit_sniper": {
+    "acronym": "LS",
+    "codePoints": [
+      "U+E00A",
+      "U+E00B"
+    ],
+    "characters": [
+      "",
+      ""
+    ],
+    "character": ""
+  },
+  "account": {
+    "acronym": "AC",
+    "codePoints": [
+      "U+E00C",
+      "U+E00D"
+    ],
+    "characters": [
+      "",
+      ""
+    ],
+    "character": ""
+  },
+  "blacklisted": {
+    "acronym": "BL",
+    "codePoints": [
+      "U+E00E",
+      "U+E00F"
+    ],
+    "characters": [
+      "",
+      ""
+    ],
+    "character": ""
+  },
+  "nicked": {
+    "acronym": "NK",
+    "codePoints": [
+      "U+E010",
+      "U+E011"
+    ],
+    "characters": [
+      "",
+      ""
+    ],
+    "character": ""
+  }
+}

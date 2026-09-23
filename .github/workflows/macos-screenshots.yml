@@ -1,0 +1,50 @@
+name: macOS screenshots
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_run_id:
+        description: Successful Fury macOS distributions workflow run to capture
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  capture:
+    runs-on: macos-15
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.23.2'
+      - name: Download the tested Apple Silicon app
+        uses: actions/download-artifact@v4
+        with:
+          name: Fury-mac-arm64
+          run-id: ${{ inputs.build_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: downloaded-release
+      - name: Extract the original app
+        shell: bash
+        run: |
+          cd downloaded-release
+          shasum -a 256 -c SHA256-arm64.txt
+          ditto -x -k Fury-Portable-*-mac-arm64.zip "$RUNNER_TEMP/Fury Screenshot App"
+          codesign --verify --deep --strict "$RUNNER_TEMP/Fury Screenshot App/Fury.app"
+      - name: Run the app and capture actual macOS screenshots
+        env:
+          FURY_SOURCE_BUILD_RUN: https://github.com/${{ github.repository }}/actions/runs/${{ inputs.build_run_id }}
+        run: node scripts/capture_macos_app.js "$RUNNER_TEMP/Fury Screenshot App/Fury.app" screenshots
+      - name: Verify app stayed unchanged
+        run: codesign --verify --deep --strict "$RUNNER_TEMP/Fury Screenshot App/Fury.app"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Fury-real-macOS-screenshots
+          path: screenshots/
+          if-no-files-found: error
+          retention-days: 14

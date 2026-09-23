@@ -1,0 +1,185 @@
+/* Windows preview: plain type, two address fields, and no decorative artwork. */
+.windows-simple-design .proxy-wordmark {
+    min-height: 38px;
+    font-family: "Segoe UI", Arial, sans-serif;
+    font-size: 29px;
+    font-weight: 700;
+    letter-spacing: -1.2px;
+}
+
+.windows-simple-design .proxy-wordmark::after {
+    content: none;
+}
+
+@media (min-width: 881px) {
+    .windows-simple-design header.app-topbar {
+        grid-template-columns: max-content minmax(220px, 1fr) max-content;
+    }
+
+    .windows-simple-design .brand-runtime-controls {
+        display: inline-flex;
+    }
+}
+
+.windows-simple-design .dashboard-server-guide {
+    padding: 22px 24px 16px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--panel);
+    box-shadow: none;
+}
+
+.windows-simple-design #join-proxy-title {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 650;
+    line-height: 1.4;
+    letter-spacing: -.2px;
+}
+
+.windows-simple-design .join-steps {
+    margin: 14px 0 22px;
+    padding-left: 20px;
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.8;
+}
+
+.windows-simple-design .join-steps li {
+    padding-left: 3px;
+}
+
+.windows-simple-design .join-steps strong {
+    color: var(--text);
+    font-weight: 500;
+}
+
+.windows-simple-design .join-addresses {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px;
+}
+
+.windows-simple-design .join-route {
+    min-width: 0;
+}
+
+.windows-simple-design .join-route label {
+    display: block;
+    margin: 0 0 4px;
+    color: var(--text-strong);
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.windows-simple-design .join-route p,
+.windows-simple-design .join-footer {
+    margin: 0;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.windows-simple-design .join-address-field {
+    display: flex;
+    align-items: stretch;
+    margin-top: 10px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    background: var(--bg);
+}
+
+.windows-simple-design .join-address-field:focus-within {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.windows-simple-design .join-address-field input {
+    flex: 1;
+    min-width: 0;
+    width: 0;
+    height: 46px;
+    margin: 0;
+    padding: 0 14px;
+    border: 0;
+    border-radius: 0;
+    outline: none;
+    background: transparent;
+    box-shadow: none;
+    color: var(--text-strong);
+    font: 16px/1.4 Consolas, "Courier New", monospace;
+    letter-spacing: 0;
+    cursor: text;
+}
+
+.windows-simple-design .join-address-field button {
+    flex: 0 0 74px;
+    min-width: 74px;
+    min-height: 46px;
+    margin: 0;
+    padding: 0 10px;
+    border: 0;
+    border-left: 1px solid var(--line);
+    border-radius: 0;
+    background: var(--panel-2);
+    box-shadow: none;
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 500;
+    transform: none;
+}
+
+.windows-simple-design .join-address-field button:hover {
+    background: var(--accent-soft);
+    color: var(--text-strong);
+}
+
+.windows-simple-design .join-address-field button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -4px;
+}
+
+.windows-simple-design .join-address-field button.is-copied {
+    color: var(--good);
+}
+
+.windows-simple-design .join-route .join-destination {
+    margin-top: 8px;
+    overflow-wrap: anywhere;
+}
+
+.windows-simple-design .join-footer {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 4px 16px;
+    margin-top: 20px;
+    padding-top: 12px;
+    border-top: 1px solid var(--line);
+}
+
+.windows-simple-design .join-footer p {
+    margin: 0;
+}
+
+.windows-simple-design .join-copy-status {
+    color: var(--text);
+}
+
+@media (max-width: 1100px) {
+    .windows-simple-design .join-addresses {
+        gap: 16px;
+    }
+
+    .windows-simple-design .join-address-field input {
+        padding-inline: 10px;
+        font-size: 15px;
+    }
+}
+
+@media (max-width: 700px) {
+    .windows-simple-design .join-addresses {
+        grid-template-columns: 1fr;
+    }
+}
