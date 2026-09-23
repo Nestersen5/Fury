@@ -1,7 +1,7 @@
 'use strict';
 
 const assert = require('assert/strict');
-const { assertApplicationComplete, plan } = require('../../scripts/export_public');
+const { assertApplicationComplete, classify, plan } = require('../../scripts/export_public');
 
 const { included, findings } = plan();
 assert.deepEqual(findings, [], 'Public export privacy gate must pass');
@@ -22,4 +22,10 @@ for (const file of [
 }
 assert(included.some(entry => entry.file === 'tests/features/test_cosmetic_search_local.js'),
     'Export must include the permanent local Cosmetic Search regression test');
+for (const excluded of ['AGENTS.md', '.agents/skills/fury-ui/SKILL.md',
+    'website/index.html', 'cloudflare/download-stats/worker.mjs',
+    'scripts/publish_release.js', 'docs/RELEASE_PUBLISHING.md']) {
+    assert.equal(classify(excluded).include, false, `Export policy must exclude ${excluded}`);
+    assert(!included.some(entry => entry.file === excluded), `Export must exclude ${excluded}`);
+}
 console.log('Public export completeness checks passed.');

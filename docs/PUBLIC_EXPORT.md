@@ -62,15 +62,16 @@ it. This is the point: `.gitignore` is a safety net, not a publication policy.
 | package metadata | `package.json`, `package-lock.json`, `.gitignore`, `.gitattributes`, `.env.example`, `cosmetic_search_package.json`, `build/installer.nsh` |
 | tests | permanent `tests/` suites grouped by owner |
 | scripts | `scripts/` |
-| docs | root `*.md`, `docs/`, `.agents/` |
+| docs | `README.md`, `SECURITY.md`, application `docs/` |
 | workflows | `.github/workflows/` |
-| release tooling | `website/`, `cloudflare/` |
 | legal | `LICENSE`, `SECURITY.md` |
 
 `EXCLUDE` runs first and wins over any include: the private archive's Git
 directory, agent-local settings, local runtime data, generated output,
 unrelated sibling projects, private deployment overrides, credential and signing
 material, logs and crash dumps, and private player data files.
+The website, download tracker, deployment scripts, and private agent guidance
+are also excluded from the public source.
 
 **Privacy gate.** Every exported text file is scanned for forbidden content
 before anything is written, and the export is refused if any file matches. The

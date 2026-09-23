@@ -38,7 +38,7 @@ const INCLUDE = [
     { category: 'production source', test: p => p === 'launcher.html' },
     { category: 'production source', test: p => p.startsWith('src/') },
     { category: 'production source', test: p => p.startsWith('features/') },
-    // Assets the packaged application and the website need.
+    // Assets the packaged application needs.
     { category: 'assets', test: p => p.startsWith('assets/') },
     // Package metadata and the packaging hooks electron-builder owns.
     // .gitattributes is required, not cosmetic: it pins LF on every checkout so
@@ -48,21 +48,20 @@ const INCLUDE = [
     { category: 'package metadata', test: p => p === 'build/installer.nsh' },
     // Permanent scripts and development tooling.
     { category: 'scripts', test: p => p.startsWith('scripts/') },
-    // Documentation, including the historical verification records.
+    // Application documentation and historical verification records.
     { category: 'docs', test: p => /^[^/]+\.md$/.test(p) },
     { category: 'docs', test: p => p.startsWith('docs/') },
-    { category: 'docs', test: p => p.startsWith('.agents/') },
     // Public CI.
     { category: 'workflows', test: p => p.startsWith('.github/workflows/') },
-    // Release and website tooling.
-    { category: 'release tooling', test: p => p.startsWith('website/') },
-    { category: 'release tooling', test: p => p.startsWith('cloudflare/') },
 ];
 
 // Never exported, even if something above would match. These are the classes
 // the privacy audit identified: local machine state, private deployment
 // overrides, generated artifacts and anything credential-shaped.
 const EXCLUDE = [
+    { reason: 'private agent guidance', test: p => p === 'AGENTS.md' || p.startsWith('.agents/') },
+    { reason: 'separate website and download tracker', test: p => p.startsWith('website/') || p.startsWith('cloudflare/download-stats/') },
+    { reason: 'deployment-only tooling', test: p => p.startsWith('scripts/fixtures/gallery-skins/') || ['scripts/prepare_release.js', 'scripts/publish_release.js', 'scripts/release_plan.js', 'scripts/stage_download_site.js', 'scripts/test_download_workflow.js', 'scripts/capture_site_gallery.js', 'tests/release/test_release_publication.js', 'docs/RELEASE_PUBLISHING.md', 'docs/PUBLIC_RELEASE_CHECKLIST.md'].includes(p) },
     { reason: 'private archive or local git state', test: p => p === '.git' || p.startsWith('.git/') },
     { reason: 'agent-local settings', test: p => p.startsWith('.claude/') },
     { reason: 'local runtime data', test: p => /^(auth_tokens|launcher_data|packet_logs|recordings|backups|quickbuy_presets|diagnostics)\//.test(p) },

@@ -59,15 +59,14 @@ the established Fury download site, `https://furyproxy.online/`, the page the
 website already serves the six downloads from.
 
 `manifestUrl` is `https://furyproxy.online/latest.json`, published by
-`scripts/publish_release.js` as the last step of a release. A packaged build only
+by the separate release publisher as the last step of a release. A packaged build only
 accepts a manifest URL that is HTTPS and shares an origin with `downloadPageUrl`;
 environment variables cannot repoint a packaged build.
 
 Until the first release publishes that file, the request returns 404 and the
 check stays silent like any other failure, so shipping this configuration ahead
 of the manifest is safe. Publication ordering is what guarantees a client is
-never told about a release before its downloads exist — see
-`docs/RELEASE_PUBLISHING.md`.
+never told about a release before its downloads exist.
 
 ## Version comparison
 

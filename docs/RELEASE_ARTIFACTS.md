@@ -99,9 +99,8 @@ pair reports. The later publishing workflow must validate completeness and
 assign URLs. Existing website staging scripts are not the publishing contract
 for these new filenames.
 
-`scripts/prepare_release.js` consumes this metadata together with the three
-pair reports to build an approved, publishable release; `docs/RELEASE_PUBLISHING.md`
-owns the public destinations and ordering. Preparing a release never publishes it.
+Publication tooling is maintained separately from the public application source.
+It validates this metadata and the three pair reports before publishing.
 
 The launcher's update check does not read this metadata. It reads a separate
 one-object manifest describing only the latest public version and the download

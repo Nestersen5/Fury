@@ -25,7 +25,7 @@ Electron and its embedded Chromium runtime remain necessary application content.
 - `tests/packaging/test_no_browser_payload.js` (new): command/dependency ownership and Windows/Mac negative payload cases.
 - `tests/integration/test_shutdown.js`, `tests/integration/test_shutdown_force.js`, `tests/integration/test_shutdown_integration.js`, `tests/integration/test_shutdown_launcher.js`: remove exclusively NameMC cases, retain other shutdown tests. The launcher test now blocks shell.openExternal in its test-only bootstrap: even synthetic device-code events otherwise invoke the production browser-opening path. No production authentication change.
 - `scripts/smoke_packaged_app.js`, `scripts/verify_packaged_runtime.js`, `tests/packaging/test_portable_package.js`: remove browser requirements while retaining proxy, history, accounts, recordings, launch and package checks.
-- `docs/PORTABLE_MAC.md`, `docs/RELEASE_ARTIFACTS.md`, `docs/PUBLIC_RELEASE_CHECKLIST.md`: update current release expectations. Prior verification reports receive an explicit historical-browser notice.
+- `docs/PORTABLE_MAC.md`, `docs/RELEASE_ARTIFACTS.md`, and the maintainer release checklist: update current release expectations. Prior verification reports receive an explicit historical-browser notice.
 
 Deleted: `namemc_grabber.js`, `src/bootstrap/browserRuntime.js`, `scripts/prepare_browser.js`, `scripts/verify_browser_bundle.js`, `scripts/verify_windows_browser_package.js`, `test_browser_runtime.js`, `test_windows_browser.js`, `test_namemc_lifecycle.js`, `docs/WINDOWS_BUNDLED_BROWSER.md`.
 

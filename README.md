@@ -40,7 +40,7 @@ See [`.env.example`](.env.example) for every environment variable.
 
 - [COSMETIC_SEARCH_API.md](docs/COSMETIC_SEARCH_API.md) — cosmetic search service.
 - [MINECRAFT_1_8_9_PACKETS.md](docs/MINECRAFT_1_8_9_PACKETS.md) — packet notes.
-- [PUBLIC_RELEASE_CHECKLIST.md](docs/PUBLIC_RELEASE_CHECKLIST.md) — release prep.
+- [RELEASE_ARTIFACTS.md](docs/RELEASE_ARTIFACTS.md) - package build and verification.
 - [docs/HISTORY_ARCHITECTURE.md](docs/HISTORY_ARCHITECTURE.md) — session-history concurrency decision and the compact `HistoryResponse` contract.
 - [docs/PUBLIC_EXPORT.md](docs/PUBLIC_EXPORT.md) — sanitized public-source export policy.
 - [SECURITY.md](SECURITY.md) — responsible disclosure (public).
@@ -75,8 +75,7 @@ launcher, settings, account manager, session cards, and proxy feature source.
 Each Mac download is compared byte-for-byte with that source, then its packaged
 UI is tested at both supported window sizes on Apple Silicon.
 
-See [PUBLIC_RELEASE_CHECKLIST.md](docs/PUBLIC_RELEASE_CHECKLIST.md) before
-publishing a build.
+See [RELEASE_ARTIFACTS.md](docs/RELEASE_ARTIFACTS.md) for package build and verification.
 
 ## Developer diagnostics
 
