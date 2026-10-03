@@ -457,14 +457,12 @@ function createSessionRender({ helpers, deps } = {}) {
         const pairs = rows.flat();
         const definitions = [
             ['finals', 'Finals', '§a'], ['beds', 'Beds', '§e'], ['kills', 'Kills', '§b'],
-            ['assists', 'Assists', '§e'], ['deaths', 'Deaths', '§c'], ['deaths', 'Died', '§c'],
-            ['final_deaths', 'Final killed', '§c'], ['beds_lost', 'Bed lost', '§c'],
-            ['rounds', 'Rounds', '§e'], ['stars', 'Stars', '§6']
+            ['deaths', 'Deaths', '§c'], ['deaths', 'Died', '§c'], ['stars', 'Stars', '§6']
         ];
         const stats = definitions.map(([field, label, color]) => {
             const pair = pairs.find(([name]) => name === label);
             return pair && { field, label, value: pair[1],
-                color: ['Died', 'Final killed', 'Bed lost'].includes(label) ? pair[1].slice(0, 2) : color };
+                color: label === 'Died' ? pair[1].slice(0, 2) : color };
         }).filter(Boolean);
         const fields = normalizeRecapFields(options.fields);
         let session = null;

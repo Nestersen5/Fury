@@ -370,7 +370,7 @@ function makeRecap(overrides = {}) {
 {
     // Every supported game uses the same layout, with its own headline stats.
     for (const [game, mode, stats, expected] of [
-        ['SkyWars', 'SKYWARS', { wins: 1, kills: 4, assists: 2 }, '4 KILLS   2 ASSISTS'],
+        ['SkyWars', 'SKYWARS', { wins: 1, kills: 4, assists: 2 }, '4 KILLS'],
         ['Duels', 'DUELS', { wins: 1, kills: 2, deaths: 1 }, '2 KILLS   1 DEATHS']
     ]) {
         const client = fakeClient();
@@ -723,6 +723,8 @@ function makeRecap(overrides = {}) {
     const { chatTextWidth } = require('../../src/stats/recapScoreboard');
     assert.deepEqual(normalizeRecapFields([]), [], 'All-off survives normalization');
     assert.deepEqual(normalizeRecapFields(['map', 'map', 'invalid']), ['map']);
+    assert.deepEqual(normalizeRecapFields(['assists', 'rounds', 'final_deaths', 'beds_lost']), [],
+        'Previously saved fields cannot restore removed recap stats');
     assert.deepEqual(normalizeRecapFields(), SESSION_DEFAULTS.sessionRecapFields);
     assert(normalizeRecapFields(['game_stats', 'session_totals']).includes('session_wins'));
     const sample = makeRecap();
@@ -730,7 +732,7 @@ function makeRecap(overrides = {}) {
     const checks = [
         ['header', 'RECAP'], ['result', 'VICTORY'], ['duration', '6m 12s'], ['map', 'Map: Airshow'],
         ['mode', 'Solos'], ['finals', '3 FINALS'], ['beds', '1 BEDS'], ['kills', '7 KILLS'],
-        ['deaths', 'DEATHS'], ['final_deaths', 'FINAL KILLED'], ['beds_lost', 'BED LOST'],
+        ['deaths', 'DEATHS'],
         ['session_wins', 'SESSION 4W'], ['session_losses', 'SESSION 2L'],
         ['session_ratio', 'SESSION FKDR 2.00'], ['session_games', 'SESSION PLAYED'], ['goals', 'GAMES GOAL']
     ];
@@ -749,6 +751,11 @@ function makeRecap(overrides = {}) {
     const all = fakeClient();
     renderGameRecapActual(all, sample, { fields: SESSION_RECAP_FIELDS, goals: { games: 10 } });
     assert(all.lines.every(line => chatTextWidth(line) <= 320), 'Additional stats wrap within chat width');
+    for (const game of ['SkyWars', 'Duels']) {
+        const { scoreboardRecapLines } = require('../../src/stats/recapScoreboard');
+        assert.deepEqual(scoreboardRecapLines({ game, fields: ['session_ratio'], session: { kdr: 2 } }), [],
+            'Session FKDR does not fall back to KDR in other games');
+    }
 }
 
 console.log('test_game_recap.js: all assertions passed');

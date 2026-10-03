@@ -58,8 +58,9 @@ function scoreboardRecapLines({ game, result, duration = '', variant = '', map =
         if (selected.has('session_wins')) results.push(`§a${count(session.wins)}W`);
         if (selected.has('session_losses')) results.push(`§c${count(session.losses)}L`);
         if (results.length) summary.push(results.join(' §7/ '));
-        const ratio = game === 'Bedwars' ? session.fkdr : session.kdr;
-        if (selected.has('session_ratio')) summary.push(`§7${game === 'Bedwars' ? 'FKDR' : 'KDR'} §f${Number.isFinite(ratio) ? formatRatio(ratio) : '?'}`);
+        if (selected.has('session_ratio') && game === 'Bedwars') {
+            summary.push(`§7FKDR §f${Number.isFinite(session.fkdr) ? formatRatio(session.fkdr) : '?'}`);
+        }
         if (selected.has('session_games')) summary.push(`§7PLAYED §f${count(session.games)}`);
     }
     const hasSession = summary.length > 0;

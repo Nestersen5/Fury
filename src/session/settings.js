@@ -6,7 +6,7 @@ const SESSION_BOUNDARY_MINUTES = [30, 60, 180, 360];
 const SESSION_RETENTION_CHOICES = [0, 50, 100, 250, 1000];
 const SESSION_RECAP_STYLES = ['scoreboard'];
 const SESSION_RECAP_FIELDS = ['header', 'result', 'duration', 'map', 'mode', 'finals', 'beds', 'kills',
-    'deaths', 'final_deaths', 'beds_lost', 'assists', 'rounds', 'stars',
+    'deaths', 'stars',
     'session_wins', 'session_losses', 'session_ratio', 'session_games', 'goals'];
 // Explicit off preserves charts for older saved field lists without this option.
 const SESSION_CHART_FIELDS = ['gamesByMode', 'hideGamesByMode'];
@@ -21,7 +21,7 @@ const SESSION_DEFAULTS = {
     sessionRetention: 0,
     sessionRecapStyle: 'scoreboard',
     sessionRecapFields: ['header', 'result', 'duration', 'map', 'mode', 'finals', 'beds', 'kills',
-        'deaths', 'assists', 'session_wins', 'session_losses', 'session_ratio', 'goals'],
+        'deaths', 'session_wins', 'session_losses', 'session_ratio', 'goals'],
     sessionBedwarsFields: ['wins', 'losses', 'finals', 'finalDeaths', 'beds', 'bedsLost', 'kills', 'deaths', 'wlr', 'fkdr', 'kdr', 'bblr', 'games', 'stars'],
     sessionSkywarsFields: ['wins', 'losses', 'kills', 'deaths', 'wlr', 'kdr', 'games', 'assists'],
     sessionDuelsFields: ['wins', 'losses', 'kills', 'deaths', 'wlr', 'kdr'],
@@ -54,7 +54,7 @@ function normalizeRecapFields(value) {
     // Older launchers always displayed the game rows, regardless of these
     // aggregate toggles. Migrate that appearance once to individual fields.
     const legacy = value.includes('game_stats') || value.includes('session_totals');
-    const fields = legacy ? ['header', 'result', 'duration', 'map', 'mode', 'finals', 'beds', 'kills', 'deaths', 'assists'] : [];
+    const fields = legacy ? ['header', 'result', 'duration', 'map', 'mode', 'finals', 'beds', 'kills', 'deaths'] : [];
     for (const field of value) {
         if (field === 'session_totals') fields.push('session_wins', 'session_losses', 'session_ratio');
         else if (SESSION_RECAP_FIELDS.includes(field)) fields.push(field);

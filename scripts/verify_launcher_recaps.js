@@ -25,6 +25,8 @@ module.exports = async function verify({ page, output, profile }) {
     assert(await page.$$eval('#session-recap-fields input', inputs => inputs.every(input => input.closest('label').checkVisibility())));
     assert.deepEqual(await page.$$eval('#session-recap-fields input', inputs => inputs.map(input => input.value)),
         require('../src/session/settings').SESSION_RECAP_FIELDS);
+    assert.equal(await page.$eval('#session-recap-fields input[value="session_ratio"]',
+        input => input.closest('label').textContent.trim()), 'Session FKDR');
     await page.$eval('#session-goal-games', input => {
         input.value = '10';
         input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -99,8 +101,7 @@ module.exports = async function verify({ page, output, profile }) {
         await toggle(field);
         await ready(text);
     }
-    for (const [field, text] of [['final_deaths', 'FINAL KILLED'], ['beds_lost', 'BED LOST'],
-        ['stars', 'STARS'], ['session_games', 'PLAYED 8']]) {
+    for (const [field, text] of [['stars', 'STARS'], ['session_games', 'PLAYED 8']]) {
         await toggle(field);
         await ready(text);
     }
