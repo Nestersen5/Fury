@@ -33,8 +33,12 @@ const target=require('./launcher_verification_target').verificationTarget('dashb
    await click('.fury-connection-help > summary');assert(await page.$eval('.join-steps',e=>e.checkVisibility()));
    await page.keyboard.press('Escape');assert.strictEqual(await page.$eval('.fury-connection-help',e=>e.open),false);
    await click('.fury-connection-options > summary');assert(await page.$eval('#join-failover-address',e=>e.checkVisibility()));
-   const menu=await page.$eval('.fury-route-menu',e=>{const r=e.getBoundingClientRect();return {width:r.width,left:r.left,right:r.right,bottom:r.bottom,viewportWidth:innerWidth,viewportHeight:innerHeight,scrollWidth:e.scrollWidth,clientWidth:e.clientWidth};});
-   assert(menu.width<=420&&menu.left>=0&&menu.right<=menu.viewportWidth&&menu.bottom<=menu.viewportHeight&&menu.scrollWidth<=menu.clientWidth+1,JSON.stringify(menu));
+   // Native details toggle dispatch is queued after activation. Inspect the
+   // fitted disclosure after its handler, including on faster Mac runners.
+   await eventually(async()=>{
+    const menu=await page.$eval('.fury-route-menu',e=>{const r=e.getBoundingClientRect();return {width:r.width,left:r.left,right:r.right,top:r.top,bottom:r.bottom,maxHeight:e.style.maxHeight,viewportWidth:innerWidth,viewportHeight:innerHeight,scrollWidth:e.scrollWidth,clientWidth:e.clientWidth};});
+    assert(menu.maxHeight&&menu.width<=420&&menu.left>=0&&menu.right<=menu.viewportWidth&&menu.bottom<=menu.viewportHeight-12&&menu.scrollWidth<=menu.clientWidth+1,JSON.stringify(menu));
+   },'Fitting the open connection disclosure');
    await page.screenshot({path:path.join(output,`connection-options-${width}.png`)});
    await click('[data-copy-route="failover"]');assert.strictEqual(await page.evaluate('require("electron").clipboard.readText()'),await page.$eval('#join-failover-address',e=>e.value));
    await click('[data-page="dashboard"] > .page-title h2');assert.strictEqual(await page.$eval('.fury-connection-options',e=>e.open),false);

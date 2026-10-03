@@ -239,7 +239,7 @@ const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
         await eventually(async()=>assert.strictEqual(JSON.parse(fs.readFileSync(path.join(profile,'server_config.json'))).proxyCustomHost,'play.example.com'),'Saving custom host');
         await change('proxy-custom-port',customPort);
         await eventually(async()=>assert.strictEqual(JSON.parse(fs.readFileSync(path.join(profile,'server_config.json'))).proxyCustomPort,customPort),'Saving custom port');
-        assert.strictEqual(await page.$eval('#proxy-custom-port',input=>input.closest('.fury-connection-card').querySelector('.fury-connection-address').textContent),`Minecraft address: localhost:${customPort}`);
+        await eventually(async()=>assert.strictEqual(await page.$eval('#proxy-custom-port',input=>input.closest('.fury-connection-card').querySelector('.fury-connection-address').textContent),`Minecraft address: localhost:${customPort}`),'Rendering saved custom port');
         await eventually(async()=>assert.deepStrictEqual(await page.evaluate(()=>[document.querySelector('[data-join-route="custom"]').hidden,document.getElementById('join-custom-address').value]),[false,`localhost:${customPort}`]),'Showing custom address on dashboard');
         const duplicateCustom=await page.evaluate(()=>ipcRenderer.invoke('network:validate',{...currentNetworkPayload(),proxyCustomPort:Number(ids.proxyDirectPort.value)}));
         assert.strictEqual(duplicateCustom.ports.custom.state,'duplicate');
