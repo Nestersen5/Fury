@@ -33,7 +33,8 @@ const target=require('./launcher_verification_target').verificationTarget('dashb
    await click('.fury-connection-help > summary');assert(await page.$eval('.join-steps',e=>e.checkVisibility()));
    await page.keyboard.press('Escape');assert.strictEqual(await page.$eval('.fury-connection-help',e=>e.open),false);
    await click('.fury-connection-options > summary');assert(await page.$eval('#join-failover-address',e=>e.checkVisibility()));
-   assert(await page.$eval('.fury-route-menu',e=>{const r=e.getBoundingClientRect();return r.width<=420&&r.left>=0&&r.right<=innerWidth&&r.bottom<=innerHeight&&e.scrollWidth<=e.clientWidth+1;}));
+   const menu=await page.$eval('.fury-route-menu',e=>{const r=e.getBoundingClientRect();return {width:r.width,left:r.left,right:r.right,bottom:r.bottom,viewportWidth:innerWidth,viewportHeight:innerHeight,scrollWidth:e.scrollWidth,clientWidth:e.clientWidth};});
+   assert(menu.width<=420&&menu.left>=0&&menu.right<=menu.viewportWidth&&menu.bottom<=menu.viewportHeight&&menu.scrollWidth<=menu.clientWidth+1,JSON.stringify(menu));
    await page.screenshot({path:path.join(output,`connection-options-${width}.png`)});
    await click('[data-copy-route="failover"]');assert.strictEqual(await page.evaluate('require("electron").clipboard.readText()'),await page.$eval('#join-failover-address',e=>e.value));
    await click('[data-page="dashboard"] > .page-title h2');assert.strictEqual(await page.$eval('.fury-connection-options',e=>e.open),false);
@@ -48,6 +49,11 @@ const target=require('./launcher_verification_target').verificationTarget('dashb
    await page.screenshot({path:path.join(output,`dashboard-${width}.png`)});
    await click('.fury-view-sessions');assert(await page.$eval('[data-page="sessions"]',e=>e.classList.contains('active')));
   }
+  await page.setViewport({width:1440,height:900});await page.evaluate("activatePage('dashboard')");
+  await click('.fury-connection-options > summary');
+  await page.setViewport({width:1024,height:680});
+  await page.waitForFunction(()=>document.querySelector('.fury-route-menu').getBoundingClientRect().bottom<=innerHeight-12);
+  await page.keyboard.press('Escape');assert.strictEqual(await page.$eval('.fury-connection-options',e=>e.open),false);
   await page.evaluate(()=>{clearTimeout(refreshTimer);furyDesign.update({...state,services:{...state.services,proxy:{...state.services.proxy,running:true}}});});
   assert.strictEqual(await page.$eval('.fury-connection-status',e=>e.textContent),'Proxy running');
   assert.deepStrictEqual(errors,[]);console.log('PASS live connection status, direct/backup clipboard copy, help/options disclosure and dismissal, session navigation and dashboard geometry at 1440 and 1024');

@@ -76,8 +76,21 @@ function mount({ document, invoke, clipboard, nativeImage, navigate, settingsPag
     optionsBody.append(routeList);options.append(optionsBody);
     const copyStatus=$('.join-copy-status');copyStatus.classList.add('fury-connection-copy-status');
     guide.replaceChildren(connectionIdentity,directField,setup,options,copyStatus);
-    setup.addEventListener('toggle',()=>{if(setup.open)options.open=false;});
-    options.addEventListener('toggle',()=>{if(options.open)setup.open=false;});
+    const connectionWindow=document.defaultView,connectionScroller=$('main');
+    function fitConnectionDisclosure(){
+        const body=setup.open?setupBody:options.open?optionsBody:null;
+        if(!body)return;
+        const height=`${Math.max(0,connectionWindow.innerHeight-body.getBoundingClientRect().top-12)}px`;
+        if(body.style.maxHeight!==height)body.style.maxHeight=height;
+    }
+    function syncConnectionDisclosure(){
+        const method=setup.open||options.open?'addEventListener':'removeEventListener';
+        connectionWindow[method]('resize',fitConnectionDisclosure);
+        connectionScroller[method]('scroll',fitConnectionDisclosure);
+        fitConnectionDisclosure();
+    }
+    setup.addEventListener('toggle',()=>{if(setup.open)options.open=false;syncConnectionDisclosure();});
+    options.addEventListener('toggle',()=>{if(options.open)setup.open=false;syncConnectionDisclosure();});
     document.addEventListener('click',event=>{if(!guide.contains(event.target)){setup.open=false;options.open=false;}});
     guide.addEventListener('keydown',event=>{if(event.key==='Escape'){const opened=setup.open?setup:options.open?options:null;if(opened){opened.open=false;opened.querySelector('summary').focus();event.stopPropagation();}}});
     const dashboardRight=node('div','fury-dashboard-right');guide.after(dashboardRight);
