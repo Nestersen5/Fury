@@ -24,12 +24,15 @@ const {
     createAutoGamblerSession,
     shouldHideAutoGamblerDialogue
 } = require('./features/auto_gambler.js');
+const { createQuickMathsSession } = require('./features/quick_maths.js');
 const { createEnderDustReminder } = require('./features/ender_dust_reminder.js');
 const { createReminderAccountStore } = require('./src/reminders/rememberedAccount');
 const reminderAccounts = createReminderAccountStore(dataPath('launcher_data', 'reminders'));
-const { createSlumberDailyRewardsReminder } = require('./features/slumber_daily_rewards_reminder.js');
 const { createGamblerGeorgeReminder, formatGeorgeCooldown } = require('./features/gambler_george_reminder.js');
-const { createApiKeyCommandHandler } = require('./features/api_key_commands.js');
+const { createApiKeyCommandHandler, sendHypixelKeyReminder } = require('./features/api_key_commands.js');
+const { createHypixelKeyReminder } = require('./src/reminders/hypixelKeyReminder.js');
+const { createHypixelKeyDeliveryStore } = require('./src/reminders/hypixelKeyDeliveryStore.js');
+const { loadKeyState, snoozeHypixelKeyReminder } = require('./app_config.js');
 const { createApiKillSwitchCommandHandler } = require('./features/api_kill_switch_command.js');
 const { createChatTriggerManager } = require('./features/chat_triggers.js');
 const {
@@ -40,6 +43,7 @@ const {
     createLookingForTriggers
 } = require('./features/looking_for_triggers.js');
 const { createProxyTabCompleter, ADDTAG_TAG_TYPES, ADDTAG_REASONS } = require('./features/command_completion.js');
+const { SCAFFOLD_CLIP_LABELS } = require('./src/recorder/scaffoldClipLabels.js');
 const { formatTabTags, tagDetailLines } = require('./src/stats/tagDisplay');
 const { createChatTabCompletion } = require('./features/chat_completion.js');
 const { handleHelpCommand, getStartupCommandSummary } = require('./features/help_command.js');
@@ -67,7 +71,6 @@ const {
 const {
     getOverlayRankNameColor,
     parseOverlayUrchinTag,
-    parseOverlaySeraphTag,
     createOverlayTagBuilder
 } = require('./src/overlay/tags.js');
 const { buildOverlayTags } = createOverlayTagBuilder({ compactTagName: (...args) => compactTagName(...args) });
@@ -133,7 +136,7 @@ const {
 
 const { getRealNameFromSkin } = require('./src/denick/skin_denicker.js');
 const express = require('express');
-const { paths: appConfigPaths, loadKeys, loadKeyMeta, saveKeys, loadScanSettings, saveScanSettings, loadFeatureSettings, saveFeatureSettings, loadChatTriggerSettings, saveChatTriggerSettings, loadServerSettings, normalizeTabStatsModeSetting, normalizeShareDestination, normalizeNametagScope, normalizeNametagSourcePriority } = require('./app_config.js');
+const { paths: appConfigPaths, loadKeys, loadKeyMeta, saveKeys, loadScanSettings, saveScanSettings, loadFeatureSettings, saveFeatureSettings, loadChatTriggerSettings, saveChatTriggerSettings, loadServerSettings, normalizeTabStatsModeSetting, normalizeShareDestination, normalizeNametagScope } = require('./app_config.js');
 const {
     detectLobbyModeScoreboard,
     isBedwarsPregameScoreboard,
@@ -155,6 +158,7 @@ const { createJsonWriter } = require('./src/storage/jsonWriter.js');
 const { createHealthServer } = require('./src/health/httpServer.js');
 const { createConfigLoader } = require('./src/bootstrap/config.js');
 const { createOwnIdentityTracker } = require('./src/net/session/ownIdentity.js');
+const { createProxyStatus } = require('./src/net/proxyStatus.js');
 const { createPartyTracker, isWithinReconnectGrace } = require('./src/net/session/partyTracking.js');
 const { createPartyArrivalCheck } = require('./src/party/arrivalCheck.js');
 const { createQueueTimeTracker } = require('./src/session/queueTime.js');
@@ -220,6 +224,8 @@ const {
 const { createRankBook } = require('./src/stats/rankBook.js');
 const { findReplayClips } = require('./src/menu/replayResults.js');
 const { createSessionTracker, gameForMode } = require('./src/session/sessionTracker.js');
+const { createRecapDelivery } = require('./src/session/gameRecap.js');
+const { createBedwarsStatsDebug } = require('./src/session/bedwarsStatsDebug.js');
 const {
     SESSION_BOUNDARY_MINUTES,
     SESSION_RETENTION_CHOICES,
@@ -228,7 +234,7 @@ const {
 } = require('./src/session/settings.js');
 const { createLauncherSessionHistoryCache } = require('./src/session/launcherSessionHistory.js');
 const { normalizeGameEvent, parseGameEvents, parseResultBanner, eventSignature, resolveSessionGameVariant } = require('./src/session/gameEvents.js');
-const { isOwnTeamElimination } = require('./src/session/gameResult.js');
+const { isOwnTeamElimination, inferGameResult } = require('./src/session/gameResult.js');
 const { createStatsLookup } = require('./src/stats/lookup.js');
 const { createStatsFetch } = require('./src/stats/fetch.js');
 const {
@@ -258,7 +264,6 @@ const configLoader = createConfigLoader({
     normalizeTabStatsModeSetting,
     normalizeShareDestination,
     normalizeNametagScope,
-    normalizeNametagSourcePriority,
     normalizeNametagTagDisplayMode,
     normalizeNametagStat,
     clampDodgeDelay: (value) => clampDodgeDelay(value),
@@ -270,6 +275,13 @@ let activeUser = null; // Define this here at the top!
 let lastPartyDisconnectAt = 0; // survives across reconnects, unlike the per-connection partyTracker
 let applyLiveFeatureSettings = null;
 let lastMatchSnapshot = null;
+// /anticheat (alias /scafdetect) and the launcher share saved controls.
+let anticheatEnabled = true;
+let anticheatScaffoldEnabled = true;
+let anticheatAutoblockEnabled = false;
+let anticheatStasisEnabled = false;
+let anticheatPossibleAlertsEnabled = true;
+let anticheatTeamAlertsEnabled = false;
 const { notifyUrchinOutageOnce, resetOutageWarning: resetUrchinOutageWarning } = createUrchinOutageNotifier({
     getActiveUser: () => activeUser,
     sendChat
@@ -285,6 +297,9 @@ const { installServiceShutdown } = require('./src/bootstrap/shutdown');
 const { createWorkDrain, ownListener, createUpstreamOwner } = require('./src/bootstrap/shutdownResources');
 const connectionDrains = createWorkDrain();
 const commandDrains = createWorkDrain();
+const hypixelKeyDeliveryStore = createHypixelKeyDeliveryStore(dataPath('launcher_data', 'hypixel-key-reminder.json'), {
+    track: work => commandDrains.track(work)
+});
 const upstreamOwner = createUpstreamOwner(mc);
 const shutdownConnections = new Set();
 const cancelConnectionWork = new Set();
@@ -336,10 +351,12 @@ const handleApiKeyCommand = createApiKeyCommandHandler({
     getKeys: () => keys,
     saveKeys,
     loadKeyMeta,
+    snoozeHypixelKeyReminder,
+    onReminderChanged: () => activeUser?.reloadHypixelKeyReminder?.(),
     getHypixelApiUsageSnapshot,
     getUrchinRateLimitSnapshot,
     onKeyChanged: (keyField) => {
-        if (['hypixel', 'urchin', 'aurora', 'seraph'].includes(keyField)) {
+        if (['hypixel', 'urchin', 'aurora'].includes(keyField)) {
             globalCache.clear();
             resetUrchinLookupState();
             auroraPingCache.clear();
@@ -373,7 +390,7 @@ const GAME_CLIPS_FILE = dataPath('game_clips.json');
 const RANK_BOOK_FILE = dataPath('rank_book.json');
 const COSMETIC_API_NAMES_FILE = dataPath('cosmetic_api_names.json');
 const KILL_MESSAGE_PATTERNS_FILE = dataPath('kill_message_patterns.json');
-let keys = { hypixel: '', urchin: '', aurora: '', seraph: '' };
+let keys = { hypixel: '', urchin: '', aurora: '' };
 const CACHE_DURATION = 5 * 60 * 1000;
 const globalCache = new BoundedTtlMap({
     ttlMs: CACHE_DURATION,
@@ -482,11 +499,11 @@ const HOTKEY_DEBUG_PACKETS = new Set([
 let tabStatsEnabled = false;
 let autoScanOnGameStart = true;
 let autoGamblerEnabled = false;
+let quickMathsEnabled = false;
 let autoSkinDenickEnabled = true;
 let autoStatsDenickEnabled = true;
 let denickChatAnnouncementsEnabled = true;
 let denickPartyAnnounceEnabled = false;
-let socialOverlayAddsEnabled = true;
 let lobbyChatStatsEnabled = true;
 let lobbyChatStatsMentionEnabled = true;
 let lobbyChatStatsDmEnabled = true;
@@ -501,7 +518,7 @@ const OVERLAY_UI_ACTIVE_TTL_MS = 15000;
 let overlayUiActiveUntil = 0;
 
 function reportOverlayUiVisible(visible) {
-    if (visible) overlayUiActiveUntil = Date.now() + OVERLAY_UI_ACTIVE_TTL_MS;
+    overlayUiActiveUntil = visible ? Date.now() + OVERLAY_UI_ACTIVE_TTL_MS : 0;
 }
 
 function isOverlayUiActive() {
@@ -523,7 +540,6 @@ let autoDodgeMinStars = 1000;
 let enderDustReminderEnabled = false;
 let enderDustReminderThreshold = 250;
 let enderDustReminderLastReading = null;
-let slumberDailyRewardsReminderEnabled = false;
 let gamblerGeorgeReminderEnabled = true;
 let gamblerGeorgeReminderState = null;
 let overlayAutoAddOutsideGamesOnly = true;
@@ -542,7 +558,6 @@ let tabStatsBedwarsFields = ['name', 'stars', 'fkdr', 'wlr', 'tags'];
 let tabStatsSkywarsFields = ['stars', 'name', 'wlr', 'kdr', 'tags'];
 let tabStatsLabelStyle = 'compact';
 let nametagScope = 'enemies'; // legacy; migrated to the per-audience flags below
-let nametagSourcePriority = 'urchin';
 // Per-audience nametag config. Each audience (teammates / enemy threats /
 // everyone else) can be enabled independently and shows up to two stats — one
 // in the prefix slot, one in the suffix slot.
@@ -615,26 +630,24 @@ const { createDenickDisplayNames } = require('./src/denick/displayNames.js');
 const { createRealSkinTextureResolver } = require('./src/denick/skinTextures.js');
 const realSkinTextureResolver = createRealSkinTextureResolver({ httpClient: axios });
 const { createDenickHistory } = require('./src/denick/history.js');
+const denickHistory = createDenickHistory({
+    historyFile: DENICKED_HISTORY_FILE,
+    writeJsonOffThread,
+    onError: error => console.error('[DenickHistory]', error.message)
+});
 const {
     loadDenickHistoryStore,
     findKnownDenickByNick,
     appendDenickHistory,
     removeDenickMapping
-} = createDenickHistory({
-    historyFile: DENICKED_HISTORY_FILE,
-    writeJsonOffThread
-});
+} = denickHistory;
 
 // Custom display names for people you know. Resolved AFTER the denick above and
 // keyed on the real IGN, so one entry covers a friend whether Hypixel is showing
 // their IGN or a nick. Display-only, same as the denick rename it rides on.
 const { createFriendAliasBook } = require('./src/friends/aliasBook.js');
 const {
-    listAliases: listFriendAliases,
-    findAlias: findFriendAlias,
-    aliasOwner: friendAliasOwner,
-    setAlias: setFriendAlias,
-    removeAlias: removeFriendAlias
+    findAlias: findFriendAlias
 } = createFriendAliasBook({
     aliasFile: FRIEND_ALIASES_FILE,
     writeJsonOffThread
@@ -813,6 +826,7 @@ const {
     parseBedDestroyChat,
     detectKillMessageCosmetic,
     detectKillMessageOwner,
+    detectKnownKillMessageForStats,
     detectKillMessageCosmeticFromChat,
     sendKillMessageRecorderUsage,
     sendKillMessageNameList,
@@ -865,14 +879,20 @@ if (!fs.existsSync(AUTH_PATH)) fs.mkdirSync(AUTH_PATH);
 function loadFeatureConfig(options = {}) {
     const features = configLoader.parseFeatureConfig(options);
     setChatPrefixAccent(features.chatPrefixAccentHex);
+    anticheatEnabled = features.anticheatEnabled !== false;
+    anticheatScaffoldEnabled = features.anticheatScaffoldEnabled !== false;
+    anticheatAutoblockEnabled = features.anticheatAutoblockEnabled === true;
+    anticheatStasisEnabled = features.anticheatStasisEnabled === true;
+    anticheatPossibleAlertsEnabled = features.anticheatPossibleAlertsEnabled !== false;
+    anticheatTeamAlertsEnabled = features.anticheatTeamAlertsEnabled === true;
     tabStatsEnabled = features.tabStatsEnabled;
     autoScanOnGameStart = true;
     autoGamblerEnabled = features.autoGamblerEnabled;
+    quickMathsEnabled = features.quickMathsEnabled;
     autoSkinDenickEnabled = features.autoSkinDenickEnabled;
     autoStatsDenickEnabled = features.autoStatsDenickEnabled;
     denickChatAnnouncementsEnabled = features.denickChatAnnouncementsEnabled;
     denickPartyAnnounceEnabled = features.denickPartyAnnounceEnabled;
-    socialOverlayAddsEnabled = features.socialOverlayAddsEnabled;
     lobbyChatStatsEnabled = features.lobbyChatStatsEnabled;
     lobbyChatStatsMentionEnabled = features.lobbyChatStatsMentionEnabled;
     lobbyChatStatsDmEnabled = features.lobbyChatStatsDmEnabled;
@@ -894,7 +914,6 @@ function loadFeatureConfig(options = {}) {
     enderDustReminderEnabled = features.enderDustReminderEnabled;
     enderDustReminderThreshold = features.enderDustReminderThreshold;
     enderDustReminderLastReading = features.enderDustReminderLastReading || null;
-    slumberDailyRewardsReminderEnabled = features.slumberDailyRewardsReminderEnabled;
     gamblerGeorgeReminderEnabled = features.gamblerGeorgeReminderEnabled;
     gamblerGeorgeReminderState = features.gamblerGeorgeReminderState || null;
     state.partyOverviewEnabled = partyOverviewEnabled;
@@ -945,7 +964,6 @@ function loadFeatureConfig(options = {}) {
     tabStatsSkywarsFields = Array.isArray(features.tabStatsSkywarsFields) ? features.tabStatsSkywarsFields.slice() : ['stars', 'name', 'wlr', 'kdr', 'tags'];
     tabStatsLabelStyle = ['compact', 'full', 'value'].includes(features.tabStatsLabelStyle) ? features.tabStatsLabelStyle : 'compact';
     nametagScope = features.nametagScope || 'enemies';
-    nametagSourcePriority = features.nametagSourcePriority || 'urchin';
     nametagTeammatesEnabled = Boolean(features.nametagTeammatesEnabled);
     nametagTeammatesPrefix = normalizeNametagStat(features.nametagTeammatesPrefix, 'none');
     nametagTeammatesPrefixFallback = normalizeNametagStat(features.nametagTeammatesPrefixFallback, 'none');
@@ -968,14 +986,20 @@ function loadFeatureConfig(options = {}) {
 function currentFeatureConfigSnapshot() {
     return {
         chatPrefixAccentHex: getChatPrefixAccent()?.sourceHex || '#e5b35d',
+        anticheatEnabled,
+        anticheatScaffoldEnabled,
+        anticheatAutoblockEnabled,
+        anticheatStasisEnabled,
+        anticheatPossibleAlertsEnabled,
+        anticheatTeamAlertsEnabled,
         tabStatsEnabled,
         autoScanOnGameStart,
         autoGamblerEnabled,
+        quickMathsEnabled,
         autoSkinDenickEnabled,
         autoStatsDenickEnabled,
         denickChatAnnouncementsEnabled,
         denickPartyAnnounceEnabled,
-        socialOverlayAddsEnabled,
         lobbyChatStatsEnabled,
         lobbyChatStatsMentionEnabled,
         lobbyChatStatsDmEnabled,
@@ -997,7 +1021,6 @@ function currentFeatureConfigSnapshot() {
         enderDustReminderEnabled,
         enderDustReminderThreshold,
         enderDustReminderLastReading,
-        slumberDailyRewardsReminderEnabled,
         gamblerGeorgeReminderEnabled,
         gamblerGeorgeReminderState,
         partyOverviewEnabled,
@@ -1048,7 +1071,6 @@ function currentFeatureConfigSnapshot() {
         tabStatsSkywarsFields,
         tabStatsLabelStyle,
         nametagScope,
-        nametagSourcePriority,
         nametagTeammatesEnabled,
         nametagTeammatesPrefix,
         nametagTeammatesPrefixFallback,
@@ -1176,7 +1198,8 @@ loadChatTriggerConfig();
 const serverSettings = loadServerSettings();
 const serverConfigs = [
     { port: serverSettings.proxyDirectPort, host: serverSettings.proxyDirectHost, name: 'Hypixel (Direct)', route: 'direct', favicon: FURY_DIRECT_SERVER_FAVICON },
-    { port: serverSettings.proxyFailoverPort, host: serverSettings.proxyFailoverHost, name: 'Hypixel (Failover)', route: 'failover', favicon: FURY_FAILOVER_SERVER_FAVICON }
+    { port: serverSettings.proxyFailoverPort, host: serverSettings.proxyFailoverHost, name: 'Hypixel (Failover)', route: 'failover', favicon: FURY_FAILOVER_SERVER_FAVICON },
+    ...(serverSettings.proxyCustomPort ? [{ port: serverSettings.proxyCustomPort, host: serverSettings.proxyCustomHost, name: 'Custom Server', route: 'custom', favicon: FURY_DIRECT_SERVER_FAVICON }] : [])
 ];
 
 const proxyStartTime = Date.now();
@@ -1245,8 +1268,7 @@ function optionalNumber(value) {
     return Number.isFinite(number) ? number : null;
 }
 
-// Overlay tag parsing (getOverlayRankNameColor, parseOverlayUrchinTag,
-// parseOverlaySeraphTag) plus the deduping buildOverlayTags assembler
+// Overlay tag parsing and the deduping buildOverlayTags assembler
 // live in src/overlay/tags.js. buildOverlayTags depends on compactTagName
 // (still defined in this file), so it's wired via createOverlayTagBuilder
 // at module load and the resulting buildOverlayTags is destructured below.
@@ -1415,9 +1437,6 @@ const healthServer = createHealthServer({
     getEnderDustReminderStatus: () => activeUser?.getEnderDustReminderStatus
         ? activeUser.getEnderDustReminderStatus()
         : null,
-    getSlumberDailyRewardsReminderStatus: () => activeUser?.getSlumberDailyRewardsReminderStatus
-        ? activeUser.getSlumberDailyRewardsReminderStatus()
-        : null,
     getGamblerGeorgeReminderStatus: () => activeUser?.getGamblerGeorgeReminderStatus
         ? activeUser.getGamblerGeorgeReminderStatus()
         : null,
@@ -1430,11 +1449,14 @@ const healthServer = createHealthServer({
     },
     removeSession: (sessionId, account) => sessionStore.removeSession(sessionId, { account }),
     removeDenickMapping,
+    appendDenickHistory,
+    flushDenickHistory: denickHistory.flush,
     getFeatures: () => ({
         chatPrefixAccentHex: getChatPrefixAccent()?.sourceHex || '#e5b35d',
         tabStatsEnabled,
         autoScanOnGameStart,
         autoGamblerEnabled,
+        quickMathsEnabled,
         autoDodgeEnabled,
         autoDodgeDelaySeconds,
         autoDodgeTaggedPlayers,
@@ -1446,14 +1468,12 @@ const healthServer = createHealthServer({
         enderDustReminderEnabled,
         enderDustReminderThreshold,
         enderDustReminderLastReading,
-        slumberDailyRewardsReminderEnabled,
         gamblerGeorgeReminderEnabled,
         gamblerGeorgeReminderState,
         autoSkinDenickEnabled,
         autoStatsDenickEnabled,
         denickChatAnnouncementsEnabled,
         denickPartyAnnounceEnabled,
-        socialOverlayAddsEnabled,
         lobbyChatStatsEnabled,
         lobbyChatStatsMentionEnabled,
         lobbyChatStatsDmEnabled,
@@ -1471,7 +1491,6 @@ const healthServer = createHealthServer({
         enderDustReminderEnabled,
         enderDustReminderThreshold,
         enderDustReminderLastReading,
-        slumberDailyRewardsReminderEnabled,
         gamblerGeorgeReminderEnabled,
         gamblerGeorgeReminderState,
         nametagOverlayEnabled,
@@ -1498,7 +1517,6 @@ const healthServer = createHealthServer({
         tabStatsSkywarsFields,
         tabStatsLabelStyle,
         nametagScope,
-        nametagSourcePriority,
         nametagTeammatesEnabled,
         nametagTeammatesPrefix,
         nametagTeammatesPrefixFallback,
@@ -1527,7 +1545,6 @@ const healthServer = createHealthServer({
         nametagStarBracketsEnabled,
         nametagTagDisplayMode,
         nametagScope,
-        nametagSourcePriority,
         nametagTeammatesEnabled,
         nametagTeammatesPrefix,
         nametagTeammatesPrefixFallback,
@@ -1566,6 +1583,7 @@ const healthServer = createHealthServer({
         loadScanConfig();
         loadFeatureConfig();
         loadChatTriggerConfig();
+        activeUser?.reloadHypixelKeyReminder?.();
     },
     resetUrchinLookupState
 });
@@ -1592,11 +1610,12 @@ function reloadRuntimeConfigurationFromDisk() {
     const beforeRevision = runtimeConfigurationRevision();
     const oldKeys = { ...keys };
     loadConfig();
+    activeUser?.reloadHypixelKeyReminder?.();
     loadScanConfig();
     loadFeatureConfig();
     loadChatTriggerConfig();
 
-    if (['hypixel', 'urchin', 'aurora', 'seraph'].some(key => oldKeys[key] !== keys[key])) {
+    if (['hypixel', 'urchin', 'aurora'].some(key => oldKeys[key] !== keys[key])) {
         globalCache.clear();
         resetUrchinLookupState();
         auroraPingCache.clear();
@@ -1885,16 +1904,16 @@ const connectionAuth = require('./src/accounts/connectionAuth');
 function createProxyServer(port, targetHost, serverName, options = {}) {
     const targetPort = Number(options.targetPort) || 25565;
     const serverFavicon = options.favicon || FURY_DIRECT_SERVER_FAVICON;
-    const serverMotd = options.route === 'failover'
-        ? `§6§lFury Gateway §8• §eFailover route\n§7Your backup when the direct connection is having trouble`
-        : `§6§lFury Gateway §8• §bDirect route\n§7Threat checks, denicks, sessions, and overlays on the fastest path`;
+    const status = createProxyStatus({ host: targetHost, port: targetPort });
     const proxy = mc.createServer({
         'online-mode': true,
         host: '127.0.0.1',
         port: port,
         version: '1.8.9',
-        motd: serverMotd,
+        maxPlayers: 1,
+        motd: status.motd,
         ...(serverFavicon ? { favicon: serverFavicon } : {}),
+        beforePing: status.beforePing,
         keepAlive: false,
         beforeLogin: applyCachedLoginProfile
     });
@@ -2160,7 +2179,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             ]);
             panel.row([
                 panel.label('Tags'),
-                ...toggleChip('Urchin/Seraph', showTagsInTabStats,
+                ...toggleChip('Urchin', showTagsInTabStats,
                     `/tabstats tags ${showTagsInTabStats ? 'off' : 'on'}`,
                     showTagsInTabStats ? 'Click to hide tags.' : 'Click to show tags.')
             ]);
@@ -2252,12 +2271,6 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             panel.toggleRow('Power', nametagOverlayEnabled, '/nametags on', '/nametags off',
                 'Add selected stats and tags to player name prefixes and suffixes.');
             panel.row([
-                panel.label('Tag source'),
-                ...panel.pick('Urchin', nametagSourcePriority === 'urchin', '/nametags source urchin', 'Prefer Urchin tags.'),
-                chatController.text(' ', panel.colors.quiet),
-                ...panel.pick('Seraph', nametagSourcePriority === 'seraph', '/nametags source seraph', 'Prefer Seraph tags.')
-            ]);
-            panel.row([
                 panel.label('Tag style'),
                 ...panel.pick('Acronyms', nametagTagDisplayMode === 'acronyms', '/nametags style acronyms', 'Use BC, CC, CF, CA, SN, LS, AC, and BL.'),
                 chatController.text(' ', panel.colors.quiet),
@@ -2312,14 +2325,6 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 clearNametagTeams({ restoreOriginalTeams: true });
                 return sendChat(client, '§6[NameTags] §aNames restored.');
             }
-            if (action === 'source') {
-                const source = normalizeNametagSourcePriority(fullArgs[2], '');
-                if (!source) return sendChat(client, '§cUsage: /nametags source urchin|seraph');
-                nametagSourcePriority = source;
-                saveFeatureConfig();
-                applyNametagConfigChange();
-                return renderNametagController();
-            }
             if (action === 'style' || action === 'tagstyle') {
                 const requestedStyle = String(fullArgs[2] || '').trim().toLowerCase();
                 const tagStyle = NAMETAG_TAG_DISPLAY_MODES.includes(requestedStyle) ? requestedStyle : '';
@@ -2331,7 +2336,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             }
             const audience = normalizeNametagAudience(action === 'slot' ? fullArgs[2] : action);
             const offset = action === 'slot' ? 3 : 2;
-            if (!audience) return sendChat(client, '§cUsage: /nametags on|off|status|refresh|clear|source|style or /nametags <teammates|threats|others> <on|off|prefix|suffix> [stat]');
+            if (!audience) return sendChat(client, '§cUsage: /nametags on|off|status|refresh|clear|style or /nametags <teammates|threats|others> <on|off|prefix|suffix> [stat]');
             const sub = String(fullArgs[offset] || '').toLowerCase();
             if (sub === 'on' || sub === 'off') {
                 setNametagAudienceEnabled(audience, sub === 'on');
@@ -2444,7 +2449,6 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 dodgeMinStars: autoDodgeMinStars,
                 shareAuto: shareSettings.auto,
                 chatStatsEnabled: lobbyChatStatsEnabled,
-                socialAddsEnabled: socialOverlayAddsEnabled,
                 pregameAddsEnabled: pregameChatStatsEnabled,
                 sessionTrackingEnabled: state.sessionTrackingEnabled,
                 gameRecapEnabled: state.gameRecapEnabled,
@@ -2457,12 +2461,11 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 goalMinutes: state.sessionGoalMinutes,
                 dustReminderEnabled: enderDustReminderEnabled,
                 dustThreshold: enderDustReminderThreshold,
-                dailyReminderEnabled: slumberDailyRewardsReminderEnabled,
                 gamblerGeorgeReminderEnabled,
                 proxyHealthEnabled: proxyHealthWarningsEnabled,
                 apiKillSwitchEnabled: state.apiKillSwitchEnabled,
                 autoGamblerEnabled,
-                configuredApiKeys: [keys.hypixel, keys.urchin, keys.aurora, keys.seraph].filter(Boolean).length
+                configuredApiKeys: [keys.hypixel, keys.urchin, keys.aurora].filter(Boolean).length
             };
         }
 
@@ -2505,8 +2508,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             if (['socialadds', 'autoadds', 'social'].includes(key)) {
                 const enabled = parseFuryToggle(value);
                 if (enabled === null) return false;
-                socialOverlayAddsEnabled = enabled;
-                finishFurySetting('social', `Automatic social overlay additions are now ${enabled ? '§aon' : '§coff'}§7.`);
+                sendChat(client, '§8[§d§lFury§8] §7Overlay additions run automatically while the launcher Overlay tab is open.');
                 return true;
             }
             if (['boundary', 'sessionboundary'].includes(key)) {
@@ -2675,7 +2677,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             ]);
             panel.row([
                 panel.label('Add from'),
-                chatController.text('Mentions, DMs, party invites (when Use Overlay is on) ', panel.colors.quiet),
+                chatController.text('Mentions, DMs, party invites (while the launcher Overlay tab is open) ', panel.colors.quiet),
                 ...panel.flag('Pregame Chat', pregameChatStatsEnabled, '/overlay source pregame',
                     pregameChatStatsEnabled ? 'Click to disable pregame-chat adds.' : 'Click to enable pregame-chat adds.')
             ]);
@@ -2903,8 +2905,9 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         }
 
         function handleDenickControllerCommand(args) {
-            const subCmd = String(args[1] || 'status').toLowerCase();
-            if (!subCmd || subCmd === 'status') {
+            const subCmd = String(args[1] || '').toLowerCase();
+            if (!subCmd || subCmd === 'help') return false;
+            if (subCmd === 'status') {
                 renderDenickController();
                 return true;
             }
@@ -2938,127 +2941,6 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             saveFeatureConfig();
             renderDenickController();
             return true;
-        }
-
-        // /alias - custom display names for people you know.
-        //
-        // Every write goes through the alias book, and every write that can
-        // change what is already on screen calls refreshRenames(): the rename
-        // decisions are deliberately sticky, so without it a new alias would
-        // not appear until the next match.
-        function renderFriendAliasController() {
-            const entries = listFriendAliases();
-            const panel = createFeatureStatus({ client, sendChat, title: 'Friend aliases', section: 'social' });
-            panel.open();
-            panel.toggleRow('Custom names', state.friendAliasEnabled, '/alias enabled on', '/alias enabled off');
-            panel.toggleRow('Name tags', state.friendAliasNametags, '/alias nametags on', '/alias nametags off');
-            panel.toggleRow('Chat', state.friendAliasChat, '/alias chat on', '/alias chat off');
-            panel.toggleRow('Tab', state.friendAliasTabStats, '/alias tab on', '/alias tab off');
-            panel.toggleRow('Show real IGN', state.friendAliasShowRealIgn, '/alias showreal on', '/alias showreal off');
-            if (!entries.length) panel.row([chatController.text('No custom names yet.', 'gray')]);
-            entries.slice(0, 40).forEach(entry => {
-                panel.row([
-                    chatController.text(`${entry.realIGN} > ${entry.color || '\u00a7f'}${entry.alias} `, 'white', {
-                        hoverEvent: chatController.hover(entry.note || entry.realIGN)
-                    }),
-                    ...panel.action('Remove', `/alias remove ${entry.realIGN}`, `Remove the alias for ${entry.realIGN}.`)
-                ]);
-            });
-            if (entries.length > 40) panel.row([chatController.text(`...and ${entries.length - 40} more`)]);
-            panel.row(panel.action('Add alias', '/alias add ', 'Type <realIGN> <name> [color].', { action: 'suggest_command' }));
-            panel.close();
-        }
-
-        function handleFriendAliasCommand(args = []) {
-            const sub = String(args[1] || 'list').toLowerCase();
-
-            if (!sub || sub === 'list' || sub === 'status') {
-                renderFriendAliasController();
-                return;
-            }
-
-            const toggles = {
-                on: value => { state.friendAliasEnabled = value; },
-                off: value => { state.friendAliasEnabled = !value; },
-                enabled: value => { state.friendAliasEnabled = value; },
-                nametags: value => { state.friendAliasNametags = value; },
-                chat: value => { state.friendAliasChat = value; },
-                tab: value => { state.friendAliasTabStats = value; },
-                showreal: value => { state.friendAliasShowRealIgn = value; }
-            };
-            if (Object.prototype.hasOwnProperty.call(toggles, sub)) {
-                const next = parseControllerToggle(args[2]);
-                if (next === null) {
-                    sendChat(client, `§cUsage: /alias ${sub} on|off`);
-                    return;
-                }
-                toggles[sub](next);
-                saveFeatureConfig();
-                // The toggle can flip the engine on or off, and can also change
-                // the answer while it stays on, so do both refreshes.
-                denickDisplayNames.refreshNameReplacement();
-                denickDisplayNames.refreshRenames();
-                refreshTabStatsForRoster();
-                renderFriendAliasController();
-                return;
-            }
-
-            if (sub === 'add' || sub === 'set') {
-                const target = String(args[2] || '').trim();
-                const alias = String(args[3] || '').trim();
-                const color = args[4] ? String(args[4]).trim() : null;
-                if (!target || !alias) {
-                    sendChat(client, '§cUsage: /alias add <realIGN> <name> [color]');
-                    return;
-                }
-                const result = setFriendAlias({ name: target, alias, color });
-                if (!result.ok) {
-                    const messages = {
-                        // The alias becomes the GameProfile name, and teams and
-                        // score entries are keyed by it, so it has to look like
-                        // a Minecraft name.
-                        invalid_alias: '§cA custom name must be 3-16 characters, letters/numbers/underscore only.',
-                        invalid_name: '§cThat is not a valid Minecraft name.',
-                        same_name: '§cThat custom name is the same as their IGN.',
-                        alias_taken: `§cThat name is already used for §f${result.conflict?.realIGN || '?'}§c.`
-                    };
-                    sendChat(client, messages[result.reason] || '§cCould not save that custom name.');
-                    return;
-                }
-                denickDisplayNames.refreshRenames();
-                refreshTabStatsForRoster();
-                const entry = result.entry;
-                sendChat(client, `§a[Alias] §f${entry.realIGN} §7will show as ${entry.color || '§f'}${entry.alias}§7.`);
-                if (!state.friendAliasNametags && !state.friendAliasChat && !state.friendAliasTabStats) {
-                    sendChat(client, '  §8Nothing is showing custom names yet — §7/alias nametags on');
-                }
-                return;
-            }
-
-            if (sub === 'remove' || sub === 'delete' || sub === 'del') {
-                const target = String(args[2] || '').trim();
-                if (!target) {
-                    sendChat(client, '§cUsage: /alias remove <realIGN>');
-                    return;
-                }
-                const result = removeFriendAlias(target);
-                if (!result.removed) {
-                    sendChat(client, `§cNo custom name saved for §f${target}§c.`);
-                    return;
-                }
-                denickDisplayNames.refreshRenames();
-                refreshTabStatsForRoster();
-                sendChat(client, `§a[Alias] §7Removed the custom name for §f${result.entry.realIGN}§7.`);
-                return;
-            }
-
-            // Bare "/alias <name>" reads back whatever is stored for them.
-            const entry = findFriendAlias(sub) || friendAliasOwner(sub);
-            if (entry) {
-                sendChat(client, `§7${entry.realIGN} §8→ ${entry.color || '§f'}${entry.alias}${entry.note ? ` §8(${entry.note})` : ''}`);
-                return;
-            }
-            sendChat(client, '§cUsage: /alias add|remove|list, or /alias nametags|chat|tab|showreal on|off');
         }
 
         function handleTabStatsCommand(mode, fullArgs = []) {
@@ -3204,6 +3086,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             reminderLobbyTimer = setTimeout(() => {
                 reminderLobbyTimer = null;
                 if (client.state === mc.states.PLAY && !gameActive) void enderDustReminder.onLobbyJoin(key);
+                hypixelKeyReminder.check();
             }, 750);
             reminderLobbyTimer.unref?.();
         }
@@ -3219,7 +3102,6 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 if (raw.player.uuid && normalizeUuid(raw.player.uuid) !== normalizeUuid(uuid)) throw new Error('Hypixel returned a different account.');
                 reminderAccounts.observe(uuid, raw, checkedAt);
                 enderDustReminder.observePlayerData(raw);
-                slumberDailyRewardsReminder.observePlayerData(raw);
                 return raw;
             })();
             try { return await reminderFetchPending; }
@@ -3247,26 +3129,6 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 enderDustReminderLastReading = reading;
                 saveFeatureConfig();
             },
-            sendChat: message => sendChat(client, message),
-            logger: console
-        });
-        const slumberDailyRewardsReminder = createSlumberDailyRewardsReminder({
-            getEnabled: () => slumberDailyRewardsReminderEnabled,
-            isApiAvailable: () => !state.apiKillSwitchEnabled && hasHypixelApiKeyConfigured(),
-            getOwnUuid: async () => {
-                const knownUuid = getOwnUuidCandidates()[0] || normalizeUuid(client.uuid);
-                if (knownUuid) return knownUuid;
-                const profile = await getPlayerData(client.username, {
-                    includeErrors: true,
-                    preferCache: true,
-                    apiPriority: 'background'
-                });
-                const uuid = normalizeUuid(profile?.data?.player?.uuid);
-                if (uuid) rememberOwnUuid(uuid);
-                return uuid;
-            },
-            fetchPlayer: fetchOwnReminderPlayer,
-            getSavedReading: () => reminderAccounts.reading(client.uuid)?.slumberDailyRewards || null,
             sendChat: message => sendChat(client, message),
             logger: console
         });
@@ -3311,6 +3173,16 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             }
         }
 
+        const hypixelKeyReminder = createHypixelKeyReminder({
+            getConfig: loadKeyState,
+            store: hypixelKeyDeliveryStore,
+            canNotify: () => activeUser?.client === client && activeUser.upstreamReady
+                && client.state === mc.states.PLAY && !gameActive && !bedwarsPregameActive
+                && Boolean(reminderLobbyTarget?.startsWith('lobby:')),
+            notify: (status, message) => sendHypixelKeyReminder(client, sendChat, status, message)
+        });
+        activeUser.reloadHypixelKeyReminder = () => hypixelKeyReminder.reload();
+
         const gamblerGeorgeReminder = createGamblerGeorgeReminder({
             getEnabled: () => gamblerGeorgeReminderEnabled,
             getSavedState: () => reminderAccounts.george(client.uuid),
@@ -3339,7 +3211,6 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         }
         activeUser.getEnderDustReminderStatus = () => enderDustReminder.getStatus();
         activeUser.checkEnderDustReminder = () => enderDustReminder.checkNow({ force: true, notify: false });
-        activeUser.getSlumberDailyRewardsReminderStatus = () => slumberDailyRewardsReminder.getStatus();
         activeUser.getGamblerGeorgeReminderStatus = () => gamblerGeorgeReminder.getStatus();
         activeUser.observeOwnHypixelPlayerData = (uuid, player) => {
             // This is the only normal lookup hook: accept only the connected
@@ -3348,7 +3219,6 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             rememberOwnUuid(uuid);
             reminderAccounts.observe(uuid, { player });
             enderDustReminder.observePlayerData({ player });
-            slumberDailyRewardsReminder.observePlayerData({ player });
             return true;
         };
         enderDustReminder.start();
@@ -3417,6 +3287,21 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
 
         function handlePartyCheckCommand(args) {
             const sub = String(args[1] || '').toLowerCase();
+            function showUsage() {
+                const help = chatController.createUsage(message => sendChat(client, message),
+                    'Party Split Warnings', 'Warn when your party gets split.');
+                help.field('Warnings', partySplitWarningsEnabled ? 'ON' : 'OFF', { inactive: !partySplitWarningsEnabled });
+                help.section('Warnings');
+                help.command('/partycheck on', 'Enable warnings and save the setting.');
+                help.command('/partycheck off', 'Disable warnings and save the setting.');
+                help.command('/partycheck dismiss', 'Dismiss warnings for this lobby.');
+                help.command('/partycheck status', 'Show the current setting.');
+                help.section('Test preview');
+                help.command('/partycheck test', 'Simulate missing teammates.');
+                help.command('/partycheck stop', 'Stop the test preview.');
+                help.note('Dismiss and test require a Bed Wars pregame lobby.');
+            }
+            if (!sub || sub === 'help') { showUsage(); return; }
             if (sub === 'on' || sub === 'off') {
                 partySplitWarningsEnabled = sub === 'on';
                 saveFeatureConfig();
@@ -3427,7 +3312,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                     : '\u00a7aParty split warnings disabled. \u00a77They stay off until /partycheck on.');
                 return;
             }
-            if (!sub || sub === 'status') {
+            if (sub === 'status') {
                 const panel = createFeatureStatus({ client, sendChat, title: 'Party split warnings', section: 'safety' });
                 panel.open();
                 panel.toggleRow('Warnings', partySplitWarningsEnabled, '/partycheck on', '/partycheck off', 'Save your warning preference.');
@@ -3454,7 +3339,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 return;
             }
             if (sub !== 'test') {
-                sendChat(client, '\u00a77Usage: \u00a7f/partycheck on|off|status\u00a77, \u00a7f/partycheck dismiss \u00a77(current lobby), \u00a7f/partycheck test|stop \u00a77(test only)');
+                showUsage();
                 return;
             }
             if (!bedwarsPregameActive || gameActive) {
@@ -3943,6 +3828,12 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         function storeDenickResult(name, realName, source = 'skin') {
             if (!isValidPlayerName(name) || !isValidPlayerName(realName)) return false;
             if (nickKey(name) === nickKey(realName)) return false;
+            if (!denickTracker.canAutoDenick(name)) return false;
+            const saved = findKnownDenickByNick(name);
+            if (saved?.source === 'manual' && nickKey(saved.realName) !== nickKey(realName)) {
+                applyKnownDenickFromHistory(name);
+                return false;
+            }
 
             const key = nickKey(name);
             const existing = autoDenickResults.get(key) || {};
@@ -4053,6 +3944,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
 
         function queueAutoSkinDenick(name, source = 'unknown') {
             if (!autoSkinDenickEnabled) return;
+            if (!denickTracker.canAutoDenick(name)) return;
             if (!isAutoSkinDenickEligible(name) || !isDetectedNickedPlayer(name)) return;
             if (getAutoDenickResult(name)?.realName) return;
 
@@ -4477,7 +4369,9 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                     gameMode: mode,
                     gameSessionId: null,
                     autoDenickResults,
-                    markNickedPlayer: (name, source = 'replay_scan') => localNicks.set(String(name).toLowerCase(), { name, source, at: Date.now() }),
+                    markNickedPlayer: (name, source = 'replay_scan') => {
+                        localNicks.set(String(name).toLowerCase(), { name, source, at: Date.now() });
+                    },
                     getKnownDenick: findKnownDenickByNick,
                     isDenickAliasDuplicate,
                     isOwnPlayer: () => false,
@@ -4494,6 +4388,31 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         // finished game (delayed so Hypixel has propagated the result), diffed
         // against the previous boundary snapshot. Entirely separate from the
         // Urchin-backed /daily card, which fetches a remote period delta.
+        const bedwarsStatsDebug = createBedwarsStatsDebug({
+            send: message => sendChat(client, message),
+            detectKnownKillMessageForStats,
+            isApiAvailable: () => !state.apiKillSwitchEnabled && hasHypixelApiKeyConfigured()
+        });
+        let pendingBedwarsResultPrompt = null;
+        const recapDelivery = createRecapDelivery({
+            getState: () => ({
+                enabled: state.sessionTrackingEnabled && state.gameRecapEnabled,
+                playing: (gameActive && !sessionGameFinalized)
+                    || Boolean(sessionTracker.getActiveSession()?.localTracking?.current),
+                gameGeneration: gameSessionId,
+                sessionId: sessionTracker.getActiveSessionId()
+            }),
+            send: recap => {
+                try {
+                    renderGameRecap(client, recap, {
+                        style: state.sessionRecapStyle,
+                        fields: state.sessionRecapFields,
+                        goals: { wins: state.sessionGoalWins, finals: state.sessionGoalFinals,
+                            games: state.sessionGoalGames, minutes: state.sessionGoalMinutes }
+                    });
+                } catch (error) { console.error('[Session] Recap render failed:', error.message); }
+            }
+        });
         const sessionTracker = createSessionTracker({
             store: sessionStore,
             getIdentity: () => ({ uuid: client.uuid, name: client.username }),
@@ -4508,23 +4427,17 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             },
             isEnabled: () => state.sessionTrackingEnabled,
             isApiAvailable: () => !state.apiKillSwitchEnabled && hasHypixelApiKeyConfigured(),
+            onGameVerified: recap => bedwarsStatsDebug.onRecap(recap),
             onGameRecap: (recap) => {
-                if (state.gameRecapEnabled) {
-                    try {
-                        renderGameRecap(client, recap, {
-                            style: state.sessionRecapStyle,
-                            fields: state.sessionRecapFields,
-                            goals: {
-                                wins: state.sessionGoalWins,
-                                finals: state.sessionGoalFinals,
-                                games: state.sessionGoalGames,
-                                minutes: state.sessionGoalMinutes
-                            }
-                        });
-                    } catch (error) {
-                        console.error('[Session] Recap render failed:', error.message);
-                    }
+                bedwarsStatsDebug.onRecap(recap);
+                if (pendingBedwarsResultPrompt && recap.record?.resultSource === 'api'
+                    && Math.abs(Number(recap.record.at) - pendingBedwarsResultPrompt.at) < 30000
+                    && (!pendingBedwarsResultPrompt.serverId || !recap.record.metadata?.serverId
+                        || pendingBedwarsResultPrompt.serverId === recap.record.metadata.serverId)) {
+                    sendChat(client, `§8[§bSession§8] §7Hypixel confirmed the previous game as a §f${recap.record.result}§7.`);
+                    pendingBedwarsResultPrompt = null;
                 }
+                recapDelivery.enqueue(recap);
             }
         });
         sessionTracker.resumePendingRetries();
@@ -4657,18 +4570,24 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             localDuelKey=null;
         }
         function observeSessionGameChat(text) {
+            if (gameActive && currentGamemode === 'BEDWARS' && activeSessionGameMetadata?.privateGame) return;
             if(localDuelKey&&state.sessionTrackingEnabled){
                 sessionTracker.observeLocalChat(text,{mode:'DUELS',sessionKey:localDuelKey,...localSessionIdentity()});
                 if(sessionTracker.observeLocalResult(text)&&sessionTracker.getActiveSession()?.localTracking?.current?.result)finishLocalDuel();
                 return;
             }
-            if (!gameActive || !gameStartTime || !state.sessionTrackingEnabled || sessionGameFinalized) return;
+            if (!gameActive || !gameStartTime || !state.sessionTrackingEnabled
+                || (sessionGameFinalized && !bedwarsStatsDebug.status().active)) return;
             const metadata = buildSessionGameMetadata();
+            const identity = localSessionIdentity();
+            if (currentGamemode === 'BEDWARS') bedwarsStatsDebug.observeChat(text, { ownTeam: metadata.team, ...identity });
+            if (sessionGameFinalized) return;
             sessionTracker.observeLocalResult(text);
             sessionTracker.observeLocalChat(text, {
                 mode: currentGamemode, sessionKey: `${activeMatchServerId || 'game'}:${gameStartTime}`,
                 ownTeam: metadata.team,
-                ...localSessionIdentity()
+                detectKnownKillMessageForStats,
+                ...identity
             });
             activeSessionGameMetadata = { ...(activeSessionGameMetadata || {}), ...metadata };
             parseGameEvents(text, {
@@ -4686,13 +4605,25 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             });
         }
 
-        function finalizeSessionGame(immediate = false) {
+        function finalizeSessionGame(immediate = false, confirmed = immediate) {
             if (sessionGameFinalized) return;
+            if (!immediate && activeSessionGameEvents.some(event =>
+                event.type === 'victory' || event.type === 'defeat')) {
+                immediate = true;
+                confirmed = true;
+            }
             const roster = buildSessionRosterSnapshot();
             const durationMs = gameStartTime ? Math.max(0, Date.now() - gameStartTime) : null;
             // Leave short, unconfirmed scoreboard transitions eligible for a
             // later real result. Team elimination is authoritative even early.
             if (immediate || durationMs === null || durationMs >= 30000) sessionGameFinalized = true;
+            if (sessionGameFinalized && pendingBedwarsResultPrompt
+                && gameSessionId > pendingBedwarsResultPrompt.queueGameSessionId) {
+                pendingBedwarsResultPrompt = null;
+            }
+            if (sessionGameFinalized && currentGamemode === 'BEDWARS') {
+                bedwarsStatsDebug.end({ at: Date.now(), serverId: activeMatchServerId, confirmed });
+            }
             Promise.resolve(sessionTracker.onGameEnd({
                 mode: currentGamemode,
                 roster,
@@ -4977,9 +4908,73 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         async function handleLocalSessionCommand(client, args) {
             const sub = String(args[1] || '').toLowerCase();
 
+            if (sub === 'result') {
+                const result = String(args[2] || '').toLowerCase();
+                if (!pendingBedwarsResultPrompt) {
+                    sendChat(client, '§8[§bSession§8] §7No previous BedWars result is waiting for confirmation.');
+                    return;
+                }
+                if (result === 'skip') {
+                    pendingBedwarsResultPrompt = null;
+                    sendChat(client, '§8[§bSession§8] §7Previous game left as unknown.');
+                    return;
+                }
+                if (!['win', 'loss'].includes(result)) {
+                    sendChat(client, '§8[§bSession§8] §7Use §f/session result win|loss|skip§7.');
+                    return;
+                }
+                const prompt = pendingBedwarsResultPrompt;
+                const saved = sessionTracker.confirmPreviousGameResult({
+                    result, at: prompt.at, serverId: prompt.serverId, localTicket: prompt.localTicket
+                });
+                if (!saved) {
+                    sendChat(client, '§8[§bSession§8] §cThat game can no longer be updated.');
+                    return;
+                }
+                pendingBedwarsResultPrompt = null;
+                if (saved.source === 'api' || saved.resultSource === 'api') {
+                    sendChat(client, `§8[§bSession§8] §7Hypixel already confirmed this game as a §f${saved.result}§7.`);
+                    return;
+                }
+                bedwarsStatsDebug.confirmQueuedResult({ result, at: prompt.debugAt, serverId: prompt.serverId });
+                sendChat(client, `§8[§bSession§8] §aPrevious BedWars game marked as a ${result}.`);
+                return;
+            }
+
+            if (sub === 'debug' && ['on', 'off', 'status'].includes(String(args[2] || '').toLowerCase())) {
+                const action = String(args[2]).toLowerCase();
+                if (action === 'on' && !state.sessionTrackingEnabled) {
+                    sendChat(client, '§8[§bStats Debug§8] §7Enable session tracking with §f/session on§7 first.');
+                    return;
+                }
+                if (action !== 'status') bedwarsStatsDebug.setEnabled(action === 'on');
+                if (action === 'on' && gameActive && currentGamemode === 'BEDWARS' && gameStartTime
+                    && !activeSessionGameMetadata?.privateGame) {
+                    const metadata = buildSessionGameMetadata('BEDWARS');
+                    bedwarsStatsDebug.start({ startedAt: gameStartTime, serverId: activeMatchServerId,
+                        ownName: client.username, ownTeam: metadata.team, ...localSessionIdentity(),
+                        observedFromStart: false, standardBedwars: isStandardBedwarsVariant(metadata.variant),
+                        apiComparable: !sessionGameFinalized, variant: metadata.variant });
+                }
+                const debug = bedwarsStatsDebug.status();
+                sendChat(client, `§8[§bStats Debug§8] §7${debug.enabled ? '§aOn' : '§cOff'} §8· §7Game ${debug.active ? (debug.paused ? 'paused' : 'active') : 'none'} §8· §7API checks pending §f${debug.awaitingApi}§7.`);
+                if (action === 'on' && (state.apiKillSwitchEnabled || !hasHypixelApiKeyConfigured())) {
+                    sendChat(client, '§8[§bStats Debug§8] §7Live observations work; API comparison needs an enabled Hypixel key before the game starts.');
+                }
+                return;
+            }
+            if (sub === 'debug' && args[2]) {
+                sendChat(client, '§8[§bStats Debug§8] §7Usage: §f/session debug on|off|status§7.');
+                return;
+            }
+
             if (sub === 'on' || sub === 'off') {
                 state.sessionTrackingEnabled = sub === 'on';
                 saveFeatureConfig();
+                if (!state.sessionTrackingEnabled) {
+                    bedwarsStatsDebug.setEnabled(false);
+                    pendingBedwarsResultPrompt = null;
+                }
                 sessionTracker.refreshSettings();
                 sendChat(client, `§8[§bSession§8] §7Tracking §f${state.sessionTrackingEnabled ? '§aenabled' : '§cdisabled'}§7.`);
                 return;
@@ -4991,6 +4986,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 state.gameRecapEnabled = arg === 'on' ? true
                     : arg === 'off' ? false
                     : !state.gameRecapEnabled;
+                if (!state.gameRecapEnabled) recapDelivery.clear();
                 saveFeatureConfig();
                 sendChat(client, `§8[§bSession§8] §7Post-game recap §f${state.gameRecapEnabled ? '§aon' : '§coff'}§7.`);
                 return;
@@ -5094,11 +5090,19 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         function handleRecapCommand(client) {
             const uuid = normalizeUuid(client.uuid);
             const record = uuid ? sessionStore.getLastGame(uuid) : null;
-            if (!record?.delta && record?.verificationStatus !== 'local') {
-                sendChat(client, '§8[§bRecap§8] §7No finished game recorded yet this session.');
+            if (!record) {
+                sendChat(client, '§8[§bRecap§8] §7No game recorded yet.');
                 return;
             }
-            const delta = record.verificationStatus === 'local' ? {
+            if (!record.delta && !record.localModes?.length && record.verificationStatus !== 'local') {
+                const outcome = record.result === 'win' ? 'a §awin' : record.result === 'loss' ? 'a §closs' : 'an §funknown result';
+                const verification = record.verificationStatus === 'pending'
+                    ? 'Waiting for Hypixel to verify its stats.'
+                    : 'Its stats could not be verified with Hypixel.';
+                sendChat(client, `§8[§bRecap§8] §7Last game saved with ${outcome}§7. ${verification} A stats recap is unavailable.`);
+                return;
+            }
+            const delta = record.verificationStatus === 'local' || (!record.delta && record.localModes?.length) ? {
                 local: true, modes: record.localModes || [], spanMs: record.durationMs
             } : {
                 stats: record.delta.stats || {},
@@ -5247,7 +5251,6 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                     { group: 'intel', label: 'info', command: '/info ', suggest: true, doc: 'Ping, tags, current Hypixel status.' },
                     { group: 'intel', label: 'ping', command: '/ping ', suggest: true, doc: 'Aurora ping history.' },
                     { group: 'intel', label: 'urchin', command: '/urchin ', suggest: true, doc: 'Urchin tag lookup.' },
-                    { group: 'intel', label: 'seraph', command: '/seraph ', suggest: true, doc: 'Seraph blacklist lookup.' },
                     { group: 'me', label: 'my stats', command: `/stats ${client.username}`, doc: 'Your own BedWars card.' },
                     { group: 'me', label: 'my session', command: `/daily ${client.username}`, doc: 'Your session stats today.' }
                 ]
@@ -5273,6 +5276,92 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             },
             log: (line) => console.log(line)
         });
+
+        const { createScaffoldDetector } = require('./src/detect/scaffoldDetector.js');
+        const { createAutoblockDetector } = require('./src/detect/autoblockDetector.js');
+        const { createStasisDetector } = require('./src/detect/stasisDetector.js');
+        const { packetToRecord } = require('./src/detect/detectorShared.js');
+        const isAnticheatInGame = () => gameActive
+            && (currentGamemode === 'BEDWARS' || currentGamemode === 'SKYWARS');
+        // One chat style for every detector: "[AC] Name » (Possibly) Cheat",
+        // evidence in the hover, tagged by group, hard evidence in red.
+        // Private, proxy-injected line - only this client sees it.
+        function announceAnticheatFlag({ cheat, name, tier, evidence, weight }) {
+            if (isOwnPlayerName(name)) return;
+            if (tier !== 'confirmed' && !anticheatPossibleAlertsEnabled) return;
+            if (!anticheatTeamAlertsEnabled && currentGamemode === 'BEDWARS') {
+                const ownTeam = clientBedwarsTeamName();
+                const actorTeam = resolveBedwarsTeamName(name);
+                if (!ownTeam || !actorTeam || ownTeam === actorTeam) return;
+            }
+            const confirmed = tier === 'confirmed';
+            const verdict = confirmed ? cheat : `Possibly ${cheat}`;
+            console.log(`[AC] ${cheat.toUpperCase()} ${confirmed ? 'CONFIRMED' : 'POSSIBLE'}: ${name} - ${evidence.map(item => item.reason).join(' | ')}`);
+            const seen = new Set();
+            const lines = [];
+            evidence.forEach(item => {
+                if (seen.has(item.reason)) return;
+                seen.add(item.reason);
+                lines.push(`§8• ${item.hard ? '§c' : '§7'}[${item.group}] §7${item.reason}`);
+            });
+            const footer = [
+                weight !== undefined ? `Weight §f${weight}` : '',
+                confirmed ? '' : 'unusual, could still be legit'
+            ].filter(Boolean).join(' §8- ');
+            const details = chatController.hover([
+                confirmed ? `§c§l${cheat}` : `§e§lPossibly ${cheat}`,
+                ...lines,
+                footer ? `§8${footer}` : ''
+            ]);
+            sendChat(client, chatController.line([
+                chatController.text('[AC] ', 'red', { bold: true }),
+                chatController.text(name, 'white', { hoverEvent: details }),
+                chatController.text(' » ', 'dark_gray'),
+                chatController.text(verdict, confirmed ? 'red' : 'yellow', { bold: confirmed, hoverEvent: details })
+            ]));
+        }
+        const SCAFFOLD_GROUP_LABELS = { sneak: 'Sneak', speed: 'Speed', swing: 'Swing', aim: 'Aim', reach: 'Reach' };
+        const scaffoldDetector = createScaffoldDetector({
+            getUuidMappedName: (uuid) => getUuidMappedName(uuid),
+            isEnabled: () => anticheatEnabled && anticheatScaffoldEnabled
+                && (isAnticheatInGame() || inReplayViewer),
+            // In replays, strikes additionally require verifiably clean 1x
+            // playback (world ticks at ~20/s, fresh) - pausing/rewinding/
+            // speed changes suspend evaluation instead of poisoning it.
+            requireCleanPlayback: () => !isAnticheatInGame(),
+            log: (line) => console.log(line),
+            onFlag: (flag) => announceAnticheatFlag({
+                cheat: 'Scaffold',
+                name: flag.name,
+                tier: flag.tier,
+                weight: flag.weight,
+                evidence: flag.strikes.flatMap(strike => (strike.parts || []).map(part => ({
+                    group: SCAFFOLD_GROUP_LABELS[part.family] || part.family,
+                    reason: part.reason,
+                    hard: part.hard
+                })))
+            })
+        });
+        // Names come from the scaffold detector, which keeps tab/spawn name
+        // bookkeeping even while off (replay actors are named only once).
+        const autoblockDetector = createAutoblockDetector({
+            nameOf: (entityId) => scaffoldDetector.nameOf(entityId),
+            isEnabled: () => anticheatEnabled && anticheatAutoblockEnabled && (isAnticheatInGame() || inReplayViewer),
+            log: (line) => console.log(line),
+            onFlag: announceAnticheatFlag
+        });
+        // Live only: replays re-pace movement, which fakes freezes.
+        const stasisDetector = createStasisDetector({
+            nameOf: (entityId) => scaffoldDetector.nameOf(entityId),
+            isEnabled: () => anticheatEnabled && anticheatStasisEnabled && isAnticheatInGame() && !inReplayViewer,
+            log: (line) => console.log(line),
+            onFlag: announceAnticheatFlag
+        });
+        function clearAnticheatDetectors() {
+            scaffoldDetector.clear();
+            autoblockDetector.clear();
+            stasisDetector.clear();
+        }
 
         // /menudebug: inventory-GUI packet monitor and driver. Tracks the
         // window Hypixel has open, reports every menu packet both ways, and can
@@ -5399,6 +5488,20 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             if (quickBuy.allowOutbound(name, data)) return quickBuyTransport(name, data, 'relay-or-proxy-feature');
         };
 
+        const nickRoll = require('./src/nick/reroller').createNickReroller({
+            sendCommand: sendHypixelCommand,
+            playSound: playSelfSound,
+            sendChat: message => sendChat(client, message),
+            getSettings: () => require('./app_config').loadFeatureSettings().nickRoll,
+            canStart: () => {
+                if (hypixelClient.state !== mc.states.PLAY) return 'Server connection is not ready.';
+                if (gameActive || bedwarsPregameActive) return 'Use the reroller in a lobby.';
+                if (quickBuy.isBusy() || layoutPreview.isBusy() || killMessageLogger.isBusy()) return 'Finish the current menu operation first.';
+                if (menuMonitor.getWindow()) return 'Close your current menu first.';
+                return null;
+            }
+        });
+
         function isAutoDenickTrackablePlayer(name) {
             return isAutoDenickEligibleActor(name) && isDetectedNickedPlayer(name);
         }
@@ -5492,9 +5595,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         }
 
         function partyOverviewTagColor(tag = {}) {
-            return String(tag.source || '').toLowerCase() === 'seraph'
-                ? 'dark_aqua'
-                : 'light_purple';
+            return 'light_purple';
         }
 
         function partyOverviewTagHover(tag = {}) {
@@ -5581,7 +5682,6 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                     },
                     ping: { avgPing: 46 },
                     urchin: { ok: true, rawTags: [] },
-                    seraph: { tagged: false },
                     ...overrides
                 }
             };
@@ -5603,7 +5703,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                     }]
                 },
                 report: {
-                    label: 'provider reports, including a second provider tag',
+                    label: 'provider reports with full details',
                     results: [{
                         name: 'PreviewReport',
                         profile: partyOverviewPreviewProfile({
@@ -5611,11 +5711,6 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                                 ok: true,
                                 rawTags: [{ tooltip: 'Cheating (Added by PreviewMod 2026-08-11) - Reach and velocity evidence' }]
                             },
-                            seraph: {
-                                tagged: true,
-                                report_type: 'Velocity',
-                                tooltip: 'Velocity: Consistent abnormal knockback (2026-08-11 by PreviewAuditor)'
-                            }
                         })
                     }]
                 },
@@ -5879,10 +5974,15 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         }
 
         function sendPartyDenickReview(review) {
+            const autoSaved = review.autoSaved || [];
             const proposals = review.proposals || [];
             const unresolved = review.unresolved || [];
             const variations = review.variations || [];
             sendChat(client, '§r ');
+
+            autoSaved.forEach((entry) => {
+                sendChat(client, `§b§lParty Denick §8» §aAuto-saved §f${entry.nick} §8→ §f${entry.realName} §7(skin match).`);
+            });
 
             proposals.forEach((entry) => {
                 sendChat(client, {
@@ -6225,7 +6325,20 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 }
             }
 
-            const shouldAnnounce = review.proposals.length > 0
+            // A skin identity that names a confirmed, nick-capable party member
+            // is already strong enough to save. Roster-only variations still
+            // need the player to choose the correct assignment.
+            review.autoSaved = [];
+            review.proposals = review.proposals.filter((entry) => {
+                if (storeDenickResult(entry.nick, entry.realName, 'party_skin')) {
+                    review.autoSaved.push(entry);
+                    return false;
+                }
+                return !getAutoDenickResult(entry.nick)?.realName;
+            });
+
+            const shouldAnnounce = review.autoSaved.length > 0
+                || review.proposals.length > 0
                 || review.variations.length > 0
                 || review.unresolved.length > 0;
             if (shouldAnnounce) {
@@ -6381,13 +6494,9 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
 
         function renderReminderController() {
             const dust = enderDustReminder.getStatus();
-            const daily = slumberDailyRewardsReminder.getStatus();
             const george = gamblerGeorgeReminder.getStatus();
             const dustAmount = dust.enderDust !== null && dust.enderDust !== undefined && dust.enderDust !== ''
                 ? `${dust.enderDust}/${dust.capacity}`
-                : 'not checked';
-            const dailyAmount = daily.rewards.length
-                ? `${daily.readyCount}/${daily.rewards.length} ready`
                 : 'not checked';
             const threshold = Math.max(1, Math.min(300, Math.round(Number(enderDustReminderThreshold) || 250)));
             const panel = createFeatureStatus({
@@ -6411,39 +6520,20 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 editHover: 'Type an Ender Dust threshold from 1 to 300.'
             });
 
-            panel.section('Daily NPC rewards');
-            panel.toggleRow('Alerts', slumberDailyRewardsReminderEnabled, '/reminder daily on', '/reminder daily off',
-                'Alert when Slumber NPC daily rewards become ready.');
-            panel.valueRow('Last check', dailyAmount, {
-                color: daily.rewards.length ? panel.colors.value : panel.colors.quiet
-            });
-
             panel.section('Gambler George');
             panel.toggleRow('Claim alerts', gamblerGeorgeReminderEnabled, '/reminder george on', '/reminder george off',
                 'After two consecutive BedWars wins, remind you when entering a lobby, pregame, or another game.');
-            panel.valueRow('Bet progress', george.paused
-                ? 'paused'
-                : george.claimReady
+            panel.valueRow('Bet progress', george.claimReady
                     ? 'ready to claim'
                     : george.active
                         ? `${george.wins}/${george.requiredWins} BedWars wins`
                         : george.onCooldown
                             ? 'failed'
                             : 'not active', {
-                color: !george.paused && (george.claimReady || george.active)
+                color: george.claimReady || george.active
                     ? panel.colors.value
                     : panel.colors.quiet
             });
-            if (george.paused) {
-                // Auto Gambler is what accepts the bet, so the tracker rides on
-                // its switch. Progress already banked is kept, not discarded.
-                panel.valueRow('Needs', 'Auto Gambler on', {
-                    color: panel.colors.muted,
-                    command: '/autogambler on',
-                    actionLabel: 'enable',
-                    hover: 'Gambler George tracking only runs while Auto Gambler is on.'
-                });
-            }
             if (george.onCooldown) {
                 panel.valueRow('New bet in', formatGeorgeCooldown(george.cooldownRemainingMs), {
                     color: panel.colors.muted,
@@ -6453,17 +6543,14 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 });
             }
 
-            if (dust.error || daily.error) {
+            if (dust.error) {
                 panel.section('Last error');
                 if (dust.error) panel.row([chatController.component(String(dust.error).slice(0, 52), 'red')]);
-                if (daily.error) panel.row([chatController.component(String(daily.error).slice(0, 52), 'red')]);
             }
 
             panel.section('Actions');
             panel.row([
                 ...panel.action('Check dust', '/reminder check', 'Refresh Ender Dust from your Hypixel player data.'),
-                chatController.text(' ', panel.colors.quiet),
-                ...panel.action('Check dailies', '/reminder daily check', 'Refresh Slumber daily reward times.'),
                 chatController.text(' ', panel.colors.quiet),
                 ...panel.action('George claimed', '/reminder george claimed', 'Clear a completed George reminder manually.'),
                 chatController.text(' ', panel.colors.quiet),
@@ -6609,6 +6696,8 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         async function runAutoDenickForObservedPlayer(key, sessionId) {
             const observed = autoDenickStats.get(key);
             if (!observed || observed.done || observed.inFlight || observed.notNicked) return;
+            const mappingVersion = denickTracker.mappingVersion(observed.name);
+            if (!denickTracker.canAutoDenick(observed.name, mappingVersion)) return;
             if (!autoStatsDenickEnabled) return;
             if (getAutoDenickResult(observed.name)?.realName) {
                 observed.done = true;
@@ -6640,7 +6729,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 const canContinue = () => {
                     const stillInGame = gameActive && currentGamemode === 'BEDWARS' && sessionId === gameSessionId;
                     const stillInGrace = sessionId === lastBedwarsGameSessionId && Date.now() <= autoDenickGraceUntil;
-                    return stillInGame || stillInGrace;
+                    return (stillInGame || stillInGrace) && denickTracker.canAutoDenick(observed.name, mappingVersion);
                 };
                 if (!canContinue()) return;
 
@@ -7040,17 +7129,18 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 scheduleReminderLobby(`lobby:${reminderLobbyBoundary}`);
             }
             autoDodger.noteScoreboard(scoreboardText);
-            noteActiveMatchServerId(scoreboardText);
             // Duels first: its sidebar title is "DUELS", and modes like "Bed Wars
             // Duel" would otherwise be misread as a real Bedwars game (the mode
             // line literally contains "BEDWARS"). When we're in a duel we skip
             // all Bedwars/SkyWars detection below.
             if (updateDuelsStateFromScoreboard()) return true;
+            notePrivateSessionGame(scoreboardText);
             const detectedMode = detectGamemodeFromText(scoreboardText);
             if (detectedMode) setCurrentGamemode(detectedMode);
             const lobbyMode = detectLobbyFromScoreboard(scoreboardText);
             if (updateLobbyStateFromScoreboard(scoreboardText, lobbyMode)) return true;
             if (updateBedwarsPregameStateFromScoreboard(scoreboardText)) return true;
+            noteActiveMatchServerId(scoreboardText);
             return updateActiveGameStateFromScoreboard(scoreboardText, detectedMode);
         }
 
@@ -7064,6 +7154,17 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             const serverId = pregameLobbyIdForScoreboard(scoreboardText);
             if (serverId) activeMatchServerId = serverId;
             if (serverId && activeSessionGameMetadata) activeSessionGameMetadata.serverId = serverId;
+        }
+
+        function notePrivateSessionGame(scoreboardText = getCurrentScoreboardText()) {
+            if (!gameActive || currentGamemode !== 'BEDWARS' || activeSessionGameMetadata?.privateGame
+                || !isPrivateBedwarsScoreboard(scoreboardText)) return;
+            activeSessionGameMetadata = { ...(activeSessionGameMetadata || {}), privateGame: true };
+            sessionGameFinalized = true;
+            activeSessionGameEvents = [];
+            sessionTracker.excludeCurrentGame();
+            bedwarsStatsDebug.discardCurrentGame();
+            saveCurrentMatchSnapshot('private_game');
         }
 
         function getCompactScoreboardText(text) {
@@ -7178,7 +7279,50 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         function enterBedwarsPregame(lobbyId = null) {
             if (bedwarsPregameActive) return false;
             stopLookingFor('you joined a game lobby');
+            if (gameActive && gameStartTime && !sessionGameFinalized
+                && Date.now() - gameStartTime < 30000) finalizeSessionGame(true, false);
             if (gameActive) resetMatchState({ keepMode: true });
+
+            const previous = lastMatchSnapshot?.username === client.username
+                && lastMatchSnapshot.mode === 'BEDWARS'
+                && Date.now() - lastMatchSnapshot.at <= LAST_MATCH_SNAPSHOT_TTL
+                ? lastMatchSnapshot : null;
+            const watchedResult = previous && inferGameResult({
+                mode: 'BEDWARS', events: previous.sessionGameEvents,
+                ownTeam: previous.sessionGameMetadata?.team || previous.myTeam
+            })?.result;
+            const savedResult = previous && [...(sessionTracker.getActiveSession()?.games || [])].reverse().find(record =>
+                record.mode === 'BEDWARS' && record.result
+                && Math.abs(Number(record.at) - previous.at) < 30000
+                && (!previous.serverId || !record.metadata?.serverId
+                    || previous.serverId === record.metadata.serverId))?.result;
+            const detectedResult = watchedResult || savedResult;
+            const localTicket = sessionTracker.onQueueStart({ mode: 'BEDWARS' });
+            const queueSession = sessionTracker.getActiveSession();
+            const debugQueue = bedwarsStatsDebug.onNewQueue();
+            pendingBedwarsResultPrompt = null;
+            if (state.sessionTrackingEnabled && !previous?.sessionGameMetadata?.privateGame
+                && !detectedResult && debugQueue?.needsResult !== false
+                && (localTicket?.gameId ? localTicket.needsResult
+                    : Boolean(previous?.gameRoster?.length && queueSession?.trackingSource !== 'local' && queueSession?.id))) {
+                pendingBedwarsResultPrompt = {
+                    at: previous?.at || localTicket?.game?.endedAt || Date.now(),
+                    debugAt: debugQueue?.at || previous?.at || Date.now(),
+                    serverId: previous?.serverId || null,
+                    queueGameSessionId: gameSessionId,
+                    localTicket: localTicket?.gameId ? localTicket : null
+                };
+                sendChat(client, { text: '', extra: [
+                    { text: '§8[§bSession§8] §7Previous BedWars game: ' },
+                    { text: '§a[WIN]', clickEvent: { action: 'run_command', value: '/session result win' },
+                        hoverEvent: { action: 'show_text', value: 'Confirm a win' } },
+                    { text: ' §c[LOSS]', clickEvent: { action: 'run_command', value: '/session result loss' },
+                        hoverEvent: { action: 'show_text', value: 'Confirm a loss' } },
+                    { text: ' §8[SKIP]', clickEvent: { action: 'run_command', value: '/session result skip' },
+                        hoverEvent: { action: 'show_text', value: 'Leave the outcome unknown' } }
+                ] });
+            }
+            clearLastMatchSnapshot();
 
             clearManualOverlayPlayersBySource('pregame', 'BEDWARS', 'new_pregame');
             pregameChatSeenPlayers.clear();
@@ -7201,9 +7345,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             // launcher/lobby idle time out of the session while including the
             // waiting room before game one. activateGame remains a fallback
             // for modes whose pregame cannot be identified reliably.
-            sessionTracker.onQueueStart({ mode: 'BEDWARS' });
             scheduleReminderLobby(`pregame:${bedwarsPregameSessionId}`);
-            slumberDailyRewardsReminder.onGameplayMilestone();
             gamblerGeorgeTransitionId += 1;
             gamblerGeorgeReminder.onTransition('pregame', `pregame:${gamblerGeorgeTransitionId}`);
             partyArrivalTracker.onPregameEnter(bedwarsPregameSessionId);
@@ -7213,6 +7355,12 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         function updateBedwarsPregameStateFromScoreboard(scoreboardText = '') {
             if (!isBedwarsPregameScoreboard(scoreboardText)) return false;
             const lobbyId = pregameLobbyIdForScoreboard(scoreboardText);
+            // Waiting-room lines can linger while the game-start sidebar is
+            // being replaced. A running BedWars game cannot return to its own
+            // waiting room: require a different server (or a transfer reset)
+            // before closing it and opening another queue.
+            if (gameActive && currentGamemode === 'BEDWARS'
+                && (!lobbyId || !activeMatchServerId || lobbyId === activeMatchServerId)) return true;
             const map = parseBedwarsPregameMap([
                 getCurrentScoreboardTitle(),
                 ...getScoreboardLineList()
@@ -7276,6 +7424,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             if (!activeMode) return false;
 
             if (!gameActive && getFreshLastMatchSnapshot(activeMode) && restoreLastMatchSnapshot('scoreboard_reconnect')) {
+                notePrivateSessionGame(scoreboardText);
                 return true;
             }
 
@@ -7667,7 +7816,6 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         }
 
         function canAutoAddSocialOverlayPlayer(type) {
-            if (!socialOverlayAddsEnabled) return false;
             if (overlayAutoAddOutsideGamesOnly && gameActive && isSupportedTabStatsMode(currentGamemode)) return false;
             return true;
         }
@@ -7747,7 +7895,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                         + ` §7| §fWS: ${getWsColor(winstreak)}${winstreak}`
                 }]
             };
-            line.extra.push(...getInteractiveTags(data.urchin, data.seraph, data.player?.displayname || data.player?.name));
+            line.extra.push(...getInteractiveTags(data.urchin, data.player?.displayname || data.player?.name));
             sendChat(client, line);
         }
 
@@ -7902,7 +8050,6 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                         stats: { Bedwars: {} }
                     },
                     urchin: { tag: 'AutoDodgeTest' },
-                    seraph: { tagged: false }
                 }
             };
         }
@@ -7951,7 +8098,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             if (!isValidPlayerName(target) || isOwnPlayerName(target) || !triggerText) {
                 return socialOverlayDetails(options, false);
             }
-            // /lf triggers are their own opt-in and do not follow Use Overlay.
+            // /lf triggers retain their own game-context rules.
             if (!options.lookingFor && !canAutoAddSocialOverlayPlayer('trigger')) return socialOverlayDetails(options, false);
             // Only insert overlay rows while the overlay UI is on screen; a chat
             // annotation caller (returnDetails) still needs the row for the chat line.
@@ -7983,7 +8130,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                     preferCache: true
                 });
                 if (!row) return socialOverlayDetails(options, insertRow);
-                if (!insertRow) return socialOverlayDetails(options, false, row);
+                if (!insertRow || !isOverlayUiActive()) return socialOverlayDetails(options, false, row);
 
                 manualOverlayPlayers.set(key, {
                     ...row,
@@ -8164,7 +8311,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             try {
                 const row = await getOverlayPlayerData(target, mode, 'mention');
                 if (!row) return socialOverlayDetails(options, insertRow);
-                if (!insertRow) return socialOverlayDetails(options, false, row);
+                if (!insertRow || !isOverlayUiActive()) return socialOverlayDetails(options, false, row);
 
                 manualOverlayPlayers.set(key, {
                     ...row,
@@ -8204,6 +8351,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
 
             try {
                 const row = await getOverlayPlayerData(target, mode, 'party_invite');
+                if (!isOverlayUiActive()) return false;
                 if (!row) return true;
 
                 manualOverlayPlayers.set(key, {
@@ -8250,7 +8398,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             try {
                 const row = await getOverlayPlayerData(target, mode, 'direct_message');
                 if (!row) return socialOverlayDetails(options, insertRow);
-                if (!insertRow) return socialOverlayDetails(options, false, row);
+                if (!insertRow || !isOverlayUiActive()) return socialOverlayDetails(options, false, row);
 
                 manualOverlayPlayers.set(key, {
                     ...row,
@@ -8396,7 +8544,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 + ` §7| §fWS: ${getWsColor(winstreak)}${winstreak}`;
             // Tags render as hoverable/clickable components: hover shows the
             // tag details (reasons, who added it, when), click runs the full
-            // /urchin or /seraph lookup for the player.
+            // /urchin lookup for the player.
             const tagComponents = buildOverlayTagComponents(row.tags, { clickName: name });
             if (tagComponents.length === 0) {
                 sendChat(client, nameText + statsText + modeTag);
@@ -8898,6 +9046,11 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 observedFromStart: false,
                 disconnected: true
             };
+            if (activeSessionGameMetadata.privateGame) {
+                sessionGameFinalized = true;
+                sessionTracker.excludeCurrentGame();
+                bedwarsStatsDebug.discardCurrentGame();
+            }
             suppressedOverlayLiveSession = null;
 
             const now = Date.now();
@@ -8928,10 +9081,12 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             // mvpPlusPlusPlayers is the pre-rename key: a snapshot written by
             // an older build still restores instead of starting empty.
             nickCapablePlayers = new Map(snapshot.nickCapablePlayers || snapshot.mvpPlusPlusPlayers || []);
-            autoDenickStats = new Map(snapshot.autoDenickStats || []);
+            autoDenickStats.clear();
+            (snapshot.autoDenickStats || []).forEach(([key, value]) => autoDenickStats.set(key, value));
             // Refill in place: denickTracker (getAutoDenickResult) holds this
             // Map, so a new one would leave the restored denicks unread.
             autoDenickResults.clear();
+            denickTracker.clearSavedMappingChanges();
             (snapshot.autoDenickResults || []).forEach(([key, result]) => autoDenickResults.set(key, result));
             gameRoster = new Set((snapshot.gameRoster || []).filter(name => lobbyPlayers.has(name)));
             currentGamePlayerNames = new Map(
@@ -8950,6 +9105,16 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
 
             if (gameRoster.size === 0) return false;
 
+            if (currentGamemode === 'BEDWARS' && !activeSessionGameMetadata?.privateGame && bedwarsStatsDebug.status().enabled) {
+                const metadata = buildSessionGameMetadata('BEDWARS');
+                bedwarsStatsDebug.start({
+                    startedAt: gameStartTime, serverId: activeMatchServerId,
+                    ownName: client.username, ownTeam: metadata.team,
+                    observedFromStart: false, standardBedwars: isStandardBedwarsVariant(metadata.variant),
+                    apiComparable: !sessionGameFinalized,
+                    variant: metadata.variant, ...localSessionIdentity()
+                });
+            }
             saveCurrentMatchSnapshot(reason);
             refreshTabStatsForRoster();
             syncBedwarsClientTeams();
@@ -9129,6 +9294,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             if (!gameActive) {
                 currentGamePlayerNames.clear();
                 currentGameTeams.clear();
+                denickTracker.clearSavedMappingChanges();
                 gameActive = true;
                 presentAtGameStart = true;
                 // Re-stamp from the sidebar in front of us — the previous game's
@@ -9144,6 +9310,14 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                     variant:localQueue?.label||buildSessionGameMetadata(mode).variant,
                     ...localSessionIdentity()
                 });
+                if (mode === 'BEDWARS' && bedwarsStatsDebug.status().enabled) bedwarsStatsDebug.start({
+                    startedAt: gameStartTime, serverId: activeMatchServerId,
+                    ownName: client.username, ownTeam: resolveOwnBedwarsTeam(),
+                    observedFromStart: localObservedFromStart, standardBedwars: localStandardBedwars,
+                    variant: localQueue?.label || buildSessionGameMetadata(mode).variant,
+                    ...localSessionIdentity()
+                });
+                notePrivateSessionGame();
                 suppressedOverlayLiveSession = null;
                 if (overlayAutoClearOnGameStartEnd) clearManualOverlayPlayers('game_start');
                 clearAutoSkinDenickAttempts();
@@ -9152,7 +9326,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             } else if (!gameStartTime) {
                 gameStartTime = Date.now();
             }
-            if(!sessionGameFinalized&&!startingNewGame&&observedStart&&(state.apiKillSwitchEnabled||!hasHypixelApiKeyConfigured()))sessionTracker.onGameStart({mode,sessionKey:`${activeMatchServerId||'game'}:${gameStartTime}`,
+            if(!sessionGameFinalized&&!startingNewGame&&observedStart)sessionTracker.onGameStart({mode,sessionKey:`${activeMatchServerId||'game'}:${gameStartTime}`,
                 ownTeam:resolveOwnBedwarsTeam(),observedFromStart:true,standardBedwars:localStandardBedwars,
                 variant:localQueue?.label||buildSessionGameMetadata(mode).variant,
                 ...localSessionIdentity()});
@@ -9194,6 +9368,9 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             // Snapshot the roster while it is still populated — the recap and
             // encounter log both need it, and gameRoster is cleared below.
             if (wasActiveSupportedGame) {
+                if (sessionGameFinalized && endingMode === 'BEDWARS') {
+                    bedwarsStatsDebug.end({ at: Date.now(), serverId: activeMatchServerId });
+                }
                 finalizeSessionGame();
                 if (!gameStartTime || Date.now() - gameStartTime >= 30000) {
                     activeSessionGameEvents = [];
@@ -9202,7 +9379,6 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             }
             if (wasActiveSupportedGame && endingMode === 'BEDWARS') {
                 markRecentBedwarsSession(endingSessionId);
-                slumberDailyRewardsReminder.onGameplayMilestone();
             }
             const pendingAutoDenicks = Array.from(autoDenickStats.entries()).filter(([, observed]) => {
                 return observed
@@ -9262,9 +9438,11 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             settledNickVerifiedAt.clear();
             nickCapablePlayers.clear();
             entityTracker.clear();
+            clearAnticheatDetectors();
             pendingNickedPlayers.forEach((value, key) => detectedNickedPlayers.set(key, value));
             if (pendingAutoDenicks.length > 0) {
-                autoDenickStats = new Map(pendingAutoDenicks);
+                autoDenickStats.clear();
+                pendingAutoDenicks.forEach(([key, value]) => autoDenickStats.set(key, value));
             } else {
                 autoDenickStats.clear();
             }
@@ -10087,7 +10265,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         // carry a tag, otherwise 'others'.
         //
         // A nick counts because it is at least as strong a signal as an
-        // Urchin/Seraph tag - an enemy hiding their identity is exactly what
+        // Urchin tag - an enemy hiding their identity is exactly what
         // the threats audience is for. It also has no stats to clear a
         // threshold with, so without this a nicked player landed in 'others',
         // which is off by default: their tab row said [NICK] while nothing at
@@ -10181,7 +10359,6 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 // applying it to them hid [NICK] above their head while their
                 // tab row still showed it.
                 isLikelyBot: isKnownTabPlayer(name) ? null : isLikelyBot,
-                priority: nametagSourcePriority,
                 audience: {
                     prefix: cfg.prefix,
                     prefixFallback: cfg.prefixFallback,
@@ -10583,7 +10760,6 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                     // See computeNametagFields: a player in the tab list is not
                     // one of Hypixel's name-shaped entities.
                     isLikelyBot: isKnownTabPlayer(name) ? null : isLikelyBot,
-                    priority: nametagSourcePriority,
                     audience: { prefixStat: 'wlr', suffixStat: 'kdr' },
                     tagDisplayMode: nametagTagDisplayMode,
                     prefixBudget: duelsPrefixBudget
@@ -11167,7 +11343,23 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             clearOverlayStatsTimers();
         };
 
+        const unsubscribeDenickChanges = denickHistory.subscribe(({ nick, previous, next, reason }) => {
+            if (reason === 'automatic') return;
+            if (reason === 'remove' && previous?.realName === next?.realName && previous?.source === next?.source) return;
+            const name = [...lobbyPlayers.keys()].find(name => nickKey(name) === nickKey(nick)) || nick;
+            if (!lobbyPlayers.has(name) && !getAutoDenickResult(name) && !autoDenickStats.has(nickKey(name))) return;
+            denickTracker.applySavedMappingChange(name, next);
+            if (next?.realName) rememberCurrentGameDenickNames(name, next.realName);
+            denickDisplayNames.refreshSavedMappings();
+            refreshScoreboardTeamDisplay();
+            if (isTabStatsActiveInGame()) refreshTabStatsImmediately();
+            if (isNametagOverlayActive() || isNametagOverlayActiveDuels()) applyNametagConfigChange();
+            queueOverlayStatsUpdate(name, 0);
+            saveCurrentMatchSnapshot('saved_denick_changed');
+        });
+
         applyLiveFeatureSettings = () => {
+            if (!quickMathsEnabled) quickMathsSession.reset();
             partyArrivalCheck.setEnabled(partySplitWarningsEnabled);
             if (!partySplitWarningsEnabled) partyArrivalPreview.stop();
             // Name/skin reissues contain a fresh player_info ADD entry, which
@@ -11193,13 +11385,21 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             else clearNametagTeams({ restoreOriginalTeams: gameActive && currentGamemode === 'BEDWARS' });
 
             sessionTracker.refreshSettings();
+            if (!state.sessionTrackingEnabled || !state.gameRecapEnabled) recapDelivery.clear();
             enderDustReminder.refreshSettings();
-            slumberDailyRewardsReminder.refreshSettings();
 
             if (isScanActiveInGame() && !hasCurrentGameScanSnapshot()) {
                 scheduleAutoScan(250);
             }
         };
+
+        const quickMathsSession = createQuickMathsSession({
+            isEnabled: () => quickMathsEnabled,
+            isOwnUuid,
+            isPlayState: () => !proxyStopping && !connectionTimersCleared
+                && hypixelClient.state === mc.states.PLAY && client.state === mc.states.PLAY,
+            sendCommand: (command, options) => sendHypixelCommand(command, options)
+        });
 
         const autoGamblerSession = createAutoGamblerSession({
             isEnabled: () => autoGamblerEnabled,
@@ -11283,6 +11483,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             if (proxyStopping) return;
             quickBuyTrace.observe('client', meta.name, data);
             bookTrace.observe('client', meta.name, data);
+            nickRoll.observeClient(data, meta);
             if (layoutPreview.observeClient(data, meta)) return;
             if (quickBuy.observeClient(data, meta)) return;
             killMessageLogger.observeClient(data, meta);
@@ -11331,6 +11532,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             quickBuyTrace.observe('server', meta.name, data);
             killMessageLogger.observeServer(data, meta);
             bookTrace.observe('server', meta.name, data);
+            const swallowedByNickRoll = nickRoll.observeServer(data, meta);
             const swallowedByLayoutPreview = layoutPreview.observeServer(data, meta);
             teamDebug.observe('server', meta.name, data);
             if (meta.name === 'login') {
@@ -11339,6 +11541,9 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             if (meta.state !== mc.states.PLAY || client.state !== mc.states.PLAY) return;
             if (meta.name === 'tab_complete') data = chatTabCompletion.serverResponse(data);
             if (meta.name === 'login' || meta.name === 'respawn') {
+                // New world: entity ids restart, so strikes must not carry
+                // over (e.g. from one replay into the next).
+                clearAnticheatDetectors();
                 replayTabEntries.clear();
                 partyArrivalTabNames.clear();
                 partyArrivalWorldStartedAt = Date.now();
@@ -11349,6 +11554,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 enderDustReminder.onLobbyLeave();
             }
             if (meta.name === 'position') rememberOwnPosition(data, data?.flags);
+            quickMathsSession.observeServer(data, meta);
             autoGamblerSession.observeRawChatPacket(data, meta);
 
             if (meta.name === 'keep_alive') {
@@ -11376,7 +11582,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             // transaction replies to clicks the proxy synthesised, so the real
             // client never sees an action number it did not send.
             const swallowedByQuickBuy = quickBuy.observeServer(data, meta);
-            const swallowedByMenuMonitor = menuMonitor.observeServerPacket(data, meta) || swallowedByQuickBuy || swallowedByLayoutPreview;
+            const swallowedByMenuMonitor = menuMonitor.observeServerPacket(data, meta) || swallowedByQuickBuy || swallowedByLayoutPreview || swallowedByNickRoll;
 
             let forwardedToClient = false;
             // /lf owns the action bar while it is on; the packet is still parsed below.
@@ -11401,9 +11607,17 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             // /recordcheat tap: runs after the packet is already forwarded, so
             // recording adds zero delivery latency. No-op when not recording.
             packetRecorder.observe(data, meta);
-            // Scaffold detector: same post-forward position, cheap no-op
-            // outside active BedWars/SkyWars games.
-            // adds zero delivery latency and no-ops while disabled.
+            // Scaffold detector: same post-forward position, so it adds zero
+            // delivery latency; cheap no-op while off or outside BedWars/SkyWars.
+            scaffoldDetector.observePacket(data, meta);
+            if (anticheatEnabled && (anticheatAutoblockEnabled || anticheatStasisEnabled)
+                && (isAnticheatInGame() || inReplayViewer)) {
+                const anticheatRecord = packetToRecord(meta.name, data, Date.now());
+                if (anticheatRecord) {
+                    if (anticheatAutoblockEnabled) autoblockDetector.observeRecord(anticheatRecord);
+                    if (anticheatStasisEnabled) stasisDetector.observeRecord(anticheatRecord);
+                }
+            }
 
             const entityObservation = observePlayerEntityPacket(data, meta);
             if ((isNametagOverlayActive() || isNametagOverlayActiveDuels())
@@ -11654,14 +11868,22 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             // makes the Gambler George bet score even when the player hits
             // /leave immediately afterwards.
             if (meta.name === 'title' && (gameActive||localDuelKey) && (Number(data.action) === 0 || Number(data.action) === 1)) {
-                const observed=sessionTracker.observeLocalResult(titlePacketText(data.text));
+                const titleText = titlePacketText(data.text);
+                const observed=sessionTracker.observeLocalResult(titleText);
+                if (gameActive && currentGamemode === 'BEDWARS') bedwarsStatsDebug.observeTitle(titleText);
                 if(observed&&localDuelKey&&sessionTracker.getActiveSession()?.localTracking?.current?.result)finishLocalDuel();
                 // Also record it on the game itself, so API-tracked games keep
                 // a result when the stats delta cannot settle one.
                 const banner = gameActive
                     ? parseResultBanner(titlePacketText(data.text), { mode: currentGamemode, startedAt: gameStartTime })
                     : null;
-                if (banner) appendSessionGameEvent(banner);
+                if (banner) {
+                    appendSessionGameEvent(banner);
+                    if (banner.type === 'victory' || (banner.type === 'defeat' && banner.cause !== 'game_over')) {
+                        finalizeSessionGame(true);
+                        saveCurrentMatchSnapshot('game_result');
+                    }
+                }
             }
             if (meta.name === 'title'
                 && gamblerGeorgeReminder.hasPendingResult()
@@ -11691,6 +11913,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                     if (!isActionBar) partyArrivalCheck.observeChatLine(text);
                     if (!isActionBar) observeChatTriggersForOverlay(text);
                     if (!isActionBar) observeSessionGameChat(text);
+                    if (!isActionBar) recapDelivery.observeChat(text);
                     if (!isActionBar) {
                         gamblerGeorgeReminder.observeChatLine(text, gamblerGeorgeGameContext());
                     }
@@ -11713,6 +11936,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                             || cleanChatText.includes("teleporting")
                         )));
                     if (lobbyTransferMessage) {
+                        quickMathsSession.reset();
                         leaveBedwarsPregame({ preserveProfiles: false, reason: 'lobby_transfer' });
                         resetMatchState({ clearPlayers: true });
                         clearTrackedScoreboard();
@@ -11774,10 +11998,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                         queueTimeTracker.observeStartChat(text);
                     }
                      
-                    if ((text.includes("Game Over")
-                            || text.includes("GAME OVER")
-                            || text.includes("VICTORY!")
-                        || text.includes("DEFEAT!"))) {
+                    if (!isActionBar && /^(?:GAME OVER|VICTORY|DEFEAT)\s*!?$/i.test(cleanChatText.trim())) {
                         resetMatchState({ clearPlayers: true, clearSnapshot: true });
                         clearTrackedScoreboard();
                     }
@@ -11791,6 +12012,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         });
 
         function clearConnectionTimers() {
+            recapDelivery.clear();
             if (connectionTimersCleared) return;
             connectionTimersCleared = true;
             cosmeticEffectRecorder.dispose();
@@ -11798,6 +12020,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             layoutPreview.dispose();
             quickBuyTrace.dispose();
             bookTrace.dispose();
+            nickRoll.dispose();
             menuMonitor.dispose();
             partyTracker.stop();
             queueTimeTracker.reset();
@@ -11814,9 +12037,10 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             tabStatsTimers.forEach(timer => clearTimeout(timer));
             tabStatsTimers.clear();
             autoGamblerSession.clearTimers();
+            quickMathsSession.reset();
             enderDustReminder.stop();
+            hypixelKeyReminder.stop();
             if (reminderLobbyTimer) clearTimeout(reminderLobbyTimer);
-            slumberDailyRewardsReminder.stop();
             shareEchoRewriter.clear();
             resetTabStatsLayout();
             if (bedwarsTeamSyncTimer) {
@@ -11851,6 +12075,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         let connectionDrain;
         function drainConnection() {
             if (!connectionDrain) {
+                unsubscribeDenickChanges();
                 shutdownConnections.delete(stopConnection);
                 cancelConnectionWork.delete(cancelWork);
                 connectionDrain = connectionDrains.track(Promise.all([packetRecorder.drain(), quickBuy.drain()]));
@@ -11957,6 +12182,12 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
 
         async function handleClientChat(packet) {
             const msg = packet.message;
+            quickMathsSession.observeCommand(msg);
+            if (/^\/nickroll(?:\s|$)/i.test(msg)) {
+                nickRoll.command(msg.trim().split(/\s+/));
+                return;
+            }
+            nickRoll.observeCommand(msg);
             if (/^\/kmlog(?:\s|$)/i.test(msg)) {
                 await killMessageLogger.command(msg.trim().split(/\s+/));
                 return;
@@ -12031,21 +12262,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             }
             else if (cmd === '/reminder' || cmd === '/reminders') {
                 const sub = String(args[1] || 'status').toLowerCase();
-                if (sub === 'daily' || sub === 'dailies' || sub === 'npc' || sub === 'rewards') {
-                    const action = String(args[2] || 'status').toLowerCase();
-                    if (action === 'on' || action === 'off') {
-                        slumberDailyRewardsReminderEnabled = action === 'on';
-                        saveFeatureConfig();
-                        slumberDailyRewardsReminder.refreshSettings();
-                        renderReminderController();
-                    } else if (action === 'check' || action === 'refresh') {
-                        sendChat(client, '§6§lFury Daily §8» §7Checking your Slumber NPC daily rewards...');
-                        await slumberDailyRewardsReminder.checkNow({ manual: true });
-                        renderReminderController();
-                    } else {
-                        renderReminderController();
-                    }
-                } else if (sub === 'george' || sub === 'gambler' || sub === 'bet') {
+                if (sub === 'george' || sub === 'gambler' || sub === 'bet') {
                     const action = String(args[2] || 'status').toLowerCase();
                     if (action === 'on' || action === 'off') {
                         gamblerGeorgeReminderEnabled = action === 'on';
@@ -12120,7 +12337,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             }
             
             else if (cmd === '/urchin') {
-                const target = args[1];
+                const target = args[1] || client.username;
                 if (!target) return sendChat(client, "§cUsage: /urchin <player>");
                 
                 sendChat(client, `§b[Urchin] §7Fetching reports for §f${target}§7...`);
@@ -12143,24 +12360,6 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                     .forEach(line => sendChat(client, line));
             }
 
-            else if (cmd === '/seraph') {
-                const target = args[1];
-                if (!target) return sendChat(client, "§cUsage: /seraph <player>");
-
-                sendChat(client, `§b[Seraph] §7Fetching reports for §f${target}§7...`);
-                const uuid = await resolveUuid(target);
-                if (!uuid) return sendChat(client, "§cInvalid player name.");
-
-                const data = await fetchSeraphFull(uuid);
-                if (data.error) return sendChat(client, `§c${data.error}`);
-
-                if (data.tagged) {
-                    tagDetailLines(target, buildOverlayTags({ seraph: data }), { source: 'Seraph' })
-                        .forEach(line => sendChat(client, line));
-                } else {
-                    sendChat(client, `§bSeraph §7» §f${target} §7— No report tags found.`);
-                }
-            }
             else if (cmd === '/sw') {
                 const target = args[1] || client.username;
                 const mode = findModeDef('SKYWARS', args.slice(2).join('_') || 'overall');
@@ -12174,16 +12373,57 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 else if (duelsState.active) await runDuelsScan();
                 else await runScanForCurrentGame();
             }
+            else if (cmd === '/anticheat' || cmd === '/scafdetect' || cmd === '/scaffolddetect') {
+                const sub = (args[1] || '').toLowerCase();
+                if (sub === 'on' || sub === 'off') {
+                    anticheatEnabled = sub === 'on';
+                    saveFeatureConfig();
+                    sendChat(client, `§8[§c§lAC§8] §7Anticheat (Scaffold, Autoblock, Stasis): ${anticheatEnabled ? '§aON' : '§cOFF'}`);
+                } else {
+                    const rows = scaffoldDetector.getStatus();
+                    const otherRows = [...autoblockDetector.getStatus(), ...stasisDetector.getStatus()];
+                    const panel = createFeatureStatus({ client, sendChat, title: 'Anticheat', section: 'safety' });
+                    panel.open();
+                    panel.toggleRow('Power', anticheatEnabled, '/anticheat on', '/anticheat off');
+                    otherRows.forEach(row => {
+                        sendChat(client, `§8[§c§lAC§8] §c${row.name} §7- ${row.cheat}: §f${row.detail}${row.tier === 'confirmed' ? ` §c(${row.cheat.toUpperCase()})` : row.tier === 'possible' ? ' §e(POSSIBLY)' : ''}`);
+                    });
+                    if (rows.length === 0 && otherRows.length === 0) {
+                        sendChat(client, '§8[§c§lAC§8] §7No anticheat evidence this game.');
+                    } else {
+                        rows.forEach(row => {
+                            // Vape-mode profiles are shadow evidence: shown here, never flagged.
+                            const profiles = [
+                                row.profiles.godbridge ? `GodBridge-like x${row.profiles.godbridge}` : '',
+                                row.profiles.telly ? `TellyBridge-like x${row.profiles.telly}` : ''
+                            ].filter(Boolean).join(', ');
+                            sendChat(client, `§8[§c§lAC§8] §c${row.name} §7- Scaffold: weight §f${row.weight}§7, strikes §f${row.strikes}${row.tier === 'confirmed' ? ' §c(SCAFFOLD)' : row.tier === 'possible' ? ' §e(POSSIBLY)' : ''}${profiles ? ` §8| §e${profiles} §8(unverified)` : ''}`);
+                        });
+                    }
+                    panel.close();
+                }
+            }
             else if (cmd === '/recordcheat' || cmd === '/rc') {
                 const sub = (args[1] || '').toLowerCase();
                 if (!sub || sub === 'help') {
-                    sendChat(client, '§b§lRecorder §8» §7Usage:');
-                    sendChat(client, ' §f/rc <player> <cheat> [replay] §7- start recording (label with the suspected cheat)');
-                    sendChat(client, ' §f/rc clip <player> <cheat> §7- save the last buffered seconds + keep recording');
-                    sendChat(client, ' §f/rc buffer on|off [seconds] §7- rolling pre-capture buffer for clip');
-                    sendChat(client, ' §f/rc mark [note] §7- timestamp a cheating moment in active recordings');
-                    sendChat(client, ' §f/rc stop [player] §7- stop one or all recordings');
-                    sendChat(client, ' §f/rc status §7- list active recordings');
+                    const help = chatController.createUsage(message => sendChat(client, message), 'Recorder',
+                        'Record labelled player clips and buffered moments.');
+                    help.section('Recordings');
+                    help.command('/rc <player> <label> [replay]', 'Start a labelled recording.');
+                    help.command('/rc clip <player> <label>', 'Save buffered seconds and keep recording.');
+                    help.command('/rc mark [note]', 'Timestamp a moment in active recordings.');
+                    help.command('/rc stop [player]', 'Stop one or all recordings.');
+                    help.command('/rc status', 'List active recordings.');
+                    help.section('Labels & buffer');
+                    help.command('/rc labels', 'Show Scaffold clip labels and length suffixes.');
+                    help.command('/rc buffer on|off [seconds]', 'Configure the rolling pre-capture buffer.');
+                } else if (sub === 'labels') {
+                    sendChat(client, '§b§lRecorder §8» §7Scaffold clip labels (§f/rc <player> <label>§7):');
+                    SCAFFOLD_CLIP_LABELS.forEach(({ name, description }) =>
+                        sendChat(client, ` §f${name} §8- §7${description}`));
+                    sendChat(client, '§7Add §f_long §7for 20-40 accepted blocks or §f_short §7for 5-10.');
+                    sendChat(client, '§7Example: §f/rc <player> sus_but_legit_long');
+                    sendChat(client, '§7Use §funknown §7when cheating cannot be verified; keep it out of labelled accuracy tests.');
                 } else if (sub === 'status') {
                     const active = packetRecorder.status();
                     const buffer = packetRecorder.getBufferInfo();
@@ -12217,7 +12457,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                     const targetPlayer = args[2];
                     const cheatLabel = args[3];
                     if (!targetPlayer || !cheatLabel) {
-                        sendChat(client, '§b§lRecorder §8» §cUsage: §f/rc clip <player> <cheat>');
+                        sendChat(client, '§b§lRecorder §8» §cUsage: §f/rc clip <player> <label>');
                         return;
                     }
                     const result = packetRecorder.clip({
@@ -12253,7 +12493,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                     const cheatLabel = args[2];
                     const source = (args[3] || '').toLowerCase() === 'replay' ? 'replay' : 'live';
                     if (!cheatLabel) {
-                        sendChat(client, '§b§lRecorder §8» §cUsage: §f/recordcheat <player> <cheat> [replay]');
+                        sendChat(client, '§b§lRecorder §8» §cUsage: §f/recordcheat <player> <label> [replay]');
                         return;
                     }
                     const result = packetRecorder.start({
@@ -12459,9 +12699,6 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                     currentGamemode,
                     isCurrentGamePlayer: (name) => gameActive && currentGamePlayerNames.has(nickKey(name))
                 });
-            }
-            else if (cmd === '/alias' || cmd === '/aliases' || cmd === '/customname') {
-                handleFriendAliasCommand(args);
             }
             else if (cmd === '/denickskin') {
                 await handleDenickSkin(client, args, lobbyPlayers, {
@@ -12860,8 +13097,6 @@ function inferTeamFromColor(lobbyMap, playerName) {
 }
 
 const { createScanRunner } = require('./src/overlay/scan.js');
-const { createTagTracker } = require('./src/overlay/tagTracker.js');
-const tagTracker = createTagTracker({ filePath: dataPath('tag_tracker.log') });
 const { createDuelsScanRunner } = require('./src/overlay/duelsScan.js');
 const {
     matchDuelsMode,
@@ -12872,6 +13107,7 @@ const {
 const { createAutoDodger } = require('./src/dodge/autoDodge.js');
 const {
     pregameLobbyIdForScoreboard,
+    isPrivateBedwarsScoreboard,
     requeueCommandForScoreboard
 } = require('./src/dodge/bedwarsQueue.js');
 const { createPartyArrivalTracker } = require('./src/dodge/partyArrival.js');
@@ -12888,8 +13124,8 @@ function formatChatTagLabel(rawTag, label = rawTag, source = 'Urchin') {
     });
 }
 
-function getInteractiveTags(urchinData, seraphData, clickName = '') {
-    const tags = buildOverlayTags({ urchin: urchinData, seraph: seraphData });
+function getInteractiveTags(urchinData, clickName = '') {
+    const tags = buildOverlayTags({ urchin: urchinData });
     const components = buildOverlayTagComponents(tags, { clickName })
         .map(component => ({ ...component, text: ` ${component.text}` }));
 
@@ -12918,20 +13154,18 @@ function getPlayerTeam(lobbyMap, playerName) {
 // isNickedLookupMiss, sendPlayerLookupError, profileLookupFailureReason,
 // runStatsLookupCommand, getPlayerDataWithNickDetection) live in
 // src/stats/lookup.js and are wired after getPlayerData below. The
-// per-service raw fetchers (Aurora ping, Hypixel status/guild, Seraph)
+// per-service raw fetchers (Aurora ping, Hypixel status/guild)
 // live in src/stats/sources.js.
 
 const {
     getHypixelGuildRaw,
     getHypixelStatusRaw,
     getAuroraPingRaw,
-    getSeraphRaw
 } = createStatsSources({
     hypixelApiGet,
     hasHypixelApiKeyConfigured,
     getHypixelKey: () => keys.hypixel,
     getAuroraKey: () => keys.aurora,
-    getSeraphKey: () => keys.seraph,
     guildCache,
     auroraPingCache,
     auroraPingCacheDuration: AURORA_PING_CACHE_DURATION,
@@ -12945,7 +13179,6 @@ const { getPlayerData } = createStatsFetch({
     hasHypixelApiKeyConfigured,
     hypixelApiGet,
     getUrchinRaw: (name, uuid) => getUrchinRaw(name, uuid),
-    getSeraphRaw: (uuid) => getSeraphRaw(uuid),
     getAuroraPingRaw: (uuid) => getAuroraPingRaw(uuid),
     getHypixelStatusRaw: (uuid) => getHypixelStatusRaw(uuid),
     makePingData: (overrides) => makePingData(overrides),
@@ -12963,8 +13196,7 @@ const { getPlayerData } = createStatsFetch({
     }
 });
 
-// getHypixelGuildRaw, getHypixelStatusRaw, getAuroraPingRaw, getSeraphRaw,
-// and the ping data shapers (makePingData, parseAuroraPingResponse,
+// The ping data shapers (makePingData, parseAuroraPingResponse,
 // classifyAuroraPingError, localDateKey, parseAuroraDayMs, validPingNumber,
 // summarizePingRows) live in src/stats/sources.js. The fetchers are wired
 // above via createStatsSources; the pure helpers are required at the top.
@@ -13487,19 +13719,6 @@ async function handleTagCommand(client, args) {
     renderTagController(client);
 }
 
-async function fetchSeraphFull(uuid) {
-    if (!keys.seraph) return { error: 'Seraph API key not set.' };
-    try {
-        const res = await axios.get(`https://api.seraph.si/${uuid}/blacklist?key=${keys.seraph}`, { timeout: 3000 });
-        if (res.data && res.data.success) {
-            return res.data.data.blacklist;
-        }
-        return { error: 'No data found for this player.' };
-    } catch (e) {
-        return { error: 'Seraph API request failed.' };
-    }
-}
-
 // Denick api surface (lookup tables + cosmetic-name slug + api matcher + the
 // /denick filter parsers) lives in src/denick/api.js; see the createDenickApi
 // wiring above. The DENICK_KILL_MESSAGE_NAMES/etc constants and the seven
@@ -13983,13 +14202,12 @@ const {
     formatBedwarsPrestige,
     getInteractiveTags,
     setLastScanSummary: (summary) => { lastScanSummary = summary; },
-    setLastScanResults: (snapshot) => { state.lastScanResults = snapshot; },
-    trackTags: tagTracker.track
+    setLastScanResults: (snapshot) => { state.lastScanResults = snapshot; }
 }));
 
 // Replay /scan: same scanner, but its own fixed settings (every player,
 // default threat thresholds) and no writes to the live scan summary, /share's
-// last results or the tag log. /scanmode and /scanconfig never reach it.
+// last results. /scanmode and /scanconfig never reach it.
 ({ performFullScan: performReplayScan } = createScanRunner({
     state: {
         scanMode: 'all',
@@ -14014,8 +14232,7 @@ const {
     formatBedwarsPrestige,
     getInteractiveTags,
     setLastScanSummary: () => {},
-    setLastScanResults: () => {},
-    trackTags: () => {}
+    setLastScanResults: () => {}
 }));
 
 ({ performDuelsScan } = createDuelsScanRunner({
@@ -14157,7 +14374,7 @@ async function handlePeriodShortcutCommand(client, args, period) {
 }
 
 function buildPlayerInfoTagComponents(data = {}) {
-    const components = getInteractiveTags(data.urchin, data.seraph, data.player?.displayname || data.player?.name);
+    const components = getInteractiveTags(data.urchin, data.player?.displayname || data.player?.name);
     if (components.length === 0) components.push({ text: '§7None' });
     return components;
 }
@@ -14213,7 +14430,7 @@ function renderDashboard(client, data, detailed, isCached) {
 
     // --- INTERACTIVE TAGS SECTION ---
     add(`§fTags: `);
-    const tagComponents = getInteractiveTags(data.urchin, data.seraph, data.player?.displayname || data.player?.name);
+    const tagComponents = getInteractiveTags(data.urchin, data.player?.displayname || data.player?.name);
     const hasTags = tagComponents.length > 0;
     jsonMsg.extra.push(...tagComponents);
 
@@ -14250,6 +14467,7 @@ console.log([
     ' Connection addresses',
     `   Direct:   localhost:${serverSettings.proxyDirectPort} -> ${serverSettings.proxyDirectHost}`,
     `   Failover: localhost:${serverSettings.proxyFailoverPort} -> ${serverSettings.proxyFailoverHost}`,
+    ...(serverSettings.proxyCustomPort ? [`   Custom:   localhost:${serverSettings.proxyCustomPort} -> ${serverSettings.proxyCustomHost}`] : []),
     '',
     ' In-game commands',
     ...startupCommandSummary.map(line => `   ${line}`),
@@ -14275,7 +14493,7 @@ installServiceShutdown({
     },
     async drain() {
         const settled = await Promise.allSettled([connectionDrains.drain(), commandDrains.drain(), cosmeticEffectLibrary.drain()]);
-        for (const store of [sessionStore, presetStore]) {
+        for (const store of [sessionStore, presetStore, denickHistory]) {
             try { await store.flush({ strict: true, onlyPending: true }); }
             catch { settled.push({ status: 'rejected' }); }
         }

@@ -1,33 +1,12 @@
 'use strict';
 const assert=require('assert'),path=require('path');
-module.exports=async function verifySessionSettings({page,output}) {
+module.exports=async function verifySessionSettings({page,output,profile}) {
     await page.evaluate("activatePage('settings');activateSettingsSubpage('sessions',false)");
     assert(await page.$eval('#replay-details-module',e=>!e.closest('.fury-removed')&&e.getBoundingClientRect().height>0),'Replay Menu toggle is shown on the Sessions page');
-    assert.strictEqual(await page.$('.fury-session-goals, .session-goal-settings, [id^="session-goal-"]'),null);
     assert.strictEqual(await page.$('#session-boundary-minutes'),null);
     assert.strictEqual(await page.$('#session-retention'),null);
     assert.deepStrictEqual(await page.evaluate('({boundary:state.settings.features.sessionBoundaryMinutes,retention:state.settings.features.sessionRetention})'),{boundary:30,retention:0});
-    const choose=async style=>{
-        await page.locator(`.fury-recap-tabs [data-style="${style}"]`).click();
-        await page.waitForFunction(style=>state.settings.features.sessionRecapStyle===style,{},style);
-    };
-    await choose('compact');
-    assert(await page.$eval('#session-recap-fields',e=>e.closest('.session-field-section').hidden));
-    assert(!(await page.$eval('#session-recap-preview',e=>e.textContent.includes('Session:'))));
-    await choose('custom');
-    assert(await page.$eval('#session-recap-fields .fury-chip-label',e=>{
-        const luminance=color=>color.match(/[\d.]+/g).slice(0,3).map(Number).map(v=>v/255).map(v=>v<=0.04045?v/12.92:((v+0.055)/1.055)**2.4).reduce((sum,v,i)=>sum+v*[0.2126,0.7152,0.0722][i],0);
-        const fg=luminance(getComputedStyle(e).color),bg=luminance(getComputedStyle(e.closest('.fury-chip')).backgroundColor);
-        return (Math.max(fg,bg)+0.05)/(Math.min(fg,bg)+0.05)>=4.5;
-    }),'Selected chips keep readable contrast');
-    assert(!(await page.$eval('#session-recap-fields',e=>e.closest('.session-field-section').hidden)));
-    const recap='.fury-binary-choice:has(#game-recap-enabled)';
-    await page.locator(recap+' .fury-binary-off').click();
-    await page.waitForFunction('state.settings.features.gameRecapEnabled===false');
-    assert.strictEqual(await page.$eval('.session-recap-preview-shell',e=>getComputedStyle(e).display),'none');
-    await page.locator(recap+' .fury-binary-on').click();
-    await page.waitForFunction('state.settings.features.gameRecapEnabled===true');
-    assert.strictEqual(await page.$eval('#session-recap-style',e=>e.value),'custom');
+    await require('./verify_launcher_recaps')({page,output,profile});
     await page.waitForSelector('.fury-session-preview-section canvas');
     const storedBefore=await page.evaluate('JSON.stringify(state.sessionHistory.sessions)');
     const chartOption='#session-bedwars-fields label:has(input[value="gamesByMode"])';

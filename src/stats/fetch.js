@@ -1,7 +1,7 @@
 'use strict';
 
 // Player profile fetch pipeline: cache lookup, Mojang -> Hypixel
-// resolution, parallel Urchin/Seraph/status/ping fan-out, error
+// resolution, parallel Urchin/status/ping fan-out, error
 // classification, and in-flight deduping. Extracted from proxy.js;
 // proxy.js still owns the cache, key store, dedupe instance, and the
 // per-service raw fetchers, and injects them via createStatsFetch.
@@ -50,7 +50,6 @@ function createStatsFetch({
     hasHypixelApiKeyConfigured,
     hypixelApiGet,
     getUrchinRaw,
-    getSeraphRaw,
     getAuroraPingRaw,
     getHypixelStatusRaw,
     makePingData,
@@ -62,7 +61,7 @@ function createStatsFetch({
 } = {}) {
     const required = {
         globalCache, cacheDuration, getHypixelKey,
-        hasHypixelApiKeyConfigured, hypixelApiGet, getUrchinRaw, getSeraphRaw,
+        hasHypixelApiKeyConfigured, hypixelApiGet, getUrchinRaw,
         getAuroraPingRaw, getHypixelStatusRaw, makePingData, mergeUrchinOverride,
         notifyUrchinOutageOnce, classifyPlayerLookupError, playerLookupDeduper
     };
@@ -122,13 +121,12 @@ function createStatsFetch({
                 }
 
                 const activeUrchinOverride = pendingUrchinOverrides.get(dedupeKey) || null;
-                const [hRes, urchin, seraph, status, ping] = await Promise.all([
+                const [hRes, urchin, status, ping] = await Promise.all([
                     hypixelApiGet(`https://api.hypixel.net/v2/player?uuid=${uuid}`, {
                         timeout: 5000,
                         apiPriority: options.apiPriority
                     }),
                     activeUrchinOverride ? Promise.resolve(activeUrchinOverride) : getUrchinRaw(name, uuid),
-                    getSeraphRaw(uuid),
                     includeStatus ? getHypixelStatusRaw(uuid) : Promise.resolve('§7Not checked'),
                     getAuroraPingRaw(uuid)
                 ]);
@@ -151,7 +149,6 @@ function createStatsFetch({
                 const data = {
                     player: isOwnPlayer ? hRes.data.player : withoutEnderDust(hRes.data.player),
                     urchin,
-                    seraph,
                     status,
                     ping
                 };

@@ -144,7 +144,7 @@ function compactOverlayTags(tags = []) {
     (Array.isArray(tags) ? tags : []).forEach((tag) => {
         const source = String(tag?.source || '').toLowerCase();
         if (tag?.title === 'Urchin API Status') return;
-        const prefix = source === 'urchin' ? 'U' : source === 'seraph' ? 'S' : '';
+        const prefix = source === 'urchin' ? 'U' : '';
         const value = shortTagValue(tag?.value, 10, source);
         if (!prefix || !value) return;
         const key = `${prefix}:${value}`.toLowerCase();

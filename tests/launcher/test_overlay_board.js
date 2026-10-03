@@ -35,7 +35,7 @@ const fours = [
     player('nalini25', 'Blue', { fkdr: 4.77 }),
     player('fyechris', 'Green', { fkdr: 13.39 }, {
         tags: [
-            { source: 'Seraph', value: 'Closet Cheater', reasons: 'legit scaff' },
+            { source: 'Urchin', value: 'Closet Cheater', reasons: 'legit scaff' },
             { source: 'Urchin', value: 'Replays Needed' }
         ]
     }),
@@ -53,6 +53,10 @@ assert.strictEqual(model.groups[0].rank, 1);
 assert.strictEqual(model.groups[3].strength, null, 'nicked players without a real name do not count toward team strength');
 assert.strictEqual(model.groups[3].rank, null);
 assert.strictEqual(model.summary.flagged, 1, 'API status tags are not threats');
+const retiredModel = board.buildBoardModel([
+    player('LegacyPlayer', 'Red', {}, { tags: [{ source: 'Seraph', value: 'Closet Cheater' }] })
+], { mode: 'BEDWARS', order });
+assert.strictEqual(retiredModel.summary.flagged, 0, 'retired provider tags cannot flag a player');
 assert.strictEqual(model.summary.nicked, 1);
 assert.strictEqual(model.summary.teamCount, 4);
 assert.strictEqual(model.summary.mine.rank, 1);

@@ -110,7 +110,16 @@ assert.deepStrictEqual(
 assert.strictEqual(isGeorgeAcceptanceCommand('  /wanttobet true  '), true);
 assert.strictEqual(isGeorgeAcceptanceCommand('/wanttobet false'), false);
 assert.strictEqual(isGeorgeAcceptanceText('§e[NPC] Gambler George: Go win 2 Bed Wars matches, I will be watching.'), true);
-assert.strictEqual(isGeorgeClaimText('§e[NPC] Gambler George: You won the bet!'), true);
+assert.strictEqual(isGeorgeAcceptanceText("[NPC] Gambler George: That's the spirit! [1/4]"), true);
+assert.strictEqual(isGeorgeAcceptanceText("[NPC] Gambler George: Win 2 Bed Wars matches in a row, and I'll give you 200 Slumber Tickets. [2/4]"), true);
+assert.strictEqual(isGeorgeAcceptanceText("[NPC] Gambler George: I bet you can't win 2 Bed Wars matches in a row. [3/3]"), false,
+    'George offering another bet does not mean it was accepted');
+assert.strictEqual(isGeorgeClaimText('[NPC] Gambler George: You won the bet!'), false,
+    'winning is not the same as collecting the reward');
+assert.strictEqual(isGeorgeClaimText('[NPC] Gambler George: Here, have some of my earnings, I think you deserve it. [4/4]'), true);
+assert.strictEqual(isGeorgeClaimText('You received +200 Slumber Tickets!'), true);
+assert.strictEqual(isGeorgeClaimText('[MVP+] Player: You received +200 Slumber Tickets!'), false);
+assert.strictEqual(isGeorgeClaimText('[MVP+] Player: [NPC] Gambler George: Here, have some of my earnings!'), false);
 
 assert.strictEqual(formatGeorgeCooldown(0), 'ready');
 assert.strictEqual(formatGeorgeCooldown(GAMBLER_GEORGE_FAIL_COOLDOWN_MS), '24h');
@@ -246,10 +255,14 @@ assert.strictEqual(brokenSoundAlerts.length, 1, 'a failed sound write must not c
 harness.setEnabled(true);
 assert.strictEqual(harness.reminder.onTransition('game', 'game:3'), true, 'disabled transitions must not consume the reminder key');
 
-assert.strictEqual(harness.reminder.observeChatLine('[NPC] Gambler George: You won the bet!'), true);
+assert.strictEqual(harness.reminder.observeChatLine('[NPC] Gambler George: You won the bet!'), false);
+assert.strictEqual(harness.reminder.getStatus().claimReady, true);
+assert.strictEqual(harness.reminder.observeChatLine('[NPC] Gambler George: Here, have some of my earnings, I think you deserve it. [4/4]'), true);
 assert.strictEqual(harness.reminder.getStatus().active, false);
 assert.strictEqual(harness.reminder.getStatus().onCooldown, false, 'claiming must not start a cooldown');
 assert.strictEqual(harness.reminder.onTransition('lobby', 'lobby:4'), false);
+assert.strictEqual(harness.reminder.observeChatLine("[NPC] Gambler George: I bet you can't win 2 Bed Wars matches in a row. [3/3]"), false);
+assert.strictEqual(harness.reminder.getStatus().active, false, 'a new offer must not silently restart the bet');
 
 // A victory that lands after the match state was torn down — the /leave case —
 // still scores against the game that produced it, exactly once.
@@ -421,23 +434,37 @@ assert.strictEqual(modeHarness.reminder.observeTitle('§6§lVICTORY!', {
 }), true, 'a banner landing after a fast /leave still scores');
 assert.strictEqual(modeHarness.reminder.getStatus().claimReady, true);
 
-// --- The bet rides on the Auto Gambler switch --------------------------------
-// Auto Gambler is what answers George's prompt, so with it off there is no bet.
+// --- Reminder tracking is independent of Auto Gambler -------------------------
 const offHarness = createHarness({ autoGambler: false });
-assert.strictEqual(offHarness.reminder.getStatus().paused, true);
-offHarness.reminder.acceptQuest('manual_control', { restart: true });
-assert.strictEqual(offHarness.reminder.getStatus().active, false, 'no bet may start while Auto Gambler is off');
-assert.strictEqual(offHarness.reminder.observeCommand(GAMBLER_GEORGE_ACCEPT_COMMAND, 'auto_gambler'), false);
+assert.strictEqual(offHarness.reminder.getStatus().paused, false);
+assert.strictEqual(offHarness.reminder.observeCommand(GAMBLER_GEORGE_ACCEPT_COMMAND, 'manual_command'), true);
+assert.strictEqual(offHarness.reminder.getStatus().active, true, 'manual bets are tracked while Auto Gambler is off');
 assert.strictEqual(offHarness.reminder.observeTitle('§6§lVICTORY!', {
     gameActive: true,
     mode: 'BEDWARS',
     gameSessionId: 80
-}), false, 'wins must not score while Auto Gambler is off');
-assert.strictEqual(offHarness.reminder.hasPendingResult(), false);
-assert.deepStrictEqual(offHarness.alerts, []);
-assert.deepStrictEqual(offHarness.sounds, []);
+}), true, 'wins score while Auto Gambler is off');
+assert.strictEqual(offHarness.reminder.hasPendingResult(), true);
+offHarness.flushAlerts();
+assert.strictEqual(offHarness.alerts.length, 1);
+assert.strictEqual(offHarness.sounds.length, 1);
+assert.strictEqual(offHarness.reminder.observeTitle('§6§lVICTORY!', {
+    gameActive: true,
+    mode: 'BEDWARS',
+    gameSessionId: 81
+}), true);
+offHarness.flushAlerts();
+assert.strictEqual(offHarness.reminder.getStatus().claimReady, true);
+assert.strictEqual(offHarness.reminder.onTransition('lobby', 'off-lobby'), true,
+    'claim reminders still appear in chat while Auto Gambler is off');
+assert.strictEqual(offHarness.reminder.observeChatLine('You received +200 Slumber Tickets!'), true);
+assert.strictEqual(offHarness.reminder.getStatus().active, false);
+assert.strictEqual(offHarness.reminder.onTransition('game', 'after-claim'), false,
+    'the ticket payout clears future reminders without another bet');
+assert.strictEqual(offHarness.reminder.observeChatLine("[NPC] Gambler George: I bet you can't win 2 Bed Wars matches in a row. [3/3]"), false);
+assert.strictEqual(offHarness.reminder.getStatus().active, false);
 
-// Turning Auto Gambler off parks a bet in flight rather than destroying it.
+// Turning Auto Gambler off during a bet does not interrupt tracking.
 const parkedHarness = createHarness();
 parkedHarness.reminder.acceptQuest('manual_control', { restart: true });
 parkedHarness.reminder.observeTitle('§6§lVICTORY!', {
@@ -448,22 +475,13 @@ parkedHarness.reminder.observeTitle('§6§lVICTORY!', {
 assert.strictEqual(parkedHarness.reminder.getStatus().wins, 1);
 
 parkedHarness.setAutoGambler(false);
-assert.strictEqual(parkedHarness.reminder.getStatus().paused, true);
-assert.strictEqual(parkedHarness.reminder.getStatus().wins, 1, 'banked progress survives the pause');
+assert.strictEqual(parkedHarness.reminder.getStatus().paused, false);
+assert.strictEqual(parkedHarness.reminder.getStatus().wins, 1);
 assert.strictEqual(parkedHarness.reminder.observeTitle('§6§lVICTORY!', {
     gameActive: true,
     mode: 'BEDWARS',
     gameSessionId: 91
-}), false);
-assert.strictEqual(parkedHarness.reminder.getStatus().wins, 1, 'and no win scores while parked');
-
-parkedHarness.setAutoGambler(true);
-assert.strictEqual(parkedHarness.reminder.getStatus().paused, false);
-assert.strictEqual(parkedHarness.reminder.observeTitle('§6§lVICTORY!', {
-    gameActive: true,
-    mode: 'BEDWARS',
-    gameSessionId: 92
-}), true, 'the bet resumes exactly where it was parked');
+}), true);
 assert.strictEqual(parkedHarness.reminder.getStatus().claimReady, true);
 
-console.log('Gambler George BedWars-only + Auto Gambler gating tests passed.');
+console.log('Gambler George BedWars-only + independent reminder tests passed.');

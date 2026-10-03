@@ -4,7 +4,7 @@
 // LevelDB *.log files: they are not disposable application logs.
 const ROOT_FILES = [
     'statmod_key.txt', 'scan_config.json', 'features_config.json', 'chat_triggers.json', 'server_config.json',
-    'presets.json', 'denicked.json', 'friend_aliases.json', 'session_data.json', 'game_clips.json', 'rank_book.json',
+    'presets.json', 'denicked.json', 'nick_names.json', 'friend_aliases.json', 'session_data.json', 'game_clips.json', 'rank_book.json',
     'cosmetic_signatures.json', 'cosmetic_profiles.json', 'cosmetic_dataset.json', 'cosmetic_direct_samples.json',
     'cosmetic_model.json', 'cosmetic_model_backup.json', 'own_cosmetics.json', 'cosmetic_accuracy.json',
     'cosmetic_api_names.json', 'kill_message_patterns.json', 'cosmetic_search_cache.json',

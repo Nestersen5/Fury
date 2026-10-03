@@ -36,8 +36,9 @@ function createHealthServer(deps) {
         getSessionHistory = () => null,
         removeSession = null,
         removeDenickMapping = null,
+        appendDenickHistory = null,
+        flushDenickHistory = null,
         getEnderDustReminderStatus = () => null,
-        getSlumberDailyRewardsReminderStatus = () => null,
         getGamblerGeorgeReminderStatus = () => null,
         getFeatures,
         getFeatureCompareSnapshot,
@@ -82,7 +83,7 @@ function createHealthServer(deps) {
         app.use(express.json());
 
         app.get('/health', (req, res) => {
-            if (typeof reportOverlayUiVisible === 'function') {
+            if ('overlayVisible' in req.query && typeof reportOverlayUiVisible === 'function') {
                 reportOverlayUiVisible(String(req.query.overlayVisible || '') === '1');
             }
             const activeUser = getActiveUser();
@@ -111,7 +112,6 @@ function createHealthServer(deps) {
                 features: getFeatures(),
                 reminders: {
                     enderDust: getEnderDustReminderStatus(),
-                    slumberDailyRewards: getSlumberDailyRewardsReminderStatus(),
                     gamblerGeorge: getGamblerGeorgeReminderStatus()
                 },
                 liveGame: activeUser?.getLiveGameState ? activeUser.getLiveGameState() : {
@@ -136,7 +136,6 @@ function createHealthServer(deps) {
                     hypixel: hasHypixelApiKeyConfigured(),
                     urchin: Boolean(keys.urchin),
                     aurora: Boolean(keys.aurora),
-                    seraph: Boolean(keys.seraph)
                 },
                 ports: {
                     proxy: serverConfigs.map(({ port: serverPort, host, name }) => ({ port: serverPort, host, name })),
@@ -207,7 +206,21 @@ function createHealthServer(deps) {
             res.json({ ok: true, sessionId: result.session?.id || req.params.id });
         });
 
-        app.delete('/denick/:realIGN/:nick', (req, res) => {
+        app.post('/denick', async (req, res) => {
+            if (!isLocalRequest(req)) return res.status(403).json({ ok: false, error: 'Use the local launcher to manage saved nicknames.' });
+            const nick = String(req.body?.nick || '').trim(), realIGN = String(req.body?.realIGN || '').trim();
+            if (!/^[A-Za-z0-9_]{3,16}$/.test(nick) || !/^[A-Za-z0-9_]{3,16}$/.test(realIGN) || nick.toLowerCase() === realIGN.toLowerCase()) {
+                return res.status(400).json({ ok: false, error: 'Use different, valid Minecraft names, 3-16 characters.' });
+            }
+            if (!appendDenickHistory || !flushDenickHistory) return res.status(503).json({ ok: false, error: 'Nickname storage is unavailable.' });
+            try {
+                const result = appendDenickHistory({ nick, realIGN, method: 'manual', account: 'launcher' });
+                await flushDenickHistory({ strict: true });
+                res.json(result);
+            } catch (error) { res.status(500).json({ ok: false, error: error.message || 'Could not save the nickname mapping.' }); }
+        });
+
+        app.delete('/denick/:realIGN/:nick', async (req, res) => {
             if (!isLocalRequest(req)) {
                 res.status(403).json({ ok: false, error: 'Saved nick mappings can only be removed from the local launcher.' });
                 return;
@@ -222,12 +235,15 @@ function createHealthServer(deps) {
                 res.status(503).json({ ok: false, error: 'Nickname storage is unavailable.' });
                 return;
             }
-            const result = removeDenickMapping(realIGN, nick);
-            if (!result?.removed) {
-                res.status(404).json({ ok: false, error: 'That saved nickname mapping no longer exists.' });
-                return;
-            }
-            res.json({ ok: true, realIGN, nick, removedPlayer: Boolean(result.removedPlayer) });
+            try {
+                const result = removeDenickMapping(realIGN, nick);
+                if (!result?.removed) {
+                    res.status(404).json({ ok: false, error: 'That saved nickname mapping no longer exists.' });
+                    return;
+                }
+                if (flushDenickHistory) await flushDenickHistory({ strict: true });
+                res.json({ ok: true, realIGN, nick, removedPlayer: Boolean(result.removedPlayer) });
+            } catch (error) { res.status(500).json({ ok: false, error: error.message || 'Could not remove the nickname mapping.' }); }
         });
 
         app.post('/reminders/ender-dust/check', async (req, res) => {
@@ -337,7 +353,7 @@ function createHealthServer(deps) {
             reloadConfig();
 
             const newKeys = getKeys();
-            if (['hypixel', 'urchin', 'aurora', 'seraph'].some(key => oldKeys[key] !== newKeys[key])) {
+            if (['hypixel', 'urchin', 'aurora'].some(key => oldKeys[key] !== newKeys[key])) {
                 globalCache.clear();
                 resetUrchinLookupState();
                 auroraPingCache.clear();

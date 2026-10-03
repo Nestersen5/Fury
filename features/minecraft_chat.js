@@ -68,18 +68,18 @@ const BRACKETED_FEATURE_PREFIXES = new Set([
     'AutoDenick', 'AutoGambler', 'ChatTriggers', 'CosmeticDenick', 'CosmeticFX',
     'Cosmetics', 'Denick', 'Fury Health', 'Fury', 'FURY', 'Alias', 'Clip', 'KM', 'Launcher', 'Lobby Chat Stats',
     'NameTags', 'Overlay', 'Party', 'Party Overview', 'Ping', 'Preset',
-    'Profile', 'Recap', 'RemoveTag', 'Seraph', 'Session', 'SkinCheck',
+    'Profile', 'Recap', 'RemoveTag', 'Session', 'SkinCheck',
     'SkinDenick', 'TabStats', 'Tag', 'Urchin'
 ]);
 
 const ARROW_FEATURE_PREFIXES = [
-    'Fury Daily Rewards', 'Fury Reminder Test', 'Party Denick Test',
-    'Fury Reminder', 'Fury Daily', 'Party Denick', 'Profile Diff',
+    'Fury Reminder Test', 'Party Denick Test',
+    'Fury Reminder', 'Party Denick', 'Profile Diff',
     'Share Preview', 'AutoDodge', 'Session', 'Recap',
     'Profile', 'Pregame', 'Recorder', 'Dodge', 'Duels', 'Share', 'Fury', 'FURY',
     // Locally generated command/status headers; diagnostic and rank labels stay excluded.
     'Gambler George', 'Queue time', 'Lobby', 'Quick Buy + Hotbar', 'Quick Buy',
-    'Hotbar', 'Preview', 'Layout', 'Urchin', 'Seraph', 'Tags'
+    'Hotbar', 'Preview', 'Layout', 'Urchin', 'Tags'
 ].sort((left, right) => right.length - left.length);
 
 const TITLE_FEATURE_PREFIXES = [

@@ -8,7 +8,7 @@
 const { stripAnsi } = require('../../features/minecraft_chat.js');
 const { isUrchinRequestFailed, urchinStatusMessage } = require('../stats/urchin.js');
 const { isUrchinDeveloperNotice } = require('../stats/urchinNotice.js');
-const { parseOverlayUrchinTag, parseOverlaySeraphTag } = require('../overlay/tags.js');
+const { parseOverlayUrchinTag } = require('../overlay/tags.js');
 
 const CAUTION_WARNING = 'THIS TAG DOES NOT MEAN THE PLAYER IS CHEATING!';
 
@@ -71,26 +71,10 @@ function parseUrchinTags(urchin = {}) {
     return tags;
 }
 
-function parseSeraphTag(seraph = {}) {
-    const parsed = parseOverlaySeraphTag(seraph);
-    if (!parsed) return null;
-
-    return {
-        source: 'Seraph',
-        kind: 'report',
-        value: parsed.value,
-        addedBy: parsed.addedBy,
-        when: parsed.when,
-        exactReason: parsed.reasons || 'No reason was provided.',
-        rawTooltip: cleanText(seraph.tooltip)
-    };
-}
-
 function classifyPartyOverview(profile = {}) {
     const data = profile?.data || profile || {};
     const tags = [
         ...parseUrchinTags(data.urchin),
-        parseSeraphTag(data.seraph)
     ].filter(Boolean);
     const reports = tags.filter(tag => tag.kind === 'report');
     const cautions = tags.filter(tag => tag.kind === 'caution');
@@ -163,7 +147,6 @@ module.exports = {
     cleanText,
     parseUrchinTag,
     parseUrchinTags,
-    parseSeraphTag,
     classifyPartyOverview,
     summarizePartyOverview
 };

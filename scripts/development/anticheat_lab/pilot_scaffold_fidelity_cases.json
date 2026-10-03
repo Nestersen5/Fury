@@ -1,0 +1,7 @@
+[
+  { "mode": "godbridge", "initialDirection": 6, "activationBlocks": 1 },
+  { "mode": "tellybridge", "initialDirection": 6, "renderFrameMs": 1 },
+  { "mode": "tellybridge", "initialDirection": 6, "renderFrameMs": 16 },
+  { "mode": "tellybridge", "initialDirection": 6, "renderFrameMs": 8, "sensitivity": 0.25 },
+  { "mode": "tellybridge", "initialDirection": 6, "renderFrameMs": 8, "sensitivity": 0.75 }
+]

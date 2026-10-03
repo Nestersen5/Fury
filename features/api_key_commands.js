@@ -2,13 +2,24 @@
 
 const { createFeatureStatus } = require('./feature_panel.js');
 const chat = require('./chat_controller.js');
+const { getHypixelKeyReminderStatus, reminderMessage } = require('../src/reminders/hypixelKeyReminder.js');
+
+function sendHypixelKeyReminder(client, sendChat, status, message = reminderMessage(status)) {
+    sendChat(client, chat.line([
+        chat.text('\u00a76\u00a7lFury \u00a78» '),
+        chat.text(message, status.phase === 'expired' ? 'red' : 'yellow'),
+        chat.text('\n'),
+        chat.action('[Open dashboard]', 'https://developer.hypixel.net/dashboard/', 'Refresh your Hypixel API key.', { action: 'open_url' }),
+        chat.gap(1), chat.suggest('[Update key]', '/apikey hypixel ', 'Paste your new Hypixel API key.'),
+        chat.gap(1), chat.action('[Snooze 24 hours]', '/apikey snooze', 'Silence key reminders for 24 hours.')
+    ]));
+}
 
 const API_KEY_TYPES = {
     hypixel: 'Hypixel',
     urchin: 'Urchin',
     urchinadmin: 'Urchin admin',
     aurora: 'Aurora',
-    seraph: 'Seraph'
 };
 
 function apiKeyDisplay(value) {
@@ -43,18 +54,19 @@ function createApiKeyCommandHandler(options = {}) {
         ? options.getUrchinRateLimitSnapshot
         : () => ({});
     const onKeyChanged = typeof options.onKeyChanged === 'function' ? options.onKeyChanged : () => {};
+    const snoozeReminder = options.snoozeHypixelKeyReminder;
+    const onReminderChanged = options.onReminderChanged || (() => {});
 
     function sendApiKeyUsage(client) {
-        const panel = createFeatureStatus({ client, sendChat, title: 'API keys', section: 'system' });
-        panel.open();
-        Object.entries(API_KEY_TYPES).forEach(([key, label]) => panel.row([
-            panel.label(label),
-            chat.text(`/apikey ${key} <key>`, 'white')
-        ]));
-        panel.row([
-            chat.text('/apikey view - saved keys; /apikey usage - request usage.', 'gray')
-        ]);
-        panel.close();
+        const help = chat.createUsage(message => sendChat(client, message), 'API keys', 'Manage provider keys and request usage.');
+        help.section('Keys');
+        Object.entries(API_KEY_TYPES).forEach(([key, label]) =>
+            help.command(`/apikey ${key} <key>`, `Set the ${label} key.`));
+        help.section('Review');
+        help.command('/apikey view', 'View saved keys.');
+        help.command('/apikey usage', 'Show request usage.');
+        help.command('/apikey reminder', 'Show Hypixel key expiry and reminder status.');
+        help.command('/apikey snooze', 'Snooze Hypixel key reminders for 24 hours.');
     }
 
     function sendHypixelApiUsage(client) {
@@ -94,6 +106,12 @@ function createApiKeyCommandHandler(options = {}) {
         const subCommand = String(args[1] || '').toLowerCase();
         const keyField = subCommand;
 
+        // Consume retired key commands locally without storing or echoing credentials.
+        if (subCommand === 'seraph') {
+            sendChat(client, '\u00a77Seraph support has been removed. This key was not saved.');
+            return;
+        }
+
         if (!subCommand) {
             sendApiKeyUsage(client);
             return;
@@ -105,6 +123,24 @@ function createApiKeyCommandHandler(options = {}) {
         }
 
         const keys = getKeys();
+        if (subCommand === 'snooze') {
+            try {
+                if (!keys.hypixel) throw new Error('Set a Hypixel API key first.');
+                if (!snoozeReminder) throw new Error('Key reminders are unavailable.');
+                snoozeReminder(keys.hypixel);
+                onReminderChanged();
+                sendChat(client, '\u00a7aHypixel key reminders snoozed for 24 hours.');
+            } catch (error) { sendChat(client, `\u00a7c${error.message}`); }
+            return;
+        }
+        if (subCommand === 'reminder') {
+            const status = getHypixelKeyReminderStatus({ keys, keyMeta: loadKeyMeta() });
+            if (!status.expiresAt) sendChat(client, `\u00a77${reminderMessage(status)}`);
+            else sendHypixelKeyReminder(client, sendChat, status, status.snoozed
+                ? `Hypixel key reminders snoozed until ${new Date(status.snoozedUntil).toLocaleString()}. Expiry: ${new Date(status.expiresAt).toLocaleString()}.`
+                : reminderMessage(status));
+            return;
+        }
         if (subCommand === 'view') {
             const meta = loadKeyMeta();
             const panel = createFeatureStatus({ client, sendChat, title: 'Saved API Keys', section: 'system' });
@@ -132,7 +168,7 @@ function createApiKeyCommandHandler(options = {}) {
         const previousKey = keys[keyField];
         keys[keyField] = nextKey;
         saveKeys(keys);
-        if (previousKey !== nextKey && ['hypixel', 'urchin', 'aurora', 'seraph'].includes(keyField)) {
+        if (previousKey !== nextKey && ['hypixel', 'urchin', 'aurora'].includes(keyField)) {
             onKeyChanged(keyField, previousKey, nextKey);
         }
 
@@ -140,6 +176,7 @@ function createApiKeyCommandHandler(options = {}) {
         sendChat(client, `\u00a7a${API_KEY_TYPES[subCommand]} API key updated.`);
         if (keyField === 'hypixel') {
             sendChat(client, `\u00a77Hypixel updated: \u00a7f${meta.hypixelUpdatedAt || 'Just now'}${apiKeyAgeSuffix(meta.hypixelUpdatedAt)}`);
+            onReminderChanged();
         }
     }
 
@@ -151,5 +188,6 @@ module.exports = {
     apiKeyAgeSuffix,
     apiKeyDisplay,
     createApiKeyCommandHandler,
+    sendHypixelKeyReminder,
     formatUsageCountdown
 };

@@ -5,7 +5,7 @@ const target=require('./launcher_verification_target').verificationTarget('setti
 (async()=>{
  const root=path.resolve(__dirname,'..'),profile=fs.mkdtempSync(path.join(os.tmpdir(),'fury-dashboard-check-'));
  const output=target.output;fs.mkdirSync(output,{recursive:true});
- const [debugPort,cosmeticPort,blockedPort]=await unusedPorts(3),env=cleanEnvironment(profile,target.resources,cosmeticPort,blockedPort);if(!target.packaged)env.NODE_BINARY=process.execPath;
+ const [debugPort,cosmeticPort,blockedPort,directPort,failoverPort,healthPort]=await unusedPorts(6),env=cleanEnvironment(profile,target.resources,cosmeticPort,blockedPort);if(!target.packaged)env.NODE_BINARY=process.execPath;
  const account={uuid:'a'.repeat(32),name:'Nestersen'};
  require('../src/reminders/rememberedAccount').createReminderAccountStore(path.join(profile,'launcher_data','reminders')).remember(account.uuid,account.name);
  fs.writeFileSync(path.join(profile,'session_data.json'),JSON.stringify({version:3,sessions:[{...account,id:'dashboard-test',startedAt:1788798600000,lastSeen:1788802980000,endedAt:1788802980000,summary:{stats:{Bedwars:{wins_bedwars:10,losses_bedwars:4,games_played_bedwars:14,final_kills_bedwars:24}}},games:[{id:"game-1",at:1788802980000,mode:"BEDWARS",result:"win",durationMs:300000,delta:{stats:{Bedwars:{wins_bedwars:1}}}}]}]}));
@@ -79,6 +79,11 @@ const target=require('./launcher_verification_target').verificationTarget('setti
   await edit('auto-dodge-min-fkdr',String(savedThreshold));
   await page.waitForFunction('!featureSaveTimer && !featureSaveInFlight');
   // Exercise the actual child lifecycle; no Minecraft client is connected.
+  // Reset-to-defaults was checked above; reserve isolated listeners before launch.
+  await page.evaluate(async ports=>{
+    await ipcRenderer.invoke('settings:save-patch',{server:ports});await refresh();
+  },{proxyDirectPort:directPort,proxyFailoverPort:failoverPort,healthPort});
+  await page.waitForFunction('!refreshInFlight');
   await page.evaluate(async()=>{await ipcRenderer.invoke('service:start','proxy');await refresh();});
   await page.waitForFunction('state.services.proxy.running');
   const oldPid=await page.evaluate('state.services.proxy.pid');
@@ -86,7 +91,12 @@ const target=require('./launcher_verification_target').verificationTarget('setti
   assert.equal(await page.$eval('.fury-autosaved',e=>e.textContent),'Saved — restart proxy to apply');
   assert.equal(await page.$eval('#connection-restart',e=>e.hidden),false);
   await page.evaluate(()=>document.getElementById('connection-restart').click());
-  await page.waitForFunction('!settingsSaveStates.has("restart") && state.services.proxy.running && !state.services.proxy.restartRequired');
+  try {
+    await page.waitForFunction('!settingsSaveStates.has("restart") && state.services.proxy.running && !state.services.proxy.restartRequired');
+  } catch (error) {
+    console.error('Restart acceptance state:', await page.evaluate(()=>({saves:[...settingsSaveStates],proxy:state.services.proxy,disabled:document.getElementById('connection-restart').disabled})));
+    throw error;
+  }
   assert.notEqual(await page.evaluate('state.services.proxy.pid'),oldPid);
   await page.evaluate(async()=>{await ipcRenderer.invoke('service:stop','proxy');});
   assert.deepEqual(errors,[]);

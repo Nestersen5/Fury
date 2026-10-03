@@ -198,8 +198,9 @@ function createDenickDisplayNames({
         if (!profileKey) return;
 
         const request = Promise.resolve()
-            .then(() => resolveSkinProperties(real))
+            .then(() => skinRequests.get(uuid) === request ? resolveSkinProperties(real) : null)
             .then((textures) => {
+                if (skinRequests.get(uuid) !== request) return;
                 if (!skinReplacementEnabled() || !Array.isArray(textures) || textures.length === 0) return;
                 const current = sentProfiles.get(profileKey);
                 if (!current || profileUuid(current) !== uuid) return;
@@ -376,6 +377,15 @@ function createDenickDisplayNames({
             if (real) freeze(nick, real);
         });
         return true;
+    }
+
+    function refreshSavedMappings() {
+        refreshRenames();
+        // A correction can change skins while name replacement is disabled.
+        // Cancel old resolutions before restoring and resolving current owners.
+        skinRequests.clear();
+        revertSkinOverrides();
+        if (skinReplacementEnabled()) scheduleKnownRealSkins();
     }
 
     // The name to display for `nick`, or null to leave it alone: the real IGN
@@ -733,6 +743,7 @@ function createDenickDisplayNames({
         rewriteClientbound,
         refreshNameReplacement: syncNameReplacementToggle,
         refreshRenames,
+        refreshSavedMappings,
         refreshSkinReplacement: syncSkinReplacementToggle,
         activeRenames,
         wasRewritten,

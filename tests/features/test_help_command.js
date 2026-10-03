@@ -30,13 +30,16 @@ const row = createHelpRow({
 });
 assert.strictEqual(row.extra[0].clickEvent.action, 'suggest_command');
 assert.strictEqual(row.extra[0].clickEvent.value, '/stats ');
+assert.strictEqual(row.extra[0].color, 'white');
+assert.strictEqual(row.extra[1].color, 'gray');
+assert(row.extra[1].text.startsWith(' - '));
 assert(row.extra[0].hoverEvent.value.includes('/stats <player>'), 'Help hover should include variations');
 
 const sent = [];
 handleHelpCommand({}, (client, message) => sent.push(message));
 const visible = message => typeof message === 'string' ? message : (message.text || '') + (message.extra || []).map(visible).join('');
 assert(sent.some(message => visible(message).includes('FURY \u00bb Help')), 'Rendered help should include the Fury title');
-assert(sent.length <= 10, 'Default help should fit a short chat page');
+assert(sent.length <= 11, 'Default help should fit a short chat page with its section heading');
 const allParts = messages => messages.flatMap(message => message.extra || []);
 assert(allParts(sent).some(part => part.clickEvent?.value === '/help stats 2'), 'Next page should work');
 assert(!allParts(sent).some(part => part.clickEvent?.value === '/help stats 0'), 'First page has no previous action');
@@ -59,4 +62,47 @@ for (const section of HELP_SECTIONS) {
     }
 }
 
+const documented = new Set(HELP_SECTIONS.flatMap(section => section.entries).flatMap(entry => [
+    ...entry.label.split(' '), ...(entry.aliases || []),
+    ...(entry.variations || []).map(syntax => syntax.split(' ')[0])
+]));
+for (const command of require('../../features/command_completion').PROXY_COMMANDS) {
+    assert(documented.has(command), `${command} must be discoverable in the command guide`);
+}
+const headings = allParts(sent).filter(part => part.text === '> ' || HELP_SECTIONS.some(section => section.title === part.text));
+assert.strictEqual(headings.length, HELP_SECTIONS.length * 2);
+assert(headings.every(part => part.color === 'gold' && part.bold));
+assert(allParts(sent).filter(part => part.clickEvent?.action === 'suggest_command').every(part => part.color === 'white'));
+
 console.log('Help command tests passed.');
+
+// Help must remain read-only even for commands that normally automate menus.
+const { createQuickBuy } = require('../../src/menu/quickBuy');
+const layoutHelp = [];
+const unexpectedOperation = () => assert.fail('Help must not send packets or fetch a player');
+const layouts = createQuickBuy({
+    sendChat: message => layoutHelp.push(message), sendUpstream: unexpectedOperation,
+    sendClient: unexpectedOperation, fetchPlayer: unexpectedOperation,
+    presetDir: require('path').join(__dirname, 'fixtures', 'help-only-layouts')
+});
+try {
+    for (const command of ['/quickbuy', '/hotbar', '/quickbuyandhotbar']) {
+        layoutHelp.length = 0;
+        layouts.command([command, 'help']);
+        assert.strictEqual(layoutHelp[0].extra[0].color, 'gold');
+        assert(layoutHelp.some(message => visible(message).includes(`${command} save <preset> - `)));
+        assert(layoutHelp.some(message => visible(message).includes(`${command} cancel - `)));
+        assert(!JSON.stringify(layoutHelp).match(/clickEvent|hoverEvent/));
+        assert.strictEqual(layouts.isActive(), false);
+    }
+} finally { layouts.dispose(); }
+
+// Exercise the same serialization path used for actual Minecraft chat packets.
+const packets = [];
+const minecraft = require('../../features/minecraft_chat');
+minecraft.setChatPrefixAccent('#ffaa00');
+handleHelpCommand({ write: (name, packet) => packets.push({ name, packet }) }, minecraft.sendChat, ['all']);
+assert(packets.every(({ name }) => name === 'chat'));
+const wireParts = packets.flatMap(({ packet }) => JSON.parse(packet.message).extra);
+assert(wireParts.some(part => part.text === '/stats' && part.color === 'white' && part.clickEvent?.value === '/stats '));
+assert(wireParts.some(part => part.text === '> ' && part.color === 'gold' && part.bold));

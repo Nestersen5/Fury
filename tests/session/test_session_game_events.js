@@ -24,6 +24,11 @@ const context = {
     resolveKillOwner: line => line.match(/\bby ([A-Za-z0-9_]+)/i)?.[1] || null
 };
 
+for (const text of ['[MVP+] Rival: VICTORY!', 'Party > Friend: DEFEAT!', 'You will see VICTORY! soon']) {
+    assert(!parseGameEvents(text, context).some(event => ['victory', 'defeat'].includes(event.type)),
+        'Quoted result words in chat cannot confirm a game end');
+}
+
 assert.strictEqual(
     resolveSessionGameVariant('SKYWARS', { bedwarsQueue: null, previousVariant: null }),
     null,

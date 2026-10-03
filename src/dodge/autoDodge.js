@@ -116,10 +116,6 @@ function createAutoDodger(deps) {
         if (!data || data.lookupFailed || (data.isNicked && !hasKnownDenick(knownDenick))) return null;
         const urchinTag = getUrchinDodgeTag(data.urchin);
         if (urchinTag) return `§cUrchin §f${urchinTag}`;
-        if (data.seraph?.tagged) {
-            const seraphTag = compactTagName(data.seraph.report_type) || 'Blacklisted';
-            return `§4Seraph §f${seraphTag}`;
-        }
         return null;
     }
 

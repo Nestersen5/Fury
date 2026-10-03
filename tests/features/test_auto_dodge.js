@@ -144,11 +144,11 @@ function findComponent(component, predicate) {
     assert.equal(delay, 0, '1s left should fire immediately');
 }
 
-// 5. Seraph-tagged player is also dodged.
+// 5. Retired provider data must never trigger a dodge.
 {
     const h = makeHarness();
     const delay = captureScheduleDelay(() => h.dodger.maybeSchedule('Cheater5', seraphProfile));
-    assert.equal(delay, 3000, 'seraph-tagged player should schedule a dodge');
+    assert.equal(delay, null, 'retired provider data must not schedule a dodge');
 }
 
 // 6. Clean player -> no dodge scheduled.

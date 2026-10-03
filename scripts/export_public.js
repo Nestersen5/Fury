@@ -31,6 +31,9 @@ const INCLUDE = [
     // specific root-level rules come before the broad ones.
     // Permanent regression coverage.
     { category: 'tests', test: p => /^tests\/[^/]+\/test_[^/]+\.js$/.test(p) },
+    // Reviewed synthetic/local-lab regression fixtures, never the private corpus.
+    { category: 'tests', test: p => p === 'tests/features/fixtures/nick_books.json'
+        || /^tests\/features\/fixtures\/anticheat_lab\/(README\.md|legit_ladder_preexisting\.jsonl|legit_ladder_blockchange\.jsonl|legit_jumpcombat_grounded\.jsonl|legit_defensive_blockhit_slowticks\.jsonl|legit_defensive_blockhit_jitter\.jsonl|ladder_multi_block_change\.json|blockhit_lag_normal\.jsonl|blink_movement_positive\.jsonl)$/.test(p) },
     // Licence and security policy.
     { category: 'legal', test: p => ['LICENSE', 'SECURITY.md'].includes(p) },
     // Production source and the renderer it mounts.
@@ -60,6 +63,7 @@ const INCLUDE = [
 // overrides, generated artifacts and anything credential-shaped.
 const EXCLUDE = [
     { reason: 'private agent guidance', test: p => p === 'AGENTS.md' || p.startsWith('.agents/') },
+    { reason: 'private release preparation records', test: p => p.startsWith('docs/release-preparation/') },
     { reason: 'separate website and download tracker', test: p => p.startsWith('website/') || p.startsWith('cloudflare/download-stats/') },
     { reason: 'deployment-only tooling', test: p => p.startsWith('scripts/fixtures/gallery-skins/') || ['scripts/prepare_release.js', 'scripts/publish_release.js', 'scripts/release_plan.js', 'scripts/stage_download_site.js', 'scripts/test_download_workflow.js', 'scripts/capture_site_gallery.js', 'tests/release/test_release_publication.js', 'docs/RELEASE_PUBLISHING.md', 'docs/PUBLIC_RELEASE_CHECKLIST.md'].includes(p) },
     { reason: 'private archive or local git state', test: p => p === '.git' || p.startsWith('.git/') },
@@ -70,7 +74,7 @@ const EXCLUDE = [
     { reason: 'private deployment override', test: p => /(^|\/)(\.env|\.env\..*|\.dev\.vars.*|.*\.local\.json|wrangler\.local\..*)$/.test(p) && p !== '.env.example' },
     { reason: 'credential or signing material', test: p => /\.(pem|p12|pfx|cer|keystore|jks)$/i.test(p) || /(^|\/)id_rsa(\..*)?$/.test(p) },
     { reason: 'local machine state', test: p => /\.(log|stackdump|bak)$/i.test(p) },
-    { reason: 'private player data', test: p => /^(json-data|session_data|encounter_data|denicked|friend_aliases|presets|own_cosmetics|anticheat_history)\.json$/.test(p) },
+    { reason: 'private player data', test: p => /^(json-data|session_data|encounter_data|denicked|nick_names|friend_aliases|presets|own_cosmetics|anticheat_history)\.json$/.test(p) },
 ];
 
 // Content the public repository must never carry. Hadex, Nestersen and
@@ -182,6 +186,21 @@ function plan() {
     return { included, excluded, findings: scan(included.map(entry => entry.file)) };
 }
 
+// Public source has no deployment tools. Preserve the private scripts locally,
+// and deterministically omit only commands owned by excluded files on export.
+function publicPackage(config) {
+    const projected = { ...config, scripts: { ...config.scripts } };
+    for (const [name, command] of Object.entries(projected.scripts)) {
+        const parts = command.split(' && ').filter(part => {
+            const entry = part.match(/^node (?:--[\w-]+ )?((?:scripts|tests)\/[^ ]+\.js)(?: |$)/);
+            return !entry || classify(entry[1]).include;
+        });
+        if (parts.length) projected.scripts[name] = parts.join(' && ');
+        else delete projected.scripts[name];
+    }
+    return projected;
+}
+
 function copy(target) {
     const result = plan();
     assert.equal(result.findings.length, 0,
@@ -192,7 +211,9 @@ function copy(target) {
     for (const { file } of result.included) {
         const to = path.join(destination, file);
         fs.mkdirSync(path.dirname(to), { recursive: true });
-        fs.copyFileSync(path.join(root, file), to);
+        if (file === 'package.json') {
+            fs.writeFileSync(to, `${JSON.stringify(publicPackage(JSON.parse(fs.readFileSync(path.join(root, file), 'utf8'))), null, 2)}\n`);
+        } else fs.copyFileSync(path.join(root, file), to);
     }
     return { destination, ...result };
 }
@@ -226,4 +247,4 @@ if (require.main === module) {
     catch (error) { console.error(error.message); process.exitCode = 1; }
 }
 
-module.exports = { INCLUDE, EXCLUDE, FORBIDDEN_CONTENT, assertApplicationComplete, classify, plan, scan, trackedFiles };
+module.exports = { INCLUDE, EXCLUDE, FORBIDDEN_CONTENT, assertApplicationComplete, classify, plan, publicPackage, scan, trackedFiles };

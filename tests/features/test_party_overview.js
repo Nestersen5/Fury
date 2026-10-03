@@ -7,7 +7,6 @@ const path = require('path');
 const {
     classifyPartyOverview,
     parseUrchinTags,
-    parseSeraphTag,
     summarizePartyOverview
 } = require('../../src/party/overview.js');
 
@@ -23,6 +22,12 @@ const report = classifyPartyOverview({
 assert.strictEqual(report.state, 'flagged');
 assert.strictEqual(report.reports.length, 1);
 assert.strictEqual(report.reports[0].exactReason, 'Reach and velocity evidence');
+const retiredReport = classifyPartyOverview({ data: {
+    player: { displayname: 'LegacyPlayer' },
+    urchin: { ok: true, rawTags: [] },
+    seraph: { tagged: true, report_type: 'Blacklisted' }
+} });
+assert.strictEqual(retiredReport.state, 'clear', 'retired reports cannot flag a player');
 
 const caution = classifyPartyOverview({
     data: {
@@ -47,16 +52,6 @@ const serviceNotice = classifyPartyOverview({
 });
 assert.strictEqual(serviceNotice.state, 'notice', 'A service notice must never flag the player.');
 assert.strictEqual(serviceNotice.reports.length, 0);
-
-const seraph = parseSeraphTag({
-    tagged: true,
-    report_type: 'Fallback',
-    tooltip: 'Velocity: Consistent abnormal knockback (2026-08-11 by Auditor)'
-});
-assert.strictEqual(seraph.value, 'Velocity');
-assert.strictEqual(seraph.addedBy, 'Auditor');
-assert.strictEqual(seraph.when, '2026-08-11');
-assert.strictEqual(seraph.exactReason, 'Consistent abnormal knockback');
 
 const failed = classifyPartyOverview({
     data: {
@@ -84,6 +79,5 @@ assert(proxySource.includes('getOverlayRankNameColor(player)'), 'Party Overview 
 assert(proxySource.includes('monthlyFkdr') && proxySource.includes('monthlyWlr'), 'Party Overview should include monthly ratio data when available.');
 assert(proxySource.includes('formatBedwarsPrestige(stats.stars ?? 0)'), 'Party Overview should render BedWars level with its coloured prestige icon.');
 assert(!proxySource.includes('§fStars: §b${stats.stars ??'), 'Party Overview should not render the raw Stars label/value pair.');
-assert(/function partyOverviewTagColor\(tag = \{\}\)[\s\S]*seraph[\s\S]*'dark_aqua'[\s\S]*'light_purple'/.test(proxySource), 'Party Overview should color Seraph dark aqua and Urchin pink.');
 
 console.log('party overview tests passed');

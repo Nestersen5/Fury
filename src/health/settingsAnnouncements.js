@@ -23,7 +23,6 @@ const LABELS = {
     'Fancy share lines': 'Detailed Sharing',
     'Recolor own share lines': 'Share Colors',
     'Live share keeps team order': 'Share Team Order',
-    'Slumber NPC daily rewards reminder': 'Daily Rewards Reminder',
     'Ender Dust reminder threshold': 'Ender Dust Threshold',
     'Queue time messages': 'Queue Timer',
     'Queue time to party chat': 'Party Queue Timer',

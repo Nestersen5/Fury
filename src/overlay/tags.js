@@ -1,8 +1,7 @@
 'use strict';
 
-// Tag parsing for the live overlay panel: turn raw Urchin/Seraph tag
-// payloads (which proxy.js already shapes via src/stats/urchin.js +
-// the seraph helpers) into a normalized {source, title, value,
+// Tag parsing for the live overlay panel: turn raw Urchin tag
+// payloads (shaped by src/stats/urchin.js) into a normalized {source, title, value,
 // addedBy, reasons, when, rawTooltip} row, and assemble them into a
 // per-player tag list with deduping. compactTagName lives in
 // proxy.js, so it's injected via createOverlayTagBuilder.
@@ -128,56 +127,6 @@ function parseOverlayUrchinTag(rawTag = {}) {
     };
 }
 
-function parseOverlaySeraphTag(seraphData = {}) {
-    if (!seraphData?.tagged) return null;
-    const rawTooltip = cleanOverlayTagText(seraphData.tooltip);
-    const structuredReason = cleanOverlayTagText(firstTagValue(seraphData.reason, seraphData.notes, seraphData.description));
-    const structuredAddedBy = seraphData.hide_username
-        ? 'Hidden'
-        : firstTagValue(seraphData.added_by_username, seraphData.added_by_name, seraphData.added_by, seraphData.user);
-    const structuredWhen = formatOverlayTagTimestamp(firstTagValue(
-        seraphData.timestamp,
-        seraphData.added_on,
-        seraphData.addedAt,
-        seraphData.created_at,
-        seraphData.createdAt
-    ));
-    let tagName = cleanOverlayTagText(seraphData.report_type) || 'Seraph';
-    let addedBy = structuredAddedBy || 'Unknown';
-    let when = structuredWhen;
-    let reasons = structuredReason || rawTooltip || 'No details';
-
-    // The final parenthetical is the attribution only when it contains
-    // "by". This keeps an intermediate marker such as "(Upgraded)" out of
-    // the metadata fields when Seraph includes both parentheticals.
-    const metadataMatch = rawTooltip.match(/\(([^()]*(?:\bby\b)[^()]*)\)\s*$/i);
-    const body = metadataMatch ? rawTooltip.slice(0, metadataMatch.index).trim() : rawTooltip;
-    const colon = body.indexOf(':');
-    if (colon >= 0) {
-        tagName = body.slice(0, colon).trim() || tagName;
-        reasons = body.slice(colon + 1).trim() || reasons;
-    }
-
-    if (metadataMatch) {
-        const metadata = metadataMatch[1].replace(/\s+/g, ' ').trim();
-        const byMatch = metadata.match(/\bby\s+(.+?)\s*$/i);
-        if (byMatch?.[1]) {
-            addedBy = byMatch[1].trim();
-            when = metadata.slice(0, byMatch.index).trim() || when;
-        }
-    }
-
-    return {
-        source: 'Seraph',
-        title: 'Seraph Blacklist',
-        value: displayOverlayTagValue(tagName),
-        addedBy: cleanOverlayTagText(addedBy) || 'Unknown',
-        reasons: cleanOverlayTagText(reasons),
-        when,
-        rawTooltip
-    };
-}
-
 function createOverlayTagBuilder({ compactTagName } = {}) {
     if (typeof compactTagName !== 'function') {
         throw new Error('createOverlayTagBuilder requires compactTagName');
@@ -218,7 +167,6 @@ function createOverlayTagBuilder({ compactTagName } = {}) {
             });
         }
 
-        add(parseOverlaySeraphTag(data.seraph));
         return tags;
     }
 
@@ -228,6 +176,5 @@ function createOverlayTagBuilder({ compactTagName } = {}) {
 module.exports = {
     getOverlayRankNameColor,
     parseOverlayUrchinTag,
-    parseOverlaySeraphTag,
     createOverlayTagBuilder
 };

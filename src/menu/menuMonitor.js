@@ -1,5 +1,7 @@
 'use strict';
 
+const { createUsage } = require('../../features/chat_controller');
+
 // Menu / inventory packet monitor and driver (/menudebug).
 //
 // Watches ONLY the inventory-GUI slice of the packet stream, in both
@@ -901,14 +903,17 @@ function createMenuMonitor({
             return;
         }
         if (sub === 'help') {
-            sendChat('§d[Menu] §8» §7Watch and drive Hypixel GUI menus.');
-            sendChat(' §f/menudebug on §8- report every inventory packet in both directions');
-            sendChat(' §f/menudebug hold on §8- keep the menu open server-side after you close it locally');
-            sendChat(' §f/menudebug dump [slot] §8- list tracked slots, or one slot with its lore');
-            sendChat(' §f/menudebug find <text> §8- locate a slot by item name or lore');
-            sendChat(' §f/menudebug click <slot> [type] §8- send a window_click the way the client would');
-            sendChat(' §f/menudebug nav <a> > <b> §8- click through a chain of entries by name');
-            sendChat(' §f/menudebug close §8- send close_window   §f/menudebug log off §8- stop the JSONL file');
+            const help = createUsage(sendChat, 'Menu debug', 'Watch and drive Hypixel GUI menus.');
+            help.section('Inspect');
+            help.command('/menudebug on', 'Report inventory packets in both directions.');
+            help.command('/menudebug dump [slot]', 'List tracked slots, or one slot with its lore.');
+            help.command('/menudebug find <text>', 'Locate a slot by item name or lore.');
+            help.section('Navigation');
+            help.command('/menudebug hold on', 'Keep the menu open server-side after closing it locally.');
+            help.command('/menudebug click <slot> [type]', 'Send a window click as the client would.');
+            help.command('/menudebug nav <a> > <b>', 'Click through a chain of entries by name.');
+            help.command('/menudebug close', 'Close the server-side window.');
+            help.command('/menudebug log off', 'Stop the JSONL file.');
             return;
         }
         renderStatus();

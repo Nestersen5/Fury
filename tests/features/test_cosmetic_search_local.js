@@ -114,12 +114,12 @@ if (process.env.FURY_COSMETIC_TEST_PRELOAD === '1') {
             result = await search('killMessage=killmessages_counter&limit=1&offset=1');
             assert.equal(result.body.totalMatches, 2);
             assert.equal(result.body.data[0].name, 'Beta');
-            assert.deepEqual(first.requests, ['key-a'], 'Fresh cache must avoid repeat Aurora calls');
+            await eventually(() => assert.deepEqual(first.requests, ['key-a']), 'Fresh-cache request notification');
 
             writeKey('key-b');
             result = await search('killMessage=new_key_cosmetic');
             assert.equal(result.body.data[0].name, 'Changed');
-            assert.deepEqual(first.requests, ['key-a', 'key-b'], 'Running child must read saved Aurora key');
+            await eventually(() => assert.deepEqual(first.requests, ['key-a', 'key-b']), 'Saved-key refresh notification');
             writeKey('error-key');
             assert.equal((await search('killMessage=anything')).status, 502);
             writeKey('timeout-key');
@@ -141,7 +141,7 @@ if (process.env.FURY_COSMETIC_TEST_PRELOAD === '1') {
             assert.equal((await search('killMessage=disk_value')).body.data[0].name, 'Disk');
             assert.equal(second.requests.length, 0);
             assert.equal((await search('killMessage=killmessages_counter&refresh=1')).body.totalMatches, 2);
-            assert.deepEqual(second.requests, ['key-a']);
+            await eventually(() => assert.deepEqual(second.requests, ['key-a']), 'Explicit refresh notification');
             await stop(second);
 
             // An expired disk entry is refreshed, rather than returned as current.

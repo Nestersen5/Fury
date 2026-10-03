@@ -63,7 +63,14 @@ process.on('message',m=>{if(m==='minimize'){win.once('minimize',()=>process.send
     recovered.send('exit'); await exited(recovered);
     console.log('PASS native Electron: simultaneous paired paths, rapid double launch, minimized restore, shutdown ownership, profile overrides, relaunch and hard-exit lock recovery');
 }
-main().catch(error => { console.error(error); process.exitCode=1; }).finally(async () => {
+main().catch(error => {
+    console.error(error);
+    console.error('Native instance diagnostics:', JSON.stringify(children.map(child => ({
+        pid: child.pid, exitCode: child.exitCode, signalCode: child.signalCode,
+        events: child.messages.map(message => message.type), stderr: child.output.slice(-4000)
+    })), null, 2));
+    process.exitCode=1;
+}).finally(async () => {
     for (const child of children) if(child.exitCode===null&&child.signalCode===null) child.kill('SIGKILL');
     for (const child of children) await eventually(()=>assert.notEqual(child.exitCode??child.signalCode,null),'owned test exit').catch(()=>{});
     fs.rmSync(root,{recursive:true,force:true,maxRetries:5,retryDelay:200});

@@ -11,8 +11,8 @@ function summarizeProfile(profile) {
         ['tab', 'Tab stats', 'Stats in the player list', /^tabStats/i, ['Tab stats'], 'tabStatsEnabled'],
         ['nicks', 'Nicknames', 'Identify nicked players', /^(autoSkinDenick|autoStatsDenick|denick|showDenicked)/i, ['Skin denick', 'Stats denick'], null],
         ['chat', 'Chat & sharing', 'Chat stats and party updates', /^(share|lobbyChat|pregameChat|partyOverview|chatTrigger|accentBedwars)/i, ['Auto Share', 'Lobby chat stats', 'Pregame chat stats', 'Party overview'], null],
-        ['overlay', 'Overlay', 'Player board display', /^(socialOverlay|overlay)/i, ['Use Overlay'], 'socialOverlayAddsEnabled'],
-        ['sessions', 'Sessions & reminders', 'Tracking, recaps and reminders', /^(session|gameRecap|enderDust|slumber|gambler)/i, ['Session tracking', 'Game recap', 'Ender Dust reminder', 'Slumber reward reminder', 'Gambler George reminder'], null]
+        ['overlay', 'Overlay', 'Player board display', /^overlay/i, [], null],
+        ['sessions', 'Sessions & reminders', 'Tracking, recaps and reminders', /^(session|gameRecap|enderDust|slumber|gambler)/i, ['Session tracking', 'Game recap', 'Ender Dust reminder', 'Gambler George reminder'], null]
     ];
     const assigned = new Set();
     return groups.map(([id, label, description, pattern, highlights, primary]) => {

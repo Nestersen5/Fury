@@ -22,7 +22,7 @@ function withLocalTracking(api, { store, getIdentity, isApiAvailable, isEnabled,
     };
     const windowMs = () => Math.max(60000, Number(getResumeWindowMs?.()) || resumeWindowMs);
     const current = () => id ? store.findSession(id) : null;
-    function save(local, at = now(), sessionId = id) { if (sessionId) store.updateLocalTracking(sessionId, local, at); }
+    function save(local, at = now(), sessionId = id) { return sessionId ? store.updateLocalTracking(sessionId, local, at) : null; }
     function finishGame(partial = false, context = {}, sessionId = id) {
         const session = sessionId ? store.findSession(sessionId) : null; if (!session?.localTracking?.current) return;
         const local = normalizeLocal(session.localTracking), game = local.current;
@@ -33,13 +33,14 @@ function withLocalTracking(api, { store, getIdentity, isApiAvailable, isEnabled,
         local.streaks[game.mode]=nextStreak(local.streaks[game.mode],game);
         const one={totals:{[game.mode]:game.counts},variants:{},streaks:{[game.mode]:local.streaks[game.mode]}};addVariant(one,game);
         local.lastGameKey = game.key; local.current = null; save(local, game.endedAt || now(), sessionId);
-        store.appendGame(sessionId, { mode: game.mode, at: game.endedAt||now(), durationMs: Math.max(0, (game.endedAt||now()) - game.startedAt),
+        const record = store.appendGame(sessionId, { mode: game.mode, at: game.endedAt||now(), durationMs: Math.max(0, (game.endedAt||now()) - game.startedAt),
             result:game.resultConflict||!game.counts.wins.available||!game.counts.losses.available?null:game.result,
             verificationStatus: 'local', delta: null, metadata: { ...context.metadata, observedFromStart: game.observedFromStart,variant:game.variant.label,disconnected:partial&&!game.endObserved },
             events: context.events || [], roster: context.roster || [],
             teammates: context.teammates || [], opponents: context.opponents || [],
             localModes: localModes(one) });
         if (sessionId === id) scheduleBoundary();
+        return record;
     }
     // Leaving mid-game: pause what can be rejoined, finish the rest.
     function leave(context = {}) {
@@ -128,10 +129,76 @@ function withLocalTracking(api, { store, getIdentity, isApiAvailable, isEnabled,
     }
     const facade = { ...api };
     facade.ensureSession = async () => localSource() ? ensure() : api.ensureSession();
-    facade.onQueueStart = options => localSource() ? null : api.onQueueStart(options);
+    facade.onQueueStart = options => {
+        if (!localSource()) return api.onQueueStart(options);
+        if (!isEnabled() || options?.mode !== 'BEDWARS') return null;
+        const session = current();
+        if (!session?.localTracking?.current || session.localTracking.current.mode !== 'BEDWARS') return null;
+        const local = normalizeLocal(session.localTracking), game = local.current;
+        const previousStreak = local.streaks.BEDWARS || null;
+        const previousCoverage = {
+            wins: local.totals.BEDWARS?.wins.available !== false,
+            losses: local.totals.BEDWARS?.losses.available !== false
+        };
+        if (!game.endObserved) {
+            settleGame(game);
+            game.endObserved = true;
+            game.endedAt = now();
+            if (game.observedFromStart) game.counts.games = { value: 1, available: true };
+        }
+        save(local);
+        const record = finishGame(false);
+        store.flush();
+        return record && { sessionId: session.id, gameId: record.id, game,
+            previousStreak, previousCoverage,
+            needsResult: !game.result || game.resultConflict
+                || !game.counts.wins.available || !game.counts.losses.available };
+    };
+    facade.confirmPreviousGameResult = ({ result, at, serverId, localTicket } = {}) => {
+        if (!localSource()) return api.confirmPreviousGameResult({ result, at, serverId });
+        if (!['win', 'loss'].includes(result) || !localTicket || localTicket.sessionId !== id) return null;
+        const session = current();
+        if (!session || session.uuid !== identity()?.uuid) return null;
+        const record = session?.games?.[session.games.length - 1];
+        if (!record || record.id !== localTicket.gameId || record.mode !== 'BEDWARS' || record.result) return null;
+        const game = localTicket.game;
+        game.result = result;
+        game.resultConflict = false;
+        game.counts.wins = { value: result === 'win' ? 1 : 0, available: true };
+        game.counts.losses = { value: result === 'loss' ? 1 : 0, available: true };
+        const local = normalizeLocal(session.localTracking);
+        const totals = local.totals.BEDWARS;
+        totals.wins.value += game.counts.wins.value;
+        totals.losses.value += game.counts.losses.value;
+        totals.wins.available = localTicket.previousCoverage.wins;
+        totals.losses.available = localTicket.previousCoverage.losses;
+        local.streaks.BEDWARS = nextStreak(localTicket.previousStreak, game);
+        if (!save(local)) return null;
+        const one = { totals: { BEDWARS: game.counts }, variants: {}, streaks: { BEDWARS: local.streaks.BEDWARS } };
+        addVariant(one, game);
+        return store.updateGame(session.id, record.id, {
+            result, resultSource: 'manual', localModes: localModes(one)
+        });
+    };
+    facade.excludeCurrentGame = () => {
+        // Discard before any source transition can settle the provisional game.
+        ignored = true;
+        clearBoundary();
+        const session = current();
+        if (session?.localTracking?.current) {
+            const local = normalizeLocal(session.localTracking);
+            local.lastGameKey = local.current.key;
+            local.current = null;
+            save(local);
+            store.flush();
+            scheduleBoundary();
+        }
+        api.excludeCurrentGame();
+    };
     facade.onGameStart = options => localSource() ? start(options) : api.onGameStart(options);
     facade.observeLocalChat = (text, context = {}) => {
-        if (!localSource() || !isEnabled() || ignored) return;
+        if (!localSource()) return api.observeLocalChat(text, context);
+        if (!isEnabled() || ignored) return;
         // A new connection first reattaches to a paused game it may be rejoining.
         if (!current()?.localTracking?.current && ensure() && !current()?.localTracking?.current) start({ ...context, observedFromStart: false });
         const local = normalizeLocal(current()?.localTracking);
@@ -141,7 +208,8 @@ function withLocalTracking(api, { store, getIdentity, isApiAvailable, isEnabled,
         if (resumed || changed || (local.current && context.identityKnown === false)) save(local);
     };
     facade.observeLocalResult = text => {
-        if (!localSource() || !isEnabled() || ignored || !current()?.localTracking?.current) return;
+        if (!localSource()) return api.observeLocalResult(text);
+        if (!isEnabled() || ignored || !current()?.localTracking?.current) return;
         const local = normalizeLocal(current().localTracking);
         if(!observeResult(local.current,text,{at:now()}))return false;
         resume(local);save(local);return true;
@@ -152,9 +220,16 @@ function withLocalTracking(api, { store, getIdentity, isApiAvailable, isEnabled,
         if(options.mode&&options.mode!==current().localTracking.current.mode)return null;
         // Match-state flicker cannot create another game or discard counters.
         if (Number(options.durationMs) < 30000 && !options.force && !current().localTracking.current.endObserved) return null;
-        if (current().localTracking.current.endObserved) finishGame(false, options);
+        let record;
+        if (current().localTracking.current.endObserved) record = finishGame(false, options);
         else if (leave(options) === 'paused') { store.flush(); return id; }
-        if (onGameRecap) onGameRecap({ delta: delta(), sessionDelta: delta(), mode: options.mode, game: {BEDWARS:'Bedwars',SKYWARS:'SkyWars',DUELS:'Duels'}[options.mode], record: { durationMs: options.durationMs } });
+        // Unconfirmed departures remain in history but do not announce a
+        // completed game. Recaps carry this game's counters, not session totals.
+        if (record && onGameRecap) onGameRecap({
+            delta: { local: true, modes: record.localModes, spanMs: record.durationMs },
+            sessionDelta: delta(), mode: record.mode,
+            game: { BEDWARS: 'Bedwars', SKYWARS: 'SkyWars', DUELS: 'Duels' }[record.mode], record
+        });
         store.flush(); return id;
     };
     facade.getActiveSession = () => localSource() ? current() : api.getActiveSession();

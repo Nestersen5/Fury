@@ -55,6 +55,7 @@ const {
     saveScanSettings,
     saveFeatureSettings,
     saveChatTriggerSettings,
+    snoozeHypixelKeyReminder,
     loadKeys
 } = require('./app_config.js');
 const {
@@ -294,6 +295,7 @@ function startSettingsWatcher() {
 }
 
 async function startService(name) {
+    if (name === 'proxy') await launcherDenickActions.idle();
     const service = services[name];
     if (!service) throw new Error(`Unknown service: ${name}`);
     if (quitting) throw new Error('Fury is stopping.');
@@ -432,232 +434,20 @@ function readPersistedSessionHistory(account = selectedLauncherAccount()) {
     return buildLauncherSessionHistory(entries, { limit: retention, sessionSettings: features, account, accountScoped: true });
 }
 
-function uniquePushCaseInsensitive(items, value) {
-    const clean = String(value || '').trim();
-    if (!clean) return;
-    if (!items.some(item => String(item).toLowerCase() === clean.toLowerCase())) {
-        items.push(clean);
-    }
-}
-
 function isMinecraftUsername(value) {
     return /^[A-Za-z0-9_]{3,16}$/.test(String(value || '').trim());
 }
 
-function denickEventTimestamp(event = {}) {
-    const parsed = Date.parse(event.at || '');
-    return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function dedupeDenickEventsByNick(events = []) {
-    const byNick = new Map();
-    events.filter(Boolean).forEach((event) => {
-        const key = String(event.nick || '').trim().toLowerCase();
-        if (!key) return;
-        const current = byNick.get(key);
-        if (!current || denickEventTimestamp(event) >= denickEventTimestamp(current)) {
-            byNick.set(key, event);
-        }
-    });
-    return Array.from(byNick.values());
-}
-
-function finalizeDenickPlayerEvents(player = {}) {
-    player.events = dedupeDenickEventsByNick(Array.isArray(player.events) ? player.events : [])
-        .sort((a, b) => denickEventTimestamp(b) - denickEventTimestamp(a))
-        .slice(0, 100);
-    if (player.events.length > 0) {
-        const sortedAscending = player.events.slice().sort((a, b) => denickEventTimestamp(a) - denickEventTimestamp(b));
-        player.firstSeen = sortedAscending[0].at || player.firstSeen;
-        player.lastSeen = sortedAscending[sortedAscending.length - 1].at || player.lastSeen;
-    }
-    return player;
-}
-
-function normalizeDenickHistory(raw) {
-    const rows = Array.isArray(raw)
-        ? raw
-        : (raw && typeof raw === 'object' && Array.isArray(raw.players) ? raw.players : []);
-    const byRealName = new Map();
-
-    rows.forEach((item) => {
-        const realIGN = String(item.realIGN || item.realName || '').trim();
-        if (!realIGN) return;
-        const key = realIGN.toLowerCase();
-        const current = byRealName.get(key) || {
-            realIGN,
-            nicks: [],
-            methods: [],
-            firstSeen: item.firstSeen || item.at || '',
-            lastSeen: item.lastSeen || item.at || '',
-            events: []
-        };
-
-        const nicks = Array.isArray(item.nicks) ? item.nicks : (item.nick ? [item.nick] : []);
-        nicks.forEach(nick => uniquePushCaseInsensitive(current.nicks, nick));
-
-        const methods = Array.isArray(item.methods) ? item.methods : (item.method ? [item.method] : []);
-        methods.forEach(method => uniquePushCaseInsensitive(current.methods, method));
-
-        const events = Array.isArray(item.events) ? item.events : (item.nick ? [item] : []);
-        events.forEach((event) => {
-            const nick = String(event.nick || item.nick || '').trim();
-            const at = event.at || item.lastSeen || item.firstSeen || '';
-            const method = String(event.method || item.method || 'unknown').trim() || 'unknown';
-            const normalized = {
-                at,
-                nick,
-                realIGN,
-                method,
-                stats: event.stats || null,
-                gameMode: event.gameMode || null,
-                account: event.account || null
-            };
-            if (nick) uniquePushCaseInsensitive(current.nicks, nick);
-            uniquePushCaseInsensitive(current.methods, method);
-            current.events.push(normalized);
-            if (at && (!current.firstSeen || String(at) < String(current.firstSeen))) current.firstSeen = at;
-            if (at && (!current.lastSeen || String(at) > String(current.lastSeen))) current.lastSeen = at;
-        });
-
-        finalizeDenickPlayerEvents(current);
-        byRealName.set(key, current);
-    });
-
-    return Array.from(byRealName.values())
-        .sort((a, b) => String(b.lastSeen || '').localeCompare(String(a.lastSeen || '')));
-}
-
-function getDenickHistory() {
-    const raw = fs.existsSync(DENICKED_HISTORY_FILE) ? readJsonFile(DENICKED_HISTORY_FILE) : [];
-    const players = normalizeDenickHistory(raw);
-    const methods = {};
-    let totalNicks = 0;
-    let totalEvents = 0;
-
-    players.forEach((player) => {
-        const events = Array.isArray(player.events) ? player.events : [];
-        totalNicks += Array.isArray(player.nicks) ? player.nicks.length : 0;
-        totalEvents += events.length;
-        const countedMethods = events.length ? events.map(event => event.method) : (player.methods || []);
-        countedMethods.forEach((method) => {
-            const key = String(method || 'unknown');
-            methods[key] = (methods[key] || 0) + 1;
-        });
-    });
-
-    return {
-        players,
-        totalPlayers: players.length,
-        totalNicks,
-        totalEvents,
-        methods,
-        fileExists: fs.existsSync(DENICKED_HISTORY_FILE)
-    };
-}
-
-function addManualDenickMapping(nickRaw, realRaw, account = 'launcher') {
-    const nick = String(nickRaw || '').trim();
-    const realIGN = String(realRaw || '').trim();
-    if (!isMinecraftUsername(nick) || !isMinecraftUsername(realIGN)) {
-        throw new Error('Use valid Minecraft names, 3-16 characters.');
-    }
-    if (nick.toLowerCase() === realIGN.toLowerCase()) {
-        throw new Error('Nick and real IGN must be different.');
-    }
-
-    const now = new Date().toISOString();
-    const raw = fs.existsSync(DENICKED_HISTORY_FILE) ? readJsonFile(DENICKED_HISTORY_FILE) : [];
-    const players = normalizeDenickHistory(raw);
-    const realKey = realIGN.toLowerCase();
-    let player = players.find(item => String(item.realIGN || '').toLowerCase() === realKey);
-
-    if (!player) {
-        player = {
-            realIGN,
-            nicks: [],
-            methods: [],
-            firstSeen: now,
-            lastSeen: now,
-            events: []
-        };
-        players.push(player);
-    }
-
-    player.realIGN = player.realIGN || realIGN;
-    uniquePushCaseInsensitive(player.nicks, nick);
-    uniquePushCaseInsensitive(player.methods, 'manual');
-    if (!Array.isArray(player.events)) player.events = [];
-    player.events.push({
-        at: now,
-        nick,
-        realIGN: player.realIGN,
-        method: 'manual',
-        stats: null,
-        gameMode: null,
-        account
-    });
-    finalizeDenickPlayerEvents(player);
-
-    players.sort((a, b) => String(b.lastSeen || '').localeCompare(String(a.lastSeen || '')));
-    fs.writeFileSync(DENICKED_HISTORY_FILE, JSON.stringify(players, null, 2), 'utf8');
-    return { ok: true, nick, realIGN: player.realIGN };
-}
-
-function removePersistedDenickMapping(realRaw, nickRaw) {
-    const realIGN = String(realRaw || '').trim();
-    const nick = String(nickRaw || '').trim();
-    if (!isMinecraftUsername(realIGN) || !isMinecraftUsername(nick)) {
-        return { ok: false, error: 'Invalid saved nickname mapping.' };
-    }
-
-    const raw = fs.existsSync(DENICKED_HISTORY_FILE) ? readJsonFile(DENICKED_HISTORY_FILE) : [];
-    const players = normalizeDenickHistory(raw);
-    const playerIndex = players.findIndex(item => String(item.realIGN || '').toLowerCase() === realIGN.toLowerCase());
-    if (playerIndex < 0) return { ok: false, error: 'That saved nickname mapping no longer exists.' };
-
-    const player = players[playerIndex];
-    const previousNickCount = player.nicks.length;
-    player.nicks = player.nicks.filter(savedNick => String(savedNick).toLowerCase() !== nick.toLowerCase());
-    player.events = player.events.filter(event => String(event.nick || '').toLowerCase() !== nick.toLowerCase());
-    if (player.nicks.length === previousNickCount) {
-        return { ok: false, error: 'That saved nickname mapping no longer exists.' };
-    }
-
-    if (!player.nicks.length) {
-        players.splice(playerIndex, 1);
-    } else {
-        player.methods = [...new Set(player.events.map(event => String(event.method || 'unknown')))].filter(Boolean);
-        finalizeDenickPlayerEvents(player);
-    }
-    fs.writeFileSync(DENICKED_HISTORY_FILE, JSON.stringify(players, null, 2), 'utf8');
-    return { ok: true, realIGN: player.realIGN, nick, removedPlayer: !player.nicks.length };
-}
-
-async function runDenickRemoveAction(entry = {}) {
-    const realIGN = String(entry.realIGN || '').trim();
-    const nick = String(entry.nick || '').trim();
-    if (!isMinecraftUsername(realIGN) || !isMinecraftUsername(nick)) {
-        return { ok: false, error: 'Invalid saved nickname mapping.' };
-    }
-    const settings = loadAllSettings();
-    try {
-        const response = await axios.delete(
-            `http://127.0.0.1:${settings.server.healthPort}/denick/${encodeURIComponent(realIGN)}/${encodeURIComponent(nick)}`,
-            { timeout: 8000 }
-        );
-        // The proxy store writes off-thread. Mirror the same exact removal in
-        // the persisted file so the launcher's immediate refresh cannot flash
-        // the deleted mapping back into view while that write is still queued.
-        if (response.data?.ok) removePersistedDenickMapping(realIGN, nick);
-        return response.data;
-    } catch (error) {
-        if (error?.response) {
-            return { ok: false, error: error.response.data?.error || 'Could not remove the saved nickname mapping.' };
-        }
-        return removePersistedDenickMapping(realIGN, nick);
-    }
-}
+const launcherDenickHistory = require('./src/launcher/denickHistory').createLauncherDenickHistory(DENICKED_HISTORY_FILE);
+const launcherDenickActions = require('./src/launcher/denickActions').createLauncherDenickActions({
+    historyFile: DENICKED_HISTORY_FILE,
+    axios,
+    getPort: () => loadAllSettings().server.healthPort,
+    proxyRunning: () => Boolean(services.proxy.child || services.proxy.stopping)
+});
+function getDenickHistory(knownRevision) { return launcherDenickHistory.get(knownRevision); }
+function addManualDenickMapping(nick, realIGN) { return launcherDenickActions.add({ nick, realIGN }); }
+function runDenickRemoveAction(entry) { return launcherDenickActions.remove(entry); }
 
 function fileStamp(filePath) {
     try {
@@ -1378,11 +1168,11 @@ function checkPort(port) {
     });
 }
 
-async function getProxyHealth(settings, { overlayVisible = false, includeSessions = false, account = null } = {}) {
+async function getProxyHealth(settings, { overlayVisible, includeSessions = false, account = null } = {}) {
     const owner = services.proxy.child;
     try {
         const query = new URLSearchParams();
-        if (overlayVisible) query.set('overlayVisible', '1');
+        if (typeof overlayVisible === 'boolean') query.set('overlayVisible', overlayVisible ? '1' : '0');
         // Keyed like the proxy scopes it, so sign-in state changes do not count.
         const sessionScope = includeSessions ? JSON.stringify(normalizeAccount(account)) : null;
         const sessionBase = sessionScope ? proxySessionHistory.base(sessionScope) : null;
@@ -1436,7 +1226,6 @@ function settingChanges(before, after) {
     addSecret('Urchin API key', before.keys.urchin, after.keys.urchin);
     addSecret('Urchin admin API key', before.keys.urchinadmin, after.keys.urchinadmin);
     addSecret('Aurora API key', before.keys.aurora, after.keys.aurora);
-    addSecret('Seraph API key', before.keys.seraph, after.keys.seraph);
     add('Scan mode', before.scan.scanMode, after.scan.scanMode);
     add('Minimum FKDR', before.scan.minFkdr, after.scan.minFkdr);
     add('Minimum stars', before.scan.minStars, after.scan.minStars);
@@ -1448,6 +1237,14 @@ function settingChanges(before, after) {
         before.features?.chatPrefixAccentHex || '#e5b35d',
         after.features?.chatPrefixAccentHex || '#e5b35d'
     );
+    for (const [label, key] of [
+        ['AntiCheat', 'anticheatEnabled'],
+        ['Scaffold', 'anticheatScaffoldEnabled'],
+        ['AutoBlock', 'anticheatAutoblockEnabled'],
+        ['Stasis', 'anticheatStasisEnabled'],
+        ['Possible Alerts', 'anticheatPossibleAlertsEnabled'],
+        ['Team Alerts', 'anticheatTeamAlertsEnabled']
+    ]) add(label, before.features?.[key], after.features?.[key]);
     add('Ender Dust reminder threshold', before.features?.enderDustReminderThreshold, after.features?.enderDustReminderThreshold);
     addList('Chat triggers', before.chatTriggers?.triggers || [], after.chatTriggers?.triggers || []);
     [
@@ -1460,17 +1257,16 @@ function settingChanges(before, after) {
         ['Share nicked players', 'shareTagsIncludeNicks'],
         ['Share stat threats', 'shareTagsIncludeThreats'],
         ['Auto gambler', 'autoGamblerEnabled'],
+        ['Quick Maths', 'quickMathsEnabled'],
         ['Auto dodge', 'autoDodgeEnabled'],
         ['Dodge tagged players', 'autoDodgeTaggedPlayers'],
         ['Dodge nicked players', 'autoDodgeNickedPlayers'],
         ['Dodge stat threats', 'autoDodgeStatThreats'],
         ['Ender Dust reminder', 'enderDustReminderEnabled'],
-        ['Slumber NPC daily rewards reminder', 'slumberDailyRewardsReminderEnabled'],
         ['Gambler George reminder', 'gamblerGeorgeReminderEnabled'],
         ['Auto skin denick', 'autoSkinDenickEnabled'],
         ['Auto stats denick', 'autoStatsDenickEnabled'],
         ['Denick chat announcements', 'denickChatAnnouncementsEnabled'],
-        ['Use Overlay', 'socialOverlayAddsEnabled'],
         ['Lobby message stats', 'lobbyChatStatsEnabled'],
         ['Lobby stats mentions', 'lobbyChatStatsMentionEnabled'],
         ['Lobby stats DMs', 'lobbyChatStatsDmEnabled'],
@@ -1520,7 +1316,7 @@ function settingChanges(before, after) {
     ].forEach(([label, key]) => add(label, before.features?.[key] || 'none', after.features?.[key] || 'none'));
     add('Session inactivity boundary', before.features?.sessionBoundaryMinutes ?? 180, after.features?.sessionBoundaryMinutes ?? 180);
     add('Session history retention', before.features?.sessionRetention ?? 100, after.features?.sessionRetention ?? 100);
-    add('Session recap style', before.features?.sessionRecapStyle || 'detailed', after.features?.sessionRecapStyle || 'detailed');
+    add('Session recap style', before.features?.sessionRecapStyle || 'scoreboard', after.features?.sessionRecapStyle || 'scoreboard');
     addList('Session recap fields', before.features?.sessionRecapFields || [], after.features?.sessionRecapFields || []);
     addList('BedWars session fields', before.features?.sessionBedwarsFields || [], after.features?.sessionBedwarsFields || []);
     addList('SkyWars session fields', before.features?.sessionSkywarsFields || [], after.features?.sessionSkywarsFields || []);
@@ -1551,9 +1347,11 @@ function settingChanges(before, after) {
     );
     add('Direct proxy port (restart proxy)', before.server.proxyDirectPort, after.server.proxyDirectPort);
     add('Failover proxy port (restart proxy)', before.server.proxyFailoverPort, after.server.proxyFailoverPort);
+    add('Custom server port (restart proxy)', before.server.proxyCustomPort, after.server.proxyCustomPort);
     add('Health port (restart proxy)', before.server.healthPort, after.server.healthPort);
     add('Direct host (restart proxy)', before.server.proxyDirectHost, after.server.proxyDirectHost);
     add('Failover host (restart proxy)', before.server.proxyFailoverHost, after.server.proxyFailoverHost);
+    add('Custom server host (restart proxy)', before.server.proxyCustomHost, after.server.proxyCustomHost);
 
     return changes;
 }
@@ -1599,9 +1397,6 @@ async function getApiStatus(settings) {
         aurora: settings.keys.aurora
             ? { label: 'Aurora', state: 'configured', detail: 'Key configured' }
             : { label: 'Aurora', state: 'missing key', detail: 'Add a key in Settings' },
-        seraph: settings.keys.seraph
-            ? { label: 'Seraph', state: 'configured', detail: 'Key configured' }
-            : { label: 'Seraph', state: 'missing key', detail: 'Add a key in Settings' }
     };
 
     const validateHypixelEntry = async (field, key, acceptedDetail) => {
@@ -1664,6 +1459,7 @@ async function launcherState(event, options = {}) {
         Promise.all([
             checkPort(settings.server.proxyDirectPort),
             checkPort(settings.server.proxyFailoverPort),
+            settings.server.proxyCustomPort ? checkPort(settings.server.proxyCustomPort) : Promise.resolve(false),
             checkPort(settings.server.healthPort)
         ]),
         getApiStatus(settings)
@@ -1671,7 +1467,8 @@ async function launcherState(event, options = {}) {
     const ports = {
         proxyDirect: portStates[0],
         proxyFailover: portStates[1],
-        health: portStates[2]
+        proxyCustom: portStates[2],
+        health: portStates[3]
     };
 
     const result = {
@@ -1688,7 +1485,7 @@ async function launcherState(event, options = {}) {
         reminders: rememberedReminders.getStatus(viewedAccount),
         authUsers: listAuthUsers(),
         authAccounts: getAuthAccounts(),
-        denickHistory: includeDenicks ? getDenickHistory() : null,
+        denickHistory: includeDenicks ? getDenickHistory(options.denickHistoryRevision) : null,
         sessionHistory: includeSessions
             ? (proxyHealth?.sessionHistory || readPersistedSessionHistory(viewedAccount))
             : null,
@@ -1903,16 +1700,23 @@ async function validateNetworkConfiguration(payload = {}) {
     const requested = {
         direct: Number(payload.proxyDirectPort),
         failover: Number(payload.proxyFailoverPort),
+        custom: Number(payload.proxyCustomPort ?? settings.server.proxyCustomPort),
         health: Number(payload.healthPort)
     };
     const configured = {
         direct: Number(settings.server.proxyDirectPort),
         failover: Number(settings.server.proxyFailoverPort),
+        custom: Number(settings.server.proxyCustomPort),
         health: Number(settings.server.healthPort)
     };
-    const duplicatePorts = new Set(Object.values(requested).filter((port, index, all) => all.indexOf(port) !== index));
+    const activePorts = Object.values(requested).filter(port => port !== 0);
+    const duplicatePorts = new Set(activePorts.filter((port, index) => activePorts.indexOf(port) !== index));
     const ports = {};
     await Promise.all(Object.entries(requested).map(async ([name, port]) => {
+        if (name === 'custom' && port === 0) {
+            ports[name] = { state: 'inactive', detail: 'Enter a local port to enable this connection.' };
+            return;
+        }
         if (!Number.isInteger(port) || port < 1 || port > 65535) {
             ports[name] = { state: 'invalid', detail: 'Use a port from 1 to 65535.' };
             return;
@@ -1935,14 +1739,19 @@ async function validateNetworkConfiguration(payload = {}) {
             : { state: 'invalid', detail: 'Enter a hostname without a protocol or port.' },
         failover: validNetworkHost(payload.proxyFailoverHost)
             ? { state: 'valid', detail: 'Valid destination hostname.' }
+            : { state: 'invalid', detail: 'Enter a hostname without a protocol or port.' },
+        custom: validNetworkHost(payload.proxyCustomHost ?? settings.server.proxyCustomHost)
+            ? { state: 'valid', detail: 'Valid destination hostname.' }
             : { state: 'invalid', detail: 'Enter a hostname without a protocol or port.' }
     };
     const restartRequired = requested.direct !== configured.direct
         || requested.failover !== configured.failover
+        || requested.custom !== configured.custom
         || requested.health !== configured.health
         || String(payload.proxyDirectHost || '').trim() !== String(settings.server.proxyDirectHost || '').trim()
-        || String(payload.proxyFailoverHost || '').trim() !== String(settings.server.proxyFailoverHost || '').trim();
-    const valid = Object.values(ports).every(item => ['active', 'available'].includes(item.state))
+        || String(payload.proxyFailoverHost || '').trim() !== String(settings.server.proxyFailoverHost || '').trim()
+        || String(payload.proxyCustomHost ?? settings.server.proxyCustomHost).trim() !== String(settings.server.proxyCustomHost || '').trim();
+    const valid = Object.values(ports).every(item => ['active', 'available', 'inactive'].includes(item.state))
         && Object.values(hosts).every(item => item.state === 'valid');
     return { ports, hosts, restartRequired, valid, proxyRunning: isRunning('proxy') };
 }
@@ -1967,11 +1776,8 @@ async function testApiKey(provider, rawKey) {
         } else if (name === 'aurora') {
             response = await request('https://bordic.xyz/api/v2/resources/lookup/finals', { params: { value: 0, range: 1, max: 1, key } });
             if (response.status >= 200 && response.status < 300 && response.data?.success !== false) return { ok: true, state: 'available', detail: 'Aurora accepted this API key.' };
-        } else if (name === 'seraph') {
-            response = await request(`https://api.seraph.si/069a79f444e94726a5befca90e38aaf5/blacklist?key=${encodeURIComponent(key)}`);
-            if (response.status >= 200 && response.status < 300 && response.data?.success !== false) return { ok: true, state: 'available', detail: 'Seraph accepted this API key.' };
         } else {
-            return { ok: false, state: 'unsupported', detail: 'This legacy provider does not require a connection test.' };
+            return { ok: false, state: 'unsupported', detail: 'This provider is no longer supported.' };
         }
         if (response?.status === 429) return { ok: true, state: 'rate limited', detail: 'The key was accepted, but the provider is rate limited.' };
         if ([401, 403].includes(response?.status)) return { ok: false, state: 'invalid key', detail: 'The provider rejected this API key.' };
@@ -2110,15 +1916,25 @@ handleLauncherRequest('settings:save-patch', async (event, patch) => {
     }
     if (merged.server) {
         const ports = ['proxyDirectPort','proxyFailoverPort','healthPort'].map(key => merged.server[key]);
-        if (ports.some(port => !Number.isInteger(port) || port < 1 || port > 65535) || new Set(ports).size !== ports.length)
+        const customPort = merged.server.proxyCustomPort;
+        if (customPort !== 0) ports.push(customPort);
+        if (!Number.isInteger(customPort) || customPort < 0 || customPort > 65535
+            || ports.some(port => !Number.isInteger(port) || port < 1 || port > 65535) || new Set(ports).size !== ports.length)
             throw new Error('Use different ports between 1 and 65535');
-        if (!validNetworkHost(merged.server.proxyDirectHost) || !validNetworkHost(merged.server.proxyFailoverHost))
+        if (!validNetworkHost(merged.server.proxyDirectHost) || !validNetworkHost(merged.server.proxyFailoverHost)
+            || !validNetworkHost(merged.server.proxyCustomHost))
             throw new Error('Enter a valid server hostname');
     }
     const saved = saveAllSettings(merged);
     apiStatusCache = { at: 0, data: null };
     await notifyProxySettingsChanged(before, settingChanges(before, saved));
     return saved;
+});
+handleLauncherRequest('settings:save-hypixel-reminder-snooze', async (event, expectedKey) => {
+    const before = loadAllSettings();
+    const meta = snoozeHypixelKeyReminder(expectedKey);
+    await notifyProxySettingsChanged(before, []);
+    return meta;
 });
 handleLauncherRequest('service:restart', async (event, name) => {
     if (name !== 'proxy') throw new Error('Unknown service');
@@ -2145,6 +1961,9 @@ handleLauncherRequest('settings:save-chat-prefix-accent', async (event, accentHe
 });
 handleLauncherRequest('settings:save-features', async (event, settings) => {
     const before = loadAllSettings();
+    const nickSettings = require('./src/nick/settings');
+    const nickRoll = settings?.features?.nickRoll === undefined ? before.features.nickRoll
+        : nickSettings.validate({ ...nickSettings.normalizeSettings(before.features.nickRoll), ...settings.features.nickRoll });
     const scan = {
         ...before.scan,
         scanMode: settings?.scan?.scanMode ?? before.scan.scanMode,
@@ -2152,6 +1971,13 @@ handleLauncherRequest('settings:save-features', async (event, settings) => {
     };
     const features = {
         ...before.features,
+        nickRoll,
+        anticheatEnabled: settings?.features?.anticheatEnabled ?? before.features?.anticheatEnabled,
+        anticheatScaffoldEnabled: settings?.features?.anticheatScaffoldEnabled ?? before.features?.anticheatScaffoldEnabled,
+        anticheatAutoblockEnabled: settings?.features?.anticheatAutoblockEnabled ?? before.features?.anticheatAutoblockEnabled,
+        anticheatStasisEnabled: settings?.features?.anticheatStasisEnabled ?? before.features?.anticheatStasisEnabled,
+        anticheatPossibleAlertsEnabled: settings?.features?.anticheatPossibleAlertsEnabled ?? before.features?.anticheatPossibleAlertsEnabled,
+        anticheatTeamAlertsEnabled: settings?.features?.anticheatTeamAlertsEnabled ?? before.features?.anticheatTeamAlertsEnabled,
         tabStatsEnabled: settings?.features?.tabStatsEnabled ?? before.features?.tabStatsEnabled,
         autoScanOnGameStart: true,
         shareTagsAuto: settings?.features?.shareTagsAuto ?? before.features?.shareTagsAuto,
@@ -2162,6 +1988,7 @@ handleLauncherRequest('settings:save-features', async (event, settings) => {
         shareTagsIncludeNicks: settings?.features?.shareTagsIncludeNicks ?? before.features?.shareTagsIncludeNicks,
         shareTagsIncludeThreats: settings?.features?.shareTagsIncludeThreats ?? before.features?.shareTagsIncludeThreats,
         autoGamblerEnabled: settings?.features?.autoGamblerEnabled ?? before.features?.autoGamblerEnabled,
+        quickMathsEnabled: settings?.features?.quickMathsEnabled ?? before.features?.quickMathsEnabled,
         autoDodgeEnabled: settings?.features?.autoDodgeEnabled ?? before.features?.autoDodgeEnabled,
         autoDodgeDelaySeconds: settings?.features?.autoDodgeDelaySeconds ?? before.features?.autoDodgeDelaySeconds,
         autoDodgeTaggedPlayers: settings?.features?.autoDodgeTaggedPlayers ?? before.features?.autoDodgeTaggedPlayers,
@@ -2173,7 +2000,6 @@ handleLauncherRequest('settings:save-features', async (event, settings) => {
         partyOverviewEnabled: true,
         enderDustReminderEnabled: settings?.features?.enderDustReminderEnabled ?? before.features?.enderDustReminderEnabled,
         enderDustReminderThreshold: settings?.features?.enderDustReminderThreshold ?? before.features?.enderDustReminderThreshold,
-        slumberDailyRewardsReminderEnabled: settings?.features?.slumberDailyRewardsReminderEnabled ?? before.features?.slumberDailyRewardsReminderEnabled,
         gamblerGeorgeReminderEnabled: settings?.features?.gamblerGeorgeReminderEnabled ?? before.features?.gamblerGeorgeReminderEnabled,
         // Progress is owned by the live proxy. Never let a launcher form save
         // overwrite a win that arrived after its last health poll.
@@ -2182,7 +2008,6 @@ handleLauncherRequest('settings:save-features', async (event, settings) => {
         autoStatsDenickEnabled: settings?.features?.autoStatsDenickEnabled ?? before.features?.autoStatsDenickEnabled,
         denickChatAnnouncementsEnabled: settings?.features?.denickChatAnnouncementsEnabled ?? before.features?.denickChatAnnouncementsEnabled,
         denickPartyAnnounceEnabled: settings?.features?.denickPartyAnnounceEnabled ?? before.features?.denickPartyAnnounceEnabled,
-        socialOverlayAddsEnabled: settings?.features?.socialOverlayAddsEnabled ?? before.features?.socialOverlayAddsEnabled,
         lobbyChatStatsEnabled: settings?.features?.lobbyChatStatsEnabled ?? before.features?.lobbyChatStatsEnabled,
         lobbyChatStatsMentionEnabled: settings?.features?.lobbyChatStatsMentionEnabled ?? before.features?.lobbyChatStatsMentionEnabled,
         lobbyChatStatsDmEnabled: settings?.features?.lobbyChatStatsDmEnabled ?? before.features?.lobbyChatStatsDmEnabled,

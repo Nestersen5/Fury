@@ -1,4 +1,5 @@
 'use strict';
+const { parseBedDestroyChat } = require('../cosmetics/bedMessages');
 
 // Values and coverage travel together. Old saves do not acquire invented zeros
 // when new counters are introduced; derived ratios require both inputs.
@@ -107,7 +108,7 @@ function observeResult(game,message,{at=Date.now()}={}){
     else {game.counts.wins={value:game.result==='win'?1:0,available:true};game.counts.losses={value:game.result==='loss'?1:0,available:true};}
     return true;
 }
-function observe(game,message,{identityKnown=true,ownNames=null,ownTeam=null,at=Date.now()}={}){
+function observe(game,message,{identityKnown=true,ownNames=null,ownTeam=null,at=Date.now(),detectKnownKillMessageForStats=null}={}){
     if(!game)return false;
     if(!game.ownTeam&&team(ownTeam))game.ownTeam=team(ownTeam);
     if(!identityKnown)invalidate(game,['finals','beds','finalDeaths','kills','deaths']);
@@ -115,29 +116,32 @@ function observe(game,message,{identityKnown=true,ownNames=null,ownTeam=null,at=
     const own=name=>Boolean(name)&&game.ownNames.includes(name);
     const text=clean(message);
     if(!text||/:/.test(text)||/^(?:Party|Guild|Officer|From|To|\[)/i.test(text))return false;
-    if(game.mode==='BEDWARS'&&/\b(?:all beds (?:have been )?destroyed|bed destruction)\b/i.test(text)&&!/\bby\b/i.test(text)&&!/TEAM ELIMINATED/.test(text)){
+    if(game.mode==='BEDWARS'&&/^(?:all beds (?:have been )?destroyed\b|bed destruction(?:\s*>\s*)?$)/i.test(text)&&!/\bby\b/i.test(text)){
         if(/\ball beds\b|^(?:BED DESTRUCTION\s*>\s*)?Your Bed\b/i.test(text))game.bedGone=true;
         invalidate(game,['beds','bedsLost']);return true;
     }
     const eliminated=text.match(/^TEAM ELIMINATED\s*>\s*(Red|Blue|Green|Yellow|Aqua|White|Pink|Gr[ae]y) Team has been eliminated[!.]?$/i);
     if(game.mode==='BEDWARS'&&eliminated&&team(eliminated[1])===game.ownTeam)return observeResult(game,'DEFEAT!',{at});
-    if(game.mode==='BEDWARS'&&/\bBED DESTRUCTION\b|\bBed\b.*\bdestroyed\b/i.test(text)){
+    if(game.mode==='BEDWARS'&&/^(?:BED DESTRUCTION\s*>\s*|(?:Your|Red|Blue|Green|Yellow|Aqua|White|Pink|Gr[ae]y) Bed\b)/i.test(text)){
         // Hypixel names the player's own bed "Your Bed" whatever the verb.
         if(/^(?:BED DESTRUCTION\s*>\s*)?Your Bed\b/i.test(text))game.bedGone=true;
-        const match=text.match(/^(?:BED DESTRUCTION\s*>\s*)?(Your|Red|Blue|Green|Yellow|Aqua|White|Pink|Gr[ae]y) Bed was (?:bed #[\d,]+ )?destroyed by ([A-Za-z0-9_]{2,16})[!.]?$/i);
+        const match=parseBedDestroyChat(text);
         if(!match){invalidate(game,['beds','bedsLost']);return true;}
-        const target=/^your$/i.test(match[1])?game.ownTeam:team(match[1]);if(!target){invalidate(game,['beds','bedsLost']);return true;}
+        const target=/^your$/i.test(match.team)?game.ownTeam:team(match.team);if(!target){invalidate(game,['beds','bedsLost']);return true;}
         if(game.destroyedTeams.includes(target))return false;game.destroyedTeams.push(target);
-        if(own(match[2].toLowerCase()))game.counts.beds.value++;
+        if(own(match.breaker.toLowerCase()))game.counts.beds.value++;
         if(target===game.ownTeam){game.counts.bedsLost.value++;game.bedGone=true;}
         return true;
     }
-    const final=/\bFINAL KILL!/i.test(text);
-    const victim=text.match(/^([A-Za-z0-9_]{2,16})\s+/)?.[1]?.toLowerCase();
-    const actor=text.match(/\bby\s+([A-Za-z0-9_]{2,16})(?:'s Golem)?[.!]?\s*(?:FINAL KILL!)?$/i)?.[1]?.toLowerCase()
+    const knownKill=game.mode==='BEDWARS'&&typeof detectKnownKillMessageForStats==='function'
+        ? detectKnownKillMessageForStats(text) : null;
+    const final=knownKill?.final||/\bFINAL KILL!/i.test(text);
+    const victim=knownKill?.victim?.toLowerCase()||text.match(/^([A-Za-z0-9_]{2,16})\s+/)?.[1]?.toLowerCase();
+    const actor=knownKill?.killer?.toLowerCase()||text.match(/\bby\s+([A-Za-z0-9_]{2,16})(?:'s Golem)?[.!]?\s*(?:FINAL KILL!)?$/i)?.[1]?.toLowerCase()
         ||text.match(/^\w+ was ([A-Za-z0-9_]{2,16})'s final #[\d,]+[.!]?\s*FINAL KILL!$/i)?.[1]?.toLowerCase();
     const suicide=/^\w+ (?:fell into the void|fell from a high place|hit the ground too hard|died|drowned|burned to death|went up in flames|tried to swim in lava|suffocated in a wall)[.!]?\s*(?:FINAL KILL!)?$/i.test(text);
-    const combat=final||suicide||/^\w+ (?:was|got|fell|died|drowned|burned|suffocated)\b/i.test(text);
+    const combat=knownKill||final||suicide||/^\w+ (?:was|fell|died|drowned|burned|suffocated)\b/i.test(text)
+        ||/^\w+ got (?:(?:killed|slain|shot|knocked|destroyed|eliminated)\b|.+\bby\b)/i.test(text);
     if(!combat)return false;
     if(game.recent.some(e=>e.text===text&&at>=e.at&&at-e.at<1000))return false;
     game.recent.push({text,at});game.recent=game.recent.slice(-64);
@@ -171,4 +175,4 @@ function settleGame(game){
     else if(!(game.counts.deaths.value>0))invalidate(game,['deaths']);
     return game;
 }
-module.exports={FIELDS,LABELS,clean,normalizeLocal,normalizeTotals,mergeTotals,localModes,createGame,observe,observeResult,invalidate,deriveRatios,addVariant,nextStreak,leaveGame,settleGame};
+module.exports={FIELDS,LABELS,clean,normalizeLocal,normalizeTotals,normalizeVariant,mergeTotals,localModes,createGame,observe,observeResult,invalidate,deriveRatios,addVariant,nextStreak,leaveGame,settleGame};

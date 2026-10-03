@@ -47,12 +47,19 @@ const target=require('./launcher_verification_target').verificationTarget('profi
     {key:'tabStatsBedwarsFields',label:'BedWars tab fields',from:['stars','name','fkdr','tags','ws'],to:['name','stars','fkdr','tags','ws']}
    ]}));
    const content = await page.$eval('.profile-change-groups',e=>e.textContent);
-   for(const label of ['Add','Remove','Reorder','Games by mode']) assert(content.includes(label));
-   assert(!content.includes('gamesByMode'));
+   assert(content.includes('Auto Dodge'));
+   for (const label of ['Session Bedwars', 'Session Duels', 'BedWars tab', 'Reorder', 'gamesByMode']) assert(!content.includes(label));
+   assert.strictEqual(await page.$$eval('.profile-change-item', els => els.length), 1);
+   assert.strictEqual(await page.$$eval('.profile-plan-overview', els => els.length), 0);
+   const projection = await page.evaluate(() => {
+    const changes = [{key:'scanMode',from:'threats',to:'off'}, {key:'minStars',from:100,to:200}, {key:'sessionSkywarsFields',from:['wins'],to:['kills']}, {key:'custom',from:{a:1},to:{a:2}}];
+    const before = JSON.stringify(changes);
+    const filtered = profileReviewChanges(changes);
+    return {keys:filtered.map(change=>change.key), unchanged:before===JSON.stringify(changes)};
+   });
+   assert.deepStrictEqual(projection.keys, ['scanMode','minStars']);
+   assert(projection.unchanged, 'Review filtering must not modify the changes applied by profiles');
    await page.screenshot({path:path.join(output,`stats-review-${width}.png`)});
-   await click('.profile-order-detail summary');
-   assert(await page.$eval('.profile-order-detail',e=>e.open));
-   assert(await page.$eval('.profile-detail-content',e=>e.scrollWidth<=e.clientWidth+1));
    await page.evaluate('closeProfileDetail()');
   }
   await click('.fury-profile-library-card.reviewing .fury-profile-more > summary');
@@ -61,9 +68,9 @@ const target=require('./launcher_verification_target').verificationTarget('profi
   await click('[data-page="profiles"] .page-actions .fury-gold-outline');
   assert(await page.$eval('#profile-create-name',e=>e===document.activeElement&&e.checkVisibility()));
   const name=await page.evaluate('profileReviewName');
-  await click('#fury-profile-review [data-profile-action="apply"]');
+  await click('.reviewing [data-profile-action="apply"]');
   await page.waitForFunction(name=>state.profiles.active===name,{},name);
-  assert.deepStrictEqual(errors,[]);console.log('PASS grouped review, readable stat diffs, ordered disclosures, responsive layout, keyboard selection, apply and duplicate controls');
+  assert.deepStrictEqual(errors,[]);console.log('PASS concise scalar-only review, unchanged source changes, responsive layout, keyboard selection, apply and duplicate controls');
  target.record();
  }finally{if(browser)await browser.disconnect();await stopChild(child);}
 })().catch(e=>{console.error(e);process.exitCode=1;});

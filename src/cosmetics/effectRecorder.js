@@ -1,5 +1,7 @@
 'use strict';
 
+const { createUsage } = require('../../features/chat_controller');
+
 // Per-connection cosmetic effect recorder/classifier (/cosmeticfx).
 //
 // Two modes:
@@ -213,7 +215,19 @@ function createEffectRecorder({
     }
 
     function sendInfo() {
-        sendChat('§d[CosmeticFX] §7Classifies final kill / bed destroy cosmetics by their packet signature. Live games are match-only - nothing is auto-recorded. To add a cosmetic: §f/cosmeticfx record <name>§7, then trigger it in a private game for a clean sample (re-recording a name replaces its sample). Commands: §fstatus§7, §flist§7, §frecord <name|cancel>§7, §fnotify [on|off]§7, §flabel§7, §fremove§7, §finfo§7.');
+        const help = createUsage(sendChat, 'Cosmetic effects', 'Identify final kill and bed destroy cosmetics by their packet signature.');
+        help.section('Inspect');
+        help.command('/cosmeticfx status', 'Show detection and recording status.');
+        help.command('/cosmeticfx list', 'List stored effects.');
+        help.command('/cosmeticfx notify [on|off]', 'Toggle detection notifications.');
+        help.command('/cosmeticfx info', 'Show this guide.');
+        help.section('Samples');
+        help.command('/cosmeticfx record <name>', 'Record the next effect you trigger.');
+        help.command('/cosmeticfx record cancel', 'Disarm recording.');
+        help.command('/cosmeticfx label <unknown-N|id> <name>', 'Name a stored effect.');
+        help.command('/cosmeticfx remove <name|id>', 'Remove a stored effect.');
+        help.note('Record in a private game for a clean sample. Re-recording a name replaces its sample.');
+        help.detail('Live games only match effects; nothing is recorded automatically.');
     }
 
     function handleCommand(client, args = []) {

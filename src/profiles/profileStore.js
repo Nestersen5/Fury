@@ -37,7 +37,7 @@ const PRESET_SETTING_KEYS = {
         'autoDodgeMinFkdr', 'autoDodgeMinStars',
         // Reminders
         'enderDustReminderEnabled', 'enderDustReminderThreshold',
-        'slumberDailyRewardsReminderEnabled', 'gamblerGeorgeReminderEnabled',
+        'gamblerGeorgeReminderEnabled',
         // Share
         'shareTagsAuto', 'shareTagsFancy', 'shareTagsColorLocal', 'shareTagsIncludeTagged',
         'shareTagsIncludeNicks', 'shareTagsIncludeThreats', 'shareTagsDestination',
@@ -47,7 +47,7 @@ const PRESET_SETTING_KEYS = {
         'tabStatsShowKillRatio', 'tabStatsShowWinRatio',
         'tabStatsBedwarsFields', 'tabStatsSkywarsFields', 'tabStatsLabelStyle',
         // Nametags
-        'nametagOverlayEnabled', 'nametagStarBracketsEnabled', 'nametagTagDisplayMode', 'nametagScope', 'nametagSourcePriority',
+        'nametagOverlayEnabled', 'nametagStarBracketsEnabled', 'nametagTagDisplayMode', 'nametagScope',
         'nametagTeammatesEnabled', 'nametagThreatsEnabled', 'nametagOthersEnabled',
         'nametagTeammatesPrefix', 'nametagTeammatesPrefixFallback',
         'nametagTeammatesSuffix', 'nametagTeammatesSuffixFallback',
@@ -62,7 +62,6 @@ const PRESET_SETTING_KEYS = {
         // Manual party intelligence
         'partyOverviewEnabled',
         // Overlay adds
-        'socialOverlayAddsEnabled',
         'overlayAutoAddOutsideGamesOnly',
         'overlayAutoClearOnGameStartEnd',
         // Denick
@@ -112,7 +111,6 @@ const PROFILE_SETTING_LABELS = {
     shareTagsAuto: 'Auto Share',
     autoSkinDenickEnabled: 'Skin denick',
     autoStatsDenickEnabled: 'Stats denick',
-    socialOverlayAddsEnabled: 'Use Overlay',
     lobbyChatStatsEnabled: 'Lobby chat stats',
     pregameChatStatsEnabled: 'Pregame chat stats',
     accentBedwarsEventLabelsEnabled: 'BedWars event text color',
@@ -120,7 +118,6 @@ const PROFILE_SETTING_LABELS = {
     sessionTrackingEnabled: 'Session tracking',
     gameRecapEnabled: 'Game recap',
     enderDustReminderEnabled: 'Ender Dust reminder',
-    slumberDailyRewardsReminderEnabled: 'Slumber reward reminder',
     gamblerGeorgeReminderEnabled: 'Gambler George reminder',
     scanMode: 'Scan mode',
     minFkdr: 'Minimum FKDR',
@@ -141,11 +138,11 @@ const PROFILE_SETTING_LABELS = {
 const PROFILE_HIGHLIGHT_KEYS = [
     'tabStatsEnabled', 'nametagOverlayEnabled', 'autoDodgeEnabled',
     'shareTagsAuto', 'autoSkinDenickEnabled',
-    'autoStatsDenickEnabled', 'socialOverlayAddsEnabled',
+    'autoStatsDenickEnabled',
     'lobbyChatStatsEnabled', 'pregameChatStatsEnabled',
     'partyOverviewEnabled',
     'sessionTrackingEnabled', 'gameRecapEnabled',
-    'enderDustReminderEnabled', 'slumberDailyRewardsReminderEnabled', 'gamblerGeorgeReminderEnabled'
+    'enderDustReminderEnabled', 'gamblerGeorgeReminderEnabled'
 ];
 
 function profileSettingLabel(key) {
@@ -360,7 +357,6 @@ function builtInProfiles() {
             autoDodgeNickedPlayers: true,
             autoDodgeMinStars: 700,
             enderDustReminderEnabled: true,
-            slumberDailyRewardsReminderEnabled: true,
             shareTagsAuto: true,
             tabStatsBedwarsFields: ['name', 'stars', 'fkdr', 'wlr', 'tags', 'ws'],
             nametagOverlayEnabled: true,
@@ -384,7 +380,6 @@ function builtInProfiles() {
             autoDodgeEnabled: true,
             autoDodgeMinStars: 700,
             enderDustReminderEnabled: true,
-            slumberDailyRewardsReminderEnabled: true,
             shareTagsAuto: true,
             shareTagsIncludeThreats: false,
             tabStatsBedwarsFields: ['name', 'stars', 'fkdr', 'tags', 'ws'],
@@ -408,14 +403,12 @@ function builtInProfiles() {
             sessionSkywarsFields: defaults.features.sessionSkywarsFields.slice(),
             sessionDuelsFields: defaults.features.sessionDuelsFields.slice(),
             sessionGoalGames: 2,
-            socialOverlayAddsEnabled: false,
             minStars: 400
         }),
         create('chill', 'Chill & Friends', 'Good for casual matches with friends and minimal player information.', ['casual', 'friends'], {
             tabStatsEnabled: false,
             autoDodgeMinStars: 700,
             enderDustReminderEnabled: true,
-            slumberDailyRewardsReminderEnabled: true,
             shareTagsIncludeTagged: false,
             shareTagsIncludeNicks: false,
             shareTagsIncludeThreats: false,
@@ -447,7 +440,6 @@ function builtInProfiles() {
             autoDodgeMinFkdr: 2,
             autoDodgeMinStars: 500,
             enderDustReminderEnabled: true,
-            slumberDailyRewardsReminderEnabled: true,
             shareTagsAuto: true,
             tabStatsBedwarsFields: ['name', 'stars', 'fkdr', 'tags', 'ws'],
             nametagOverlayEnabled: true,

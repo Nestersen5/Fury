@@ -117,8 +117,17 @@ const completer = createProxyTabCompleter({
 });
 
 assert(PROXY_COMMANDS.includes('/autogambler'), 'Visible command list should include /autogambler');
+assert(PROXY_COMMANDS.includes('/nickroll'));
+assert.deepStrictEqual(completer('/nickroll st'), ['start', 'stop', 'status']);
+assert.deepStrictEqual(completer('/nickroll filter digits e'), []);
+assert.deepStrictEqual(completer('/nickroll skin a'), []);
+assert.deepStrictEqual(completer('/nickroll wo'), ['words']);
+assert.deepStrictEqual(completer('/nickroll words gr'), []);
+assert.deepStrictEqual(completer('/nickroll delay a'), []);
+assert.deepStrictEqual(completer('/nickroll ti'), []);
 assert(PROXY_COMMANDS.includes('/apikill'), 'Visible command list should include /apikill');
 assert(PROXY_COMMANDS.includes('/share'), 'Visible command list should include /share');
+assert(PROXY_COMMANDS.includes('/rc') && PROXY_COMMANDS.includes('/recordcheat'), 'Recorder commands should tab-complete');
 assert(!PROXY_COMMANDS.includes('/sharetags'), 'Legacy /sharetags should not be in visible command list');
 assert(PROXY_COMMANDS.includes('/autododgetest'), 'Visible command list should include /autododgetest');
 assert(PROXY_COMMANDS.includes('/cancel'), 'Visible command list should include /cancel');
@@ -163,6 +172,22 @@ assert.deepStrictEqual(completer('/dodge include nicks '), ['on', 'off']);
 assert.deepStrictEqual(completer('/dodge threat f'), ['fkdr']);
 assert.deepStrictEqual(completer('/session st'), ['start']);
 assert.deepStrictEqual(completer('/session en'), ['end']);
+assert.deepStrictEqual(completer('/session debug '), ['on', 'off', 'status']);
+assert.deepStrictEqual(completer('/session result '), ['win', 'loss', 'skip']);
+assert.deepStrictEqual(completer('/rc De'), ['DemoPlayer_']);
+assert.deepStrictEqual(completer('/rc labels '), []);
+assert.deepStrictEqual(completer('/rc stop De'), ['DemoPlayer_']);
+assert.deepStrictEqual(completer('/rc clip De'), ['DemoPlayer_']);
+const scaffoldClipChoices = completer('/rc DemoPlayer_ ');
+for (const label of ['totally_legit', 'legit', 'sus_but_legit', 'legit_scaff', 'blatant_scaff']) {
+    for (const choice of [label, `${label}_short`, `${label}_long`])
+        assert(scaffoldClipChoices.includes(choice), `/rc should offer ${choice}`);
+}
+assert.deepStrictEqual(completer('/rc clip DemoPlayer_ '), scaffoldClipChoices);
+assert.deepStrictEqual(completer('/rc DemoPlayer_ sus_but_legit_l'), ['sus_but_legit_long']);
+assert.deepStrictEqual(completer('/recordcheat DemoPlayer_ totally_legit_s'), ['totally_legit_short']);
+assert.deepStrictEqual(completer('/rc clip DemoPlayer_ blatant_scaff_l'), ['blatant_scaff_long']);
+assert.deepStrictEqual(completer('/rc DemoPlayer_ legit_scaff_long r'), ['replay']);
 assert.deepStrictEqual(completer('/autododgetest De'), ['DemoPlayer_']);
 assert.deepStrictEqual(completer('/cancel '), []);
 assert.deepStrictEqual(completer('/kmlog '), ['start', 'status', 'cancel', 'stop', 'help']);
@@ -172,7 +197,7 @@ assert.deepStrictEqual(completer('/fury h'), ['home', 'history', 'help']);
 assert.deepStrictEqual(completer('/fury help s'), ['safety', 'social', 'system', 'settings', 'share']);
 assert.deepStrictEqual(completer('/fury set eventlabels '), ['on', 'off']);
 assert.deepStrictEqual(completer('/fury set boundary '), ['30', '60', '180', '360']);
-assert.deepStrictEqual(completer('/fury set recapstyle '), ['compact', 'detailed', 'custom']);
+assert.deepStrictEqual(completer('/fury set recapstyle '), ['scoreboard']);
 assert.deepStrictEqual(completer('/fury set goal '), ['wins', 'finals', 'games', 'minutes']);
 assert.deepStrictEqual(completer('/chattrigger remove p'), ['perm party']);
 assert(completer('/chatstats s').includes('source'), '/chatstats should complete source controls');
@@ -192,10 +217,10 @@ const fullGameCompleter = createProxyTabCompleter({ knownPlayerNames: () => full
 assert.strictEqual(fullGameCompleter('/denick add ').length, 96, '/denick add nick completion must not truncate a full nick+real-IGN game identity set');
 assert.strictEqual(fullGameCompleter('/denick add Player00 ').length, 96, '/denick add real-IGN completion must not truncate a full nick+real-IGN game identity set');
 assert.strictEqual(fullGameCompleter('/stats ').length, 15, 'other player completion surfaces should retain their compact result limit');
-assert.deepStrictEqual(completer('/reminder '), ['status', 'check', 'test', 'on', 'off', 'threshold', 'daily', 'george']);
+assert.deepStrictEqual(completer('/reminder '), ['status', 'check', 'test', 'on', 'off', 'threshold', 'george']);
 assert.deepStrictEqual(completer('/reminder threshold '), ['250', '275', '300']);
 assert.deepStrictEqual(completer('/reminder test '), ['below', 'threshold', 'full', 'waiting']);
-assert.deepStrictEqual(completer('/reminder daily '), ['on', 'off', 'check', 'status']);
+assert.deepStrictEqual(completer('/reminder daily '), []);
 assert.deepStrictEqual(completer('/reminder george '), ['status', 'on', 'off', 'claimed', 'accepted', 'cooldown']);
 assert.deepStrictEqual(completer('/denick finalkill Blo'), ['Blood Explosion']);
 assert(completer('/denick finals 102000 beddestroy ').includes('Ghosts'), 'Denick should suggest cosmetic names after stat filters');
@@ -204,7 +229,15 @@ assert.deepStrictEqual(completer('/apikill '), ['on', 'off', 'toggle', 'status']
 assert(completer('/po ').includes('test'), '/po should tab-complete its local preview command');
 assert.deepStrictEqual(completer('/po test '), ['all', 'clear', 'report', 'caution', 'notice', 'unavailable', 'lookup']);
 assert.deepStrictEqual(completer('/potest '), ['all', 'clear', 'report', 'caution', 'notice', 'unavailable', 'lookup']);
+assert.deepStrictEqual(completer('/scafdetect '), ['on', 'off', 'status']);
+assert.deepStrictEqual(completer('/anticheat '), ['on', 'off', 'status']);
+assert.deepStrictEqual(completer('/scaffolddetect o'), ['on', 'off']);
 
 console.log('Command completion tests passed.');
 assert.deepStrictEqual(completer('/partycheck '), ['on', 'off', 'status', 'test', 'stop', 'dismiss']);
 assert.deepStrictEqual(completer('/partycheck o'), ['on', 'off']);
+
+for (const command of ['/alias', '/aliases', '/customname']) {
+    assert(!PROXY_COMMANDS.includes(command));
+    assert.strictEqual(completer(command + ' '), null, 'Removed commands are not handled by Fury');
+}

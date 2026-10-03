@@ -79,7 +79,18 @@ require(${JSON.stringify(path.join(REPOSITORY_ROOT, 'src/accounts/connectionAuth
         await command('/fury', 'launcher', true);
         await command('/help overlay', '/tabstats', true);
         await command('/help stats 2', '/reminder', true);
-        await command('/alias', 'Friend aliases', true);
+        for (const input of ['/denick', '/denick help']) {
+            const output = await command(input, 'Ghosts bed effect + matching final kills.', true);
+            const guide = output.join('\n');
+            for (const text of ['Denick usage', 'Stats', 'Cosmetics',
+                '/denick finals <number> beds <number>', '/denick beddestroy ghosts',
+                'Name: cosmetic, not IGN', 'Combined example']) {
+                assert(guide.includes(text), `${input} should explain ${text}`);
+            }
+            assert(output.length <= 8, 'Denick usage must stay compact');
+            assert(!guide.includes('"clickEvent"'), 'Denick help stays read-only');
+        }
+        await command('/denick status', 'Denick status.', true);
         await command('/chattrigger list', 'Chat triggers', true);
         await command('/apikill status', 'API access', true);
         for (const [input, title] of [
@@ -98,12 +109,17 @@ require(${JSON.stringify(path.join(REPOSITORY_ROOT, 'src/accounts/connectionAuth
         assert.strictEqual(saved.partySplitWarningsEnabled, false);
         assert.strictEqual(saved.queueTimePartyChatEnabled, true, 'Preserve unrelated settings');
         await command('/partycheck status', 'OFF', false);
+        for (const input of ['/partycheck', '/partycheck help']) {
+            const output = await command(input, 'Dismiss and test require', false);
+            assert(output.some(message => message.includes('/partycheck stop')), 'Usage explains how to stop the preview');
+            assert(!output.some(message => /clickEvent|hoverEvent/.test(message)), 'Party usage must be entirely static');
+        }
         await command('/partycheck on', 'warnings enabled', true);
         assert.strictEqual(JSON.parse(fs.readFileSync(featureFile, 'utf8')).partySplitWarningsEnabled, true);
         await command('/partycheck off', 'warnings disabled', false);
         await command('/partycheck dismiss', 'no active pregame lobby', false);
         assert(!receivedCommands.some(value => value.startsWith('/partycheck')), 'Local commands must not reach the upstream server');
-        assert(!receivedCommands.some(value => /^\/(fury|help|alias|chattrigger|apikill)(?: |$)/.test(value)), 'Redesigned controls must stay local');
+        assert(!receivedCommands.some(value => /^\/(fury|help|chattrigger|apikill)(?: |$)/.test(value)), 'Redesigned controls must stay local');
         disconnect();
         await stopChild(child);
         // A different feature being saved must not reset the permanent mute.

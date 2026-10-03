@@ -2,9 +2,9 @@
 
 const fs = require('fs');
 const path = require('path');
-const crypto = require('crypto');
+const { describeBook } = require('./bookContent');
 const nbt = require('prismarine-nbt');
-const { simplifyNbt, decodeTitle } = require('./menuMonitor');
+const { decodeTitle } = require('./menuMonitor');
 const { encode } = require('./quickBuyTrace');
 
 const PACKETS = new Set(['custom_payload', 'open_window', 'close_window', 'window_click', 'window_items',
@@ -12,33 +12,6 @@ const PACKETS = new Set(['custom_payload', 'open_window', 'close_window', 'windo
     'transaction', 'respawn', 'login']);
 const BOOK_IDS = new Set([386, 387]); // Installed Minecraft 1.8.9 item/protocol data.
 
-function describeBook(item) {
-    if (!item || !BOOK_IDS.has(item.blockId)) return null;
-    const data = simplifyNbt(item.nbtData) || {};
-    const source = Array.isArray(data.pages) ? data.pages : [];
-    const actions = [];
-    const pages = source.slice(0, 128).map((value, index) => {
-        const original = typeof value === 'string' ? value : JSON.stringify(value);
-        const raw = original.slice(0, 16384);
-        let component;
-        try { component = JSON.parse(raw); } catch { component = raw; }
-        function walk(node, depth = 0) {
-            if (depth > 20 || node == null) return '';
-            if (typeof node === 'string') return node;
-            if (Array.isArray(node)) return node.map(v => walk(v, depth + 1)).join('');
-            if (typeof node !== 'object') return '';
-            if (node.clickEvent && typeof node.clickEvent.action === 'string') {
-                actions.push({ page: index + 1, action: node.clickEvent.action, value: node.clickEvent.value });
-            }
-            return String(node.text || node.translate || '') + (node.extra ? walk(node.extra, depth + 1) : '');
-        }
-        return { page: index + 1, raw, text: walk(component), truncated: raw.length !== original.length };
-    });
-    const book = { itemId: item.blockId, title: data.title || null, author: data.author || null,
-        generation: data.generation, pageCount: source.length, pages, actions,
-        truncated: source.length > pages.length || pages.some(p => p.truncated) };
-    return { id: crypto.createHash('sha256').update(JSON.stringify(book)).digest('hex').slice(0, 20), ...book };
-}
 
 function decodeBookPayload(buffer) {
     if (!Buffer.isBuffer(buffer) || buffer.length < 5) throw new Error('Missing or short slot payload');

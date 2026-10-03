@@ -1,0 +1,8 @@
+{
+  "name": "fury-anticheat-lab-runtime",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Development-only localhost gameplay driver; excluded from Fury runtime dependencies",
+  "engines": { "node": ">=22" },
+  "dependencies": { "mineflayer": "4.39.0" }
+}

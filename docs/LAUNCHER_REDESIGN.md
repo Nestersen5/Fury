@@ -12,7 +12,7 @@ The settings-search icon shares the input's vertical centerline. Start/Stop cont
 
 - The viewed account is persisted separately from the account connected to Minecraft. Selecting it immediately clears old sessions, reminder readings and card previews. Responses from a previous selection are discarded.
 - UUID is the account key. Session history is filtered before limits; retention and deletion are scoped to the owner. Legacy records without UUIDs can match by name, but a recorded UUID always wins.
-- Dust, daily rewards and Gambler George progress are stored by UUID. Viewing another account never changes the proxy's connected identity. Profile presets are shared feature configurations, not account progress.
+- Dust and Gambler George progress are stored by UUID. Viewing another account never changes the proxy's connected identity. Profile presets are shared feature configurations, not account progress.
 - Microsoft login runs in a cancellable worker and a temporary cache. Only a successful Minecraft profile is promoted; cache filenames are mapped to the returned IGN. Cancelling leaves existing accounts intact.
 - Account heads, nametag previews and generated session avatars use Mojang's official texture and a UUID-specific disk cache. A failed skin refresh retains the cached real skin instead of treating a third-party Steve fallback as that account.
 

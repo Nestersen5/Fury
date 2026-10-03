@@ -1,0 +1,18 @@
+[
+  { "mode": "godbridge", "initialDirection": 6, "activationBlocks": 1 },
+  { "mode": "godbridge", "initialDirection": 8, "activationBlocks": 2 },
+  { "mode": "godbridge", "initialDirection": 7, "activationBlocks": 3 },
+  { "mode": "godbridge", "initialDirection": 5, "activationBlocks": 4 },
+  { "mode": "godbridge", "initialDirection": 6, "turn": "left" },
+  { "mode": "godbridge", "initialDirection": 6, "turn": "right" },
+  { "mode": "godbridge", "initialDirection": 8, "turn": "left" },
+  { "mode": "godbridge", "initialDirection": 8, "turn": "right" },
+  { "mode": "godbridge", "initialDirection": 7, "turn": "left" },
+  { "mode": "godbridge", "initialDirection": 7, "turn": "right" },
+  { "mode": "godbridge", "initialDirection": 5, "turn": "left" },
+  { "mode": "godbridge", "initialDirection": 5, "turn": "right" },
+  { "mode": "tellybridge", "initialDirection": 6, "yIncrease": 0 },
+  { "mode": "tellybridge", "initialDirection": 8, "yIncrease": 1 },
+  { "mode": "tellybridge", "initialDirection": 7, "yIncrease": 2 },
+  { "mode": "tellybridge", "initialDirection": 5, "yIncrease": 3 }
+]

@@ -527,55 +527,14 @@
             background: rgba(250, 204, 21, .04);
         }
 
-        /* A parent setting and the sub-settings it gates. The whole child group
-           is inset behind a rule rather than each row being padded on its own:
-           the theme gives every .feature-card a 68px min-height, so a padding
-           step alone is far too small a cue to read as nesting. Dims out when
-           the parent is off. */
         .feature-card-parent {
             background: rgba(255, 255, 255, .028);
             border-bottom: none;
         }
 
-        .feature-subcards {
-            margin-left: 30px;
-            border-left: 2px solid var(--line);
-            border-bottom: 1px solid rgba(255, 255, 255, .065);
-            background: rgba(0, 0, 0, .16);
-            transition: opacity .16s ease;
-        }
-
-        .feature-subcards:last-child {
-            border-bottom: none;
-        }
-
-        /* Beats the theme's `.feature-card { padding: 12px 15px }` on
-           specificity, so the inset survives the stylesheet load order. */
-        .feature-subcards .feature-card {
-            padding-left: 18px;
-            min-height: 58px;
-            background: transparent;
-            border-bottom: 1px solid rgba(255, 255, 255, .05);
-        }
-
-        .feature-subcards .feature-card:last-child {
-            border-bottom: none;
-        }
-
-        .feature-subcards .feature-card h3 {
-            font-size: 12.5px;
-        }
-
-        .feature-subcards .feature-card .note {
-            font-size: 11px;
-        }
-
-        .feature-subcards.is-disabled {
+        [data-page="anticheat"] .anticheat-detectors.is-disabled {
             opacity: .42;
-        }
-
-        .feature-subcards.is-disabled .feature-card:hover {
-            background: transparent;
+            pointer-events: none;
         }
 
         .feature-card h3 {
@@ -2239,11 +2198,6 @@
             border-color: rgba(168, 85, 247, .35);
         }
 
-        .overlay-tag-pill.seraph {
-            color: #93c5fd;
-            background: rgba(59, 130, 246, .12);
-            border-color: rgba(59, 130, 246, .35);
-        }
 
         .overlay-remove-player {
             width: 28px;
@@ -2894,7 +2848,7 @@
         <div class="profile-detail-backdrop" data-profile-detail-close></div>
         <section class="profile-detail-dialog" aria-describedby="profile-detail-content">
             <div class="profile-detail-head">
-                <div><span class="eyebrow">Profiles / Review changes</span><h2 id="profile-detail-title">Profile details</h2></div>
+                <div><span class="eyebrow">Review changes</span><h2 id="profile-detail-title">Profile details</h2></div>
                 <button type="button" class="profile-detail-close" data-profile-detail-close aria-label="Close"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"></path></svg></button>
             </div>
             <div id="profile-detail-content" class="profile-detail-content"></div>
@@ -2931,6 +2885,7 @@
                     <span class="nav-tab-icon" aria-hidden="true"><svg viewBox="0 0 40 40" focusable="false"><g transform="translate(1 -1.1)"><circle cx="10" cy="8" r="5"/><path d="M2 27c.6-6 3.5-9 8-9s7.4 3 8 9"/><circle cx="28" cy="22" r="5"/><path d="M20 39c.6-6 3.5-9 8-9s7.4 3 8 9"/><path class="nav-icon-accent" d="M20 7h12l-3-3m3 3-3 3M18 33H6l3-3m-3 3 3 3"/></g></svg></span>
                     <span class="nav-tab-copy"><strong>Nicks</strong><small>Nick intelligence</small></span>
                 </button>
+                <button class="nav-tab" data-page-tab="nickroll" data-page-label="Nick Reroller" title="Nick Reroller"><span class="nav-tab-copy"><strong>Nick Reroller</strong><small>Matching rules</small></span></button>
                 <button class="nav-tab" data-page-tab="reminders" data-page-label="Reminders" title="Reminders">
                     <span class="nav-tab-icon" aria-hidden="true"><svg viewBox="0 0 40 40" focusable="false"><g transform="translate(-1.25 .98)"><path d="M7 27h26l-3.5-5V14c0-6-3.7-10-9.5-10S10.5 8 10.5 14v8L7 27Z"/><path d="M16 32c.8 2.5 2.2 3.7 4 3.7s3.2-1.2 4-3.7"/><circle class="nav-icon-accent nav-icon-dot" cx="31.5" cy="6.5" r="4"/></g></svg></span>
                     <span class="nav-tab-copy"><strong>Reminders</strong><small>Slumber collection alerts</small></span>
@@ -2938,6 +2893,10 @@
                 <button class="nav-tab" data-page-tab="profiles" data-page-label="Profiles" title="Profiles">
                     <span class="nav-tab-icon" aria-hidden="true"><svg viewBox="0 0 40 40" focusable="false"><g transform="translate(.5 0)"><rect x="8" y="3" width="27" height="25" rx="4"/><path d="M4 9v24c0 2.2 1.8 4 4 4h23"/><circle class="nav-icon-accent" cx="18" cy="13" r="3"/><path d="M13 22c.7-3.1 2.4-4.6 5-4.6s4.3 1.5 5 4.6M28 10h3M28 15h3"/></g></svg></span>
                     <span class="nav-tab-copy"><strong>Profiles</strong><small>Playstyle setups</small></span>
+                </button>
+                <button class="nav-tab" data-page-tab="anticheat" data-page-label="AntiCheat" title="AntiCheat">
+                    <span class="nav-tab-icon" aria-hidden="true"><svg viewBox="0 0 40 40" focusable="false"><path d="M20 3 34 9v9c0 9-5.5 15-14 19C11.5 33 6 27 6 18V9L20 3Z"/><path class="nav-icon-accent" d="m13 20 5 5 9-10"/></svg></span>
+                    <span class="nav-tab-copy"><strong>AntiCheat</strong><small>Detection &amp; alerts</small></span>
                 </button>
                 <button class="nav-tab" data-page-tab="settings" data-page-label="Settings" title="Settings">
                     <span class="nav-tab-icon" aria-hidden="true"><svg class="nav-settings-icon" viewBox="0 0 24 24" focusable="false"><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 9 19.36a1.7 1.7 0 0 0-1.88.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.63 15 1.7 1.7 0 0 0 3.07 14H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.64 9a1.7 1.7 0 0 0-.34-1.88l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.63h.01A1.7 1.7 0 0 0 10 3.07V3a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 15 4.64a1.7 1.7 0 0 0 1.88-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.37 9v.01A1.7 1.7 0 0 0 20.93 10H21a2 2 0 1 1 0 4h-.09A1.7 1.7 0 0 0 19.4 15Z"/><circle class="nav-icon-accent" cx="12" cy="12" r="3"/></svg></span>
@@ -3374,6 +3333,10 @@
                 </div>
             </section>
 
+            <section class="tab-page" data-page="nickroll">
+                <div class="page-title"><div><span class="eyebrow">Nickname search</span><h2>Nick Reroller</h2><div class="note">Configure your next search. Start with /nickroll start in a Minecraft lobby; you choose whether to apply a match.</div></div></div>
+                <form id="nickroll-form"></form>
+            </section>
             <section class="tab-page reminders-page" data-page="reminders">
                 <div class="page-title reminder-page-title">
                     <div>
@@ -3394,20 +3357,6 @@
                             <div class="reminder-reading"><span>Latest reading</span><strong id="reminder-current-dust">Not checked</strong><small id="reminder-profile-name">Hypixel player data</small></div>
                             <div class="reminder-actions"><button id="ender-dust-reminder-check" type="button">Check now</button><span id="reminder-status-copy" class="note">No saved reading yet.</span></div>
                             <p class="reminder-repeat-limit"><strong>Every lobby</strong><span>Once your dust reaches the target, chat reminders repeat each time you join a lobby until you collect it.</span></p>
-                        </div>
-                    </section>
-
-                    <section class="reminder-card reminder-daily-card">
-                        <header class="reminder-card-head">
-                            <div><span class="eyebrow">Slumber NPCs</span><h3>Daily rewards</h3><p>Send one alert after reset when a reward is ready to claim.</p></div>
-                            <div class="reminder-daily-actions">
-                                <label class="reminder-daily-filter"><input id="slumber-daily-rewards-incomplete-only" type="checkbox"><span>Incomplete only</span></label>
-                                <div class="feature-toggle"><label class="switch"><input id="slumber-daily-rewards-reminder-enabled" type="checkbox"><span class="switch-track"></span><span class="switch-thumb"></span><span class="switch-label">OFF</span></label></div>
-                            </div>
-                        </header>
-                        <div class="reminder-card-body">
-                            <div id="slumber-daily-rewards-status-copy" class="reminder-daily-status">Waiting for your own Hypixel Player API data.</div>
-                            <div id="slumber-daily-rewards-list" class="slumber-daily-reward-list" aria-live="polite"></div>
                         </div>
                     </section>
 
@@ -3452,6 +3401,32 @@
                         <button id="profile-create" class="primary">Save profile</button>
                     </div>
                 </div>
+            </section>
+
+            <section class="tab-page" data-page="anticheat">
+                <div class="page-title">
+                    <div>
+                        <span class="eyebrow">Game safety</span>
+                        <h2>AntiCheat</h2>
+                        <div class="note">Choose which cheats Fury checks for and which alerts appear in Minecraft chat. Changes save automatically.</div>
+                    </div>
+                </div>
+                <div class="panel anticheat-panel anticheat-master-panel">
+                    <div class="feature-card anticheat-master-row"><div><h3>Enable AntiCheat</h3><small>Detect cheats in game.</small></div><div class="feature-toggle"><label class="switch"><input id="anticheat-enabled" type="checkbox" aria-label="AntiCheat"><span class="switch-track"></span><span class="switch-thumb"></span><span class="switch-label">ON</span></label></div></div>
+                </div>
+                <section id="anticheat-detectors" class="panel anticheat-panel anticheat-detectors" aria-labelledby="anticheat-checks-heading">
+                    <div class="anticheat-section-heading"><h3 id="anticheat-checks-heading">Detection checks</h3><p>Choose what to detect.</p></div>
+                    <div class="feature-card"><div><h3>Scaffold</h3><small>Automatic bridging.</small></div><div class="feature-toggle"><label class="switch"><input id="anticheat-scaffold-enabled" type="checkbox" aria-label="Scaffold detection"><span class="switch-track"></span><span class="switch-thumb"></span><span class="switch-label">ON</span></label></div></div>
+                    <div class="feature-card"><div><h3>AutoBlock</h3><small>Blocking while attacking.</small></div><div class="feature-toggle"><label class="switch"><input id="anticheat-autoblock-enabled" type="checkbox" aria-label="AutoBlock detection"><span class="switch-track"></span><span class="switch-thumb"></span><span class="switch-label">ON</span></label></div></div>
+                    <div class="feature-card"><div><h3>Stasis</h3><small>Suspicious freezing in mid-air.</small></div><div class="feature-toggle"><label class="switch"><input id="anticheat-stasis-enabled" type="checkbox" aria-label="Stasis detection"><span class="switch-track"></span><span class="switch-thumb"></span><span class="switch-label">ON</span></label></div></div>
+                </section>
+                <p class="note">Note: AutoBlock and Stasis flags are experimental and may not be accurate.</p>
+                <section class="panel anticheat-panel" aria-labelledby="anticheat-alerts-heading">
+                    <div class="anticheat-section-heading"><h3 id="anticheat-alerts-heading">Chat alerts</h3><p>Choose what appears in chat.</p></div>
+                    <div class="feature-card"><div><h3>Possible Alerts <span class="anticheat-recommendation">Recommended</span></h3><small>Warn about suspected cheats.</small></div><div class="feature-toggle"><label class="switch"><input id="anticheat-possible-alerts-enabled" type="checkbox" aria-label="Possible Alerts"><span class="switch-track"></span><span class="switch-thumb"></span><span class="switch-label">ON</span></label></div></div>
+                    <div class="feature-card"><div><h3>Team Alerts</h3><small>Include teammates in alerts.</small></div><div class="feature-toggle"><label class="switch"><input id="anticheat-team-alerts-enabled" type="checkbox" aria-label="Team Alerts"><span class="switch-track"></span><span class="switch-thumb"></span><span class="switch-label">OFF</span></label></div></div>
+                </section>
+                <p class="anticheat-save-note">Changes save automatically.</p>
             </section>
 
             <section class="tab-page settings-page" data-page="settings">
@@ -3598,7 +3573,7 @@
                                         <div class="share-include-panel">
                                             <div class="share-include-heading"><div><span class="eyebrow">Include</span><h3>Players To Share</h3></div><small>Choose which scan findings belong in party chat</small></div>
                                             <div class="share-include-grid">
-                                                <div class="share-include-card"><span class="share-include-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 4h7l9 9-7 7-9-9V4Z"></path><circle cx="8.5" cy="8.5" r="1.25"></circle></svg></span><div><h3>Tagged Players</h3><small>Urchin or Seraph tags</small></div><div class="feature-toggle"><label class="switch"><input id="share-tags-include-tagged" type="checkbox"><span class="switch-track"></span><span class="switch-thumb"></span><span class="switch-label">OFF</span></label></div></div>
+                                                <div class="share-include-card"><span class="share-include-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 4h7l9 9-7 7-9-9V4Z"></path><circle cx="8.5" cy="8.5" r="1.25"></circle></svg></span><div><h3>Tagged Players</h3><small>Urchin tags</small></div><div class="feature-toggle"><label class="switch"><input id="share-tags-include-tagged" type="checkbox"><span class="switch-track"></span><span class="switch-thumb"></span><span class="switch-label">OFF</span></label></div></div>
                                                 <div class="share-include-card"><span class="share-include-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3.5 9.5c2.8-2 5.6-2.7 8.5-2.7s5.7.7 8.5 2.7l-1.2 6.1c-2.2 1.6-4.6 2.4-7.3 2.4s-5.1-.8-7.3-2.4L3.5 9.5Z"></path><path d="M7.3 12.1c1.2-.6 2.4-.6 3.5 0-1 1.8-2.6 2-3.5 0Zm5.9 0c1.1-.6 2.3-.6 3.5 0-.9 2-2.5 1.8-3.5 0Z"></path></svg></span><div><h3>Nicked Players</h3><small>Detected nicked accounts</small></div><div class="feature-toggle"><label class="switch"><input id="share-tags-include-nicks" type="checkbox"><span class="switch-track"></span><span class="switch-thumb"></span><span class="switch-label">OFF</span></label></div></div>
                                                 <div class="share-include-card"><span class="share-include-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 19V5M4 19h16"></path><path d="m7 15 3-4 3 2 4-6"></path><path d="m14.5 7 2.5-.2.2 2.5"></path></svg></span><div><h3>Stat Threats</h3><small>Threshold-based risks</small></div><div class="feature-toggle"><label class="switch"><input id="share-tags-include-threats" type="checkbox"><span class="switch-track"></span><span class="switch-thumb"></span><span class="switch-label">OFF</span></label></div></div>
                                             </div>
@@ -3652,6 +3627,16 @@
                                         <div class="feature-toggle"><label class="switch"><input id="auto-gambler-enabled" type="checkbox"><span class="switch-track"></span><span class="switch-thumb"></span><span class="switch-label">OFF</span></label></div>
                                     </div>
                                 </div>
+                                <div class="settings-subgroup">
+                                    <div class="settings-subgroup-head"><h3>Quick Maths</h3></div>
+                                    <div class="feature-card settings-search-item">
+                                        <div>
+                                            <h3>Auto Quick Maths</h3>
+                                            <div class="note">Automatically answers Quick Maths challenges</div>
+                                        </div>
+                                        <div class="feature-toggle"><label class="switch"><input id="quick-maths-enabled" type="checkbox" aria-label="Auto Quick Maths"><span class="switch-track"></span><span class="switch-thumb"></span><span class="switch-label">OFF</span></label></div>
+                                    </div>
+                                </div>
                                 <div class="settings-subgroup auto-dodge-group">
                                     <div class="settings-subgroup-head"><h3>Auto Dodge</h3></div>
                                     <section class="auto-dodge-module settings-search-item" aria-labelledby="auto-dodge-title">
@@ -3674,7 +3659,7 @@
                                                 <div class="auto-dodge-choice-grid">
                                                     <div class="auto-dodge-choice settings-search-item">
                                                         <div class="auto-dodge-choice-icon" aria-hidden="true">✦</div>
-                                                        <div><h3>Tagged players</h3><div class="note">Urchin or Seraph tag detected.</div></div>
+                                                        <div><h3>Tagged players</h3><div class="note">Urchin tag detected.</div></div>
                                                         <div class="feature-toggle"><label class="switch"><input id="auto-dodge-tagged-players" type="checkbox"><span class="switch-track"></span><span class="switch-thumb"></span><span class="switch-label">OFF</span></label></div>
                                                     </div>
                                                     <div class="auto-dodge-choice settings-search-item">
@@ -3759,8 +3744,8 @@
                                     <section class="session-recap-designer settings-search-item">
                                         <div class="session-recap-editor">
                                             <div class="session-recap-master"><div><span class="eyebrow">Minecraft chat output</span><h3>Post-game recap</h3><div class="note">Choose how much information Fury prints after a verified game.</div></div><div class="feature-toggle"><label class="switch"><input id="game-recap-enabled" type="checkbox"><span class="switch-track"></span><span class="switch-thumb"></span><span class="switch-label">OFF</span></label></div></div>
-                                            <label class="session-setting-field" for="session-recap-style"><span>Layout</span><select id="session-recap-style"><option value="compact">Compact</option><option value="detailed">Detailed</option><option value="custom">Custom</option></select></label>
-                                            <div class="session-field-section"><span>Include in recap</span><div class="session-field-chips" id="session-recap-fields"><label><input type="checkbox" value="result">Result</label><label><input type="checkbox" value="duration">Duration</label><label><input type="checkbox" value="game_stats">Game stats</label><label><input type="checkbox" value="session_totals">Session totals</label><label><input type="checkbox" value="goals">Goals</label></div></div>
+                                            <div class="session-field-section"><span>Include in recap</span><div class="session-field-chips" id="session-recap-fields"><label><input type="checkbox" value="header">Title and borders</label><label><input type="checkbox" value="result">Game result</label><label><input type="checkbox" value="duration">Game time</label><label><input type="checkbox" value="map">Map</label><label><input type="checkbox" value="mode">Mode</label><label><input type="checkbox" value="finals">Final kills</label><label><input type="checkbox" value="beds">Beds broken</label><label><input type="checkbox" value="kills">Kills</label><label><input type="checkbox" value="deaths">Deaths</label><label><input type="checkbox" value="stars">Stars gained</label><label><input type="checkbox" value="session_wins">Session wins</label><label><input type="checkbox" value="session_losses">Session losses</label><label><input type="checkbox" value="session_ratio">Session FKDR</label><label><input type="checkbox" value="session_games">Session games</label><label><input type="checkbox" value="goals">Games goal</label></div></div>
+                                            <label class="session-setting-field" id="session-games-goal-field" for="session-goal-games"><span>Games goal</span><input id="session-goal-games" type="number" min="0" max="100000" step="1" value="0" aria-describedby="session-games-goal-note"><small id="session-games-goal-note" class="note">Completed games this session. Set to 0 to turn the goal off.</small></label>
                                         </div>
                                         <div class="session-recap-preview-shell"><span class="eyebrow">Live preview</span><div id="session-recap-preview" class="minecraft-session-recap" aria-live="polite"></div></div>
                                     </section>
@@ -3835,8 +3820,7 @@
                                     <section class="overlay-concept-module settings-search-item" aria-labelledby="overlay-sources-title">
                                         <div class="concept-module-hero">
                                             <span class="concept-module-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"></rect><path d="M8 21h8M12 17v4"></path></svg></span>
-                                            <div><span class="eyebrow">Launcher player board</span><h3 id="overlay-sources-title">Use Overlay</h3><div class="note">Automatically add players from mentions, direct messages, and party invites while enabled.</div></div>
-                                            <div class="feature-toggle"><label class="switch"><input id="social-overlay-adds-enabled" type="checkbox"><span class="switch-track"></span><span class="switch-thumb"></span><span class="switch-label">OFF</span></label></div>
+                                            <div><span class="eyebrow">Launcher player board</span><h3 id="overlay-sources-title">Overlay</h3><div class="note">Automatically adds players while the Overlay tab is open.</div></div>
                                         </div>
                                         <div class="concept-module-section concept-trigger-section">
                                             <div class="feature-trigger-editor">
@@ -3983,7 +3967,7 @@
                                         <div class="feature-card feature-select-row settings-search-item">
                                             <div>
                                                 <h3>Tag Display</h3>
-                                                <div class="note">Choose compact acronyms or full classification labels. Urchin renders pink; Seraph renders dark aqua. The preview uses Urchin.</div>
+                                                <div class="note">Choose compact acronyms or full classification labels. Urchin renders pink. The preview uses Urchin.</div>
                                             </div>
                                             <select id="nametag-tag-display-mode" aria-label="Nametag tag display style">
                                                 <option value="acronyms">Acronyms · BC, CC, SN…</option>
@@ -4098,8 +4082,11 @@
                                     <div class="api-service-module-head"><div><span class="eyebrow">Hypixel Data</span><h3>Hypixel API Key</h3><p>Validate the key used for stats, guilds, status, and scans.</p></div><span class="api-module-health" id="api-module-hypixel-health">Checking</span></div>
                                     <div class="api-service-grid">
                                         <details class="api-key-card settings-search-item" data-api-card="hypixel" open>
-                                            <summary class="api-key-card-head"><span class="api-provider-icon">H</span><span class="api-key-card-copy"><strong>Hypixel</strong><small>Stats, guilds, status, and scans</small></span><span class="api-card-status" data-api-status="hypixel">Checking</span><span class="api-key-chevron" aria-hidden="true"></span></summary>
-                                            <div class="api-key-card-body"><div class="api-key-input"><input id="key-hypixel" type="password" placeholder="Paste API key"><button data-key-toggle="hypixel">Show</button></div><div class="api-key-actions"><button data-key-copy="hypixel">Copy</button><button data-key-replace="hypixel">Replace</button><button class="primary" data-api-test="hypixel">Test Connection</button></div><div class="api-key-result"><span data-api-detail="hypixel">Waiting for status</span><small data-api-last="hypixel">Never successfully tested</small></div><div id="key-hypixel-meta" class="note">Updated: Not tracked yet</div></div>
+                                            <summary class="api-key-card-head"><span class="api-provider-icon">H</span><span class="api-key-card-copy"><strong>Hypixel</strong><small id="hypixel-key-reminder-summary">Stats, guilds, status, and scans</small></span><span class="api-card-status" data-api-status="hypixel">Checking</span><span class="api-key-chevron" aria-hidden="true"></span></summary>
+                                            <div class="api-key-card-body"><div class="api-key-input"><input id="key-hypixel" type="password" placeholder="Paste API key"><button data-key-toggle="hypixel">Show</button></div><div class="api-key-actions"><button data-key-copy="hypixel">Copy</button><button data-key-replace="hypixel">Replace</button><button class="primary" data-api-test="hypixel">Test Connection</button></div><div class="api-key-result"><span data-api-detail="hypixel">Waiting for status</span><small data-api-last="hypixel">Never successfully tested</small></div><div id="key-hypixel-meta" class="note">Updated: Not tracked yet</div>
+                                                <div class="api-key-result" id="hypixel-key-reminder" role="status"><span id="hypixel-key-reminder-status">Add a key to enable expiry reminders.</span><small id="hypixel-key-reminder-expiry">Expiry is counted 48 hours from saving a new key.</small></div>
+                                                <div class="api-key-actions"><button id="hypixel-key-dashboard">Open Hypixel dashboard</button><button id="hypixel-key-snooze" disabled>Snooze 24 hours</button></div>
+                                            </div>
                                         </details>
                                     </div>
                                 </section>
@@ -4107,7 +4094,6 @@
                                     <details class="api-key-card settings-search-item" data-api-card="urchin"><summary class="api-key-card-head"><span class="api-provider-icon api-icon-tag">◇</span><span class="api-key-card-copy"><strong>Urchin</strong><small>Player tags and session statistics</small></span><span class="api-card-status" data-api-status="urchin">Checking</span><span class="api-key-chevron" aria-hidden="true"></span></summary><div class="api-key-card-body"><div class="api-key-input"><input id="key-urchin" type="password" placeholder="Paste Urchin key"><button data-key-toggle="urchin">Show</button></div><div class="api-key-actions"><button data-key-copy="urchin">Copy</button><button data-key-replace="urchin">Replace</button><button class="primary" data-api-test="urchin">Test Connection</button></div><div class="api-key-result"><span data-api-detail="urchin">Waiting for status</span><small data-api-last="urchin">Never successfully tested</small></div></div></details>
                                     <details class="api-key-card settings-search-item" data-api-card="urchinadmin"><summary class="api-key-card-head"><span class="api-provider-icon api-icon-tag">U+</span><span class="api-key-card-copy"><strong>Urchin Admin</strong><small>Write and remove player tags</small></span><span class="api-card-status" data-api-status="urchinadmin">Checking</span><span class="api-key-chevron" aria-hidden="true"></span></summary><div class="api-key-card-body"><div class="api-key-input"><input id="key-urchin-admin" type="password" placeholder="Paste Urchin admin key"><button data-key-toggle="urchinadmin">Show</button></div><div class="api-key-actions"><button data-key-copy="urchinadmin">Copy</button><button data-key-replace="urchinadmin">Replace</button><button class="primary" data-api-test="urchinadmin">Test Connection</button></div><div class="api-key-result"><span data-api-detail="urchinadmin">Waiting for status</span><small data-api-last="urchinadmin">Never successfully tested</small></div></div></details>
                                     <details class="api-key-card settings-search-item" data-api-card="aurora"><summary class="api-key-card-head"><span class="api-provider-icon">A</span><span class="api-key-card-copy"><strong>Aurora</strong><small>Ping and stats-based denick evidence</small></span><span class="api-card-status" data-api-status="aurora">Checking</span><span class="api-key-chevron" aria-hidden="true"></span></summary><div class="api-key-card-body"><div class="api-key-input"><input id="key-aurora" type="password" placeholder="Paste Aurora key"><button data-key-toggle="aurora">Show</button></div><div class="api-key-actions"><button data-key-copy="aurora">Copy</button><button data-key-replace="aurora">Replace</button><button class="primary" data-api-test="aurora">Test Connection</button></div><div class="api-key-result"><span data-api-detail="aurora">Waiting for status</span><small data-api-last="aurora">Never successfully tested</small></div></div></details>
-                                    <details class="api-key-card settings-search-item" data-api-card="seraph"><summary class="api-key-card-head"><span class="api-provider-icon">S</span><span class="api-key-card-copy"><strong>Seraph</strong><small>Blacklist and threat signals</small></span><span class="api-card-status" data-api-status="seraph">Checking</span><span class="api-key-chevron" aria-hidden="true"></span></summary><div class="api-key-card-body"><div class="api-key-input"><input id="key-seraph" type="password" placeholder="Paste Seraph key"><button data-key-toggle="seraph">Show</button></div><div class="api-key-actions"><button data-key-copy="seraph">Copy</button><button data-key-replace="seraph">Replace</button><button class="primary" data-api-test="seraph">Test Connection</button></div><div class="api-key-result"><span data-api-detail="seraph">Waiting for status</span><small data-api-last="seraph">Never successfully tested</small></div></div></details>
                                 </div></section>
                             </div>
                         </div>
@@ -4129,7 +4115,6 @@
                                         <article class="network-node"><span class="network-node-icon">H</span><div><small>Destination</small><strong id="network-topology-host">mc.hypixel.net</strong><b id="network-topology-route">Direct route</b></div></article>
                                     </div>
                                     <div id="network-restart-banner" class="network-restart-banner hidden"><span>Restart required</span><p>Saved endpoint changes take effect after restarting the proxy.</p></div>
-                                    <div class="network-health-row"><span class="network-health-icon" aria-hidden="true">!</span><div><h3>Proxy Health Warnings</h3><p>Warn when the proxy lags and temporarily pause expensive optional packet features.</p></div><div class="feature-toggle"><label class="switch"><input id="proxy-health-warnings-enabled" type="checkbox"><span class="switch-track"></span><span class="switch-thumb"></span><span class="switch-label">OFF</span></label></div></div>
                                 </section>
                             </div>
                             <div class="settings-subgroup network-studio-group">
@@ -4138,9 +4123,10 @@
                                     <div class="network-endpoint-grid">
                                         <article class="network-endpoint-card settings-search-item"><div class="network-endpoint-head"><span>D</span><div><h3>Direct Proxy</h3><small>Primary local connection</small></div><b data-network-status="direct">Checking</b></div><label>Local port<input id="proxy-direct-port" type="number" min="1" max="65535"></label><small data-network-detail="direct">Validating port…</small></article>
                                         <article class="network-endpoint-card settings-search-item"><div class="network-endpoint-head"><span>F</span><div><h3>Failover Proxy</h3><small>Backup route</small></div><b data-network-status="failover">Checking</b></div><label>Local port<input id="proxy-failover-port" type="number" min="1" max="65535"></label><small data-network-detail="failover">Validating port…</small></article>
+                                        <article class="network-endpoint-card settings-search-item"><div class="network-endpoint-head"><span>C</span><div><h3>Custom Server</h3><small>Optional third connection</small></div><b data-network-status="custom">Checking</b></div><label>Local port<input id="proxy-custom-port" type="number" min="1" max="65535" placeholder="Add port"></label><small data-network-detail="custom">Enter a port to enable</small></article>
                                         <article class="network-endpoint-card settings-search-item"><div class="network-endpoint-head"><span>♥</span><div><h3>Health Panel</h3><small>Launcher monitoring endpoint</small></div><b data-network-status="health">Checking</b></div><label>Local port<input id="health-port" type="number" min="1" max="65535"></label><small data-network-detail="health">Validating port…</small></article>
                                     </div>
-                                    <details class="network-advanced"><summary><span><strong>Advanced host settings</strong><small>Destinations used by direct and failover routes</small></span><b>Expand</b></summary><div class="network-host-grid"><label>Direct destination<input id="proxy-direct-host" placeholder="mc.hypixel.net"><small data-network-host-status="direct">Not checked</small></label><label>Failover destination<input id="proxy-failover-host" placeholder="hypixel.fast"><small data-network-host-status="failover">Not checked</small></label></div></details>
+                                    <details class="network-advanced"><summary><span><strong>Advanced host settings</strong><small>Destinations used by the three connections</small></span><b>Expand</b></summary><div class="network-host-grid"><label>Direct destination<input id="proxy-direct-host" placeholder="mc.hypixel.net"><small data-network-host-status="direct">Not checked</small></label><label>Failover destination<input id="proxy-failover-host" placeholder="hypixel.fast"><small data-network-host-status="failover">Not checked</small></label><label>Custom server destination<input id="proxy-custom-host" placeholder="play.example.com"><small data-network-host-status="custom">Not checked</small></label></div></details>
                                     <div class="network-actions"><div><strong id="network-validation-summary">Validating configuration…</strong><small>Port and host checks never change your settings automatically.</small></div><button type="button" id="network-copy-config">Copy Configuration</button><button type="button" id="network-safe-defaults">Restore Safe Defaults</button></div>
                                 </section>
                             </div>
@@ -4293,7 +4279,6 @@
             tagNetwork: '<path d="M3 5h8l6 6-6 6-8-8V5Z"/><circle cx="7" cy="9" r="1"/><circle class="icon-accent" cx="18" cy="6" r="2"/><circle class="icon-accent" cx="20" cy="14" r="2"/><path class="icon-accent" d="m16 11 2-3m1 4 1-4"/>',
             tagPlus: '<path d="M3 5h9l7 7-7 7-9-9V5Z"/><circle cx="7" cy="9" r="1"/><path class="icon-accent" d="M17 3v6M14 6h6"/>',
             aurora: '<path d="M3 16c3-8 5-8 8 0s5 8 10 0M3 11c3-5 5-5 8 0s5 5 10 0"/><path class="icon-accent" d="M5 6h14"/>',
-            seraph: '<path d="M12 4 17 7v4c0 3.3-1.7 5.8-5 7.5C8.7 16.8 7 14.3 7 11V7l5-3Z"/><path d="M7 8 3 6v5l4 3M17 8l4-2v5l-4 3"/><path class="icon-accent" d="m10 11 1.5 1.5L14 9"/>',
             eye: '<path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6Z"/><circle class="icon-accent" cx="12" cy="12" r="2.5"/>',
             copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
             refresh: '<path d="M20 7v5h-5M4 17v-5h5M18.5 12A7 7 0 0 0 6 7.5L4 10M5.5 12A7 7 0 0 0 18 16.5l2-2.5"/>',
@@ -4323,7 +4308,7 @@
             keys: [.5, -.5], megaphone: [-.5, -.5], motion: [2.5, 0], partySearch: [-.15, -.75],
             partySpeaker: [-.13, 0], playerList: [.5, .75], players: [.25, 0],
             playerThreat: [.25, 0], plugCheck: [-.5, 0], pulseShield: [1, .5],
-            quoteBolt: [0, -1], recap: [0, -.5], seraph: [0, .75], slidersWarning: [-1, 0],
+            quoteBolt: [0, -1], recap: [0, -.5], slidersWarning: [-1, 0],
             sparkleLines: [1.25, 1.5], statThreat: [-1, 0], stopwatch: [0, .5],
             tagAlert: [-.5, 1], tagNetwork: [-.5, 1.5], tagPlus: [.5, 1],
             teamOrder: [0, .15], threat: [0, .5], timeline: [.25, .25], trophy: [0, -.5],
@@ -4382,7 +4367,7 @@
                 'intelligence providers':'network', 'proxy & network':'network', 'connection topology':'network',
                 'minecraft â†’ fury â†’ hypixel':'network', 'minecraft → fury → hypixel':'network',
                 'proxy health warnings':'pulseShield', 'endpoints':'socket', 'direct proxy':'routeDirect',
-                'failover proxy':'routeFailover', 'health panel':'activity', 'advanced host settings':'serverSliders'
+                'failover proxy':'routeFailover', 'custom server':'globeServer', 'health panel':'activity', 'advanced host settings':'serverSliders'
             }));
 
             document.querySelectorAll('.settings-content .settings-pane-heading h2, .settings-content .feature-section-title h2').forEach((heading) => {
@@ -4400,8 +4385,8 @@
                 ['.auto-dodge-choice', { 'Tagged players':'tagAlert', 'Nicked players':'mask', 'Stat threats':'statThreat' }, '.auto-dodge-choice-icon'],
                 ['.nametag-audience-card', { 'Teammates':'users', 'Threats':'playerThreat', 'Everyone Else':'user' }, '.nametag-audience-icon'],
                 ['.chat-stats-context-card', { 'Pregame lobby stats':'chatHourglass', 'Lobby Stats':'chatBuilding' }, '.chat-stats-context-icon'],
-                ['.api-key-card', { 'Hypixel':'keyPrimary', 'Urchin':'tagNetwork', 'Urchin Admin':'tagPlus', 'Aurora':'aurora', 'Seraph':'seraph' }, '.api-provider-icon'],
-                ['.network-endpoint-card', { 'Direct Proxy':'routeDirect', 'Failover Proxy':'routeFailover', 'Health Panel':'activity' }, '.network-endpoint-head > span:first-child']
+                ['.api-key-card', { 'Hypixel':'keyPrimary', 'Urchin':'tagNetwork', 'Urchin Admin':'tagPlus', 'Aurora':'aurora' }, '.api-provider-icon'],
+                ['.network-endpoint-card', { 'Direct Proxy':'routeDirect', 'Failover Proxy':'routeFailover', 'Custom Server':'globeServer', 'Health Panel':'activity' }, '.network-endpoint-head > span:first-child']
             ];
             exceptionIconSets.forEach(([rootSelector, labels, slotSelector]) => {
                 document.querySelectorAll(rootSelector).forEach((root) => {
@@ -4444,8 +4429,8 @@
                 ['.denick-setting-card', { 'Match by skin':'fingerprint', 'Match from Bed Wars stats':'chartSearch' }, '.denick-method-icon'],
                 ['.concept-choice-card', { 'Mentions':'atChat', 'Direct Messages':'envelope', 'Party Invites':'userPlus' }, '.concept-choice-icon'],
                 ['.chat-stats-context-card', { 'Pregame lobby stats':'chatHourglass', 'Lobby Stats':'chatBuilding' }, '.chat-stats-context-icon'],
-                ['.api-key-card', { 'Hypixel':'keyPrimary', 'Urchin':'tagNetwork', 'Urchin Admin':'tagPlus', 'Aurora':'aurora', 'Seraph':'seraph' }, '.api-provider-icon'],
-                ['.network-endpoint-card', { 'Direct Proxy':'routeDirect', 'Failover Proxy':'routeFailover', 'Health Panel':'activity' }, '.network-endpoint-head > span:first-child']
+                ['.api-key-card', { 'Hypixel':'keyPrimary', 'Urchin':'tagNetwork', 'Urchin Admin':'tagPlus', 'Aurora':'aurora' }, '.api-provider-icon'],
+                ['.network-endpoint-card', { 'Direct Proxy':'routeDirect', 'Failover Proxy':'routeFailover', 'Custom Server':'globeServer', 'Health Panel':'activity' }, '.network-endpoint-head > span:first-child']
             ];
             const clearNestedTitleArt = (root) => {
                 root.querySelectorAll('h2 > .settings-svg-icon, h3 > .settings-svg-icon, h4 > .settings-svg-icon').forEach((icon) => {
@@ -4515,7 +4500,6 @@
                     }
                 });
             };
-            decorateLabel('label[for="session-recap-style"]', 'layout');
             decorateLabel('label[for="auto-dodge-delay-seconds"]', 'countdown');
             decorateLabel('label[for="auto-dodge-min-fkdr"], label[for="auto-dodge-min-stars"]', 'statThreat');
 
@@ -4554,7 +4538,6 @@
 
         installSettingsIconSystem();
         let state = null;
-        let latestSlumberDailyRewards = null;
         let activeLog = 'proxy';
         let sessionAccountFilter = '';
         let sessionModeFilter = '';
@@ -4593,11 +4576,16 @@
         const msUsername = document.getElementById('ms-username');
         const msLoginStatus = document.getElementById('ms-login-status');
         const ids = {
+            anticheatEnabled: document.getElementById('anticheat-enabled'),
+            anticheatScaffoldEnabled: document.getElementById('anticheat-scaffold-enabled'),
+            anticheatAutoblockEnabled: document.getElementById('anticheat-autoblock-enabled'),
+            anticheatStasisEnabled: document.getElementById('anticheat-stasis-enabled'),
+            anticheatPossibleAlertsEnabled: document.getElementById('anticheat-possible-alerts-enabled'),
+            anticheatTeamAlertsEnabled: document.getElementById('anticheat-team-alerts-enabled'),
             hypixel: document.getElementById('key-hypixel'),
             urchin: document.getElementById('key-urchin'),
             urchinadmin: document.getElementById('key-urchin-admin'),
             aurora: document.getElementById('key-aurora'),
-            seraph: document.getElementById('key-seraph'),
             scanMode: document.getElementById('scan-mode'),
             minFkdr: document.getElementById('min-fkdr'),
             minStars: document.getElementById('min-stars'),
@@ -4616,6 +4604,7 @@
             shareTagsIncludeNicks: document.getElementById('share-tags-include-nicks'),
             shareTagsIncludeThreats: document.getElementById('share-tags-include-threats'),
             autoGamblerEnabled: document.getElementById('auto-gambler-enabled'),
+            quickMathsEnabled: document.getElementById('quick-maths-enabled'),
             autoDodgeEnabled: document.getElementById('auto-dodge-enabled'),
             autoDodgeDelaySeconds: document.getElementById('auto-dodge-delay-seconds'),
             autoDodgeTaggedPlayers: document.getElementById('auto-dodge-tagged-players'),
@@ -4625,12 +4614,10 @@
             autoDodgeMinStars: document.getElementById('auto-dodge-min-stars'),
             enderDustReminderEnabled: document.getElementById('ender-dust-reminder-enabled'),
             enderDustReminderThreshold: document.getElementById('ender-dust-reminder-threshold'),
-            slumberDailyRewardsReminderEnabled: document.getElementById('slumber-daily-rewards-reminder-enabled'),
             gamblerGeorgeReminderEnabled: document.getElementById('gambler-george-reminder-enabled'),
             autoSkinDenickEnabled: document.getElementById('auto-skin-denick-enabled'),
             autoStatsDenickEnabled: document.getElementById('auto-stats-denick-enabled'),
             denickChatAnnouncementsEnabled: document.getElementById('denick-chat-announcements-enabled'),
-            socialOverlayAddsEnabled: document.getElementById('social-overlay-adds-enabled'),
             lobbyChatStatsEnabled: document.getElementById('lobby-chat-stats-enabled'),
             lobbyChatStatsMentionEnabled: document.getElementById('lobby-chat-stats-mention-enabled'),
             lobbyChatStatsDmEnabled: document.getElementById('lobby-chat-stats-dm-enabled'),
@@ -4650,7 +4637,7 @@
             sessionTrackingEnabled: document.getElementById('session-tracking-enabled'),
             gameRecapEnabled: document.getElementById('game-recap-enabled'),
             replayDetailsEnabled: document.getElementById('replay-details-enabled'),
-            sessionRecapStyle: document.getElementById('session-recap-style'),
+            sessionGoalGames: document.getElementById('session-goal-games'),
             denickPartyAnnounceEnabled: document.getElementById('denick-party-announce-enabled'),
             showTagsInTabStats: document.getElementById('show-tags-in-tabstats'),
             nametagOverlayEnabled: document.getElementById('nametag-overlay-enabled'),
@@ -4672,18 +4659,25 @@
             nametagOthersSuffix: document.getElementById('nametag-others-suffix'),
             nametagOthersSuffixFallback: document.getElementById('nametag-others-suffix-fallback'),
             apiKillSwitchEnabled: document.getElementById('api-kill-switch-enabled'),
-            proxyHealthWarningsEnabled: document.getElementById('proxy-health-warnings-enabled'),
             chatTriggerInput: document.getElementById('chat-trigger-input'),
             chatTriggerList: document.getElementById('chat-trigger-list'),
             chatTriggerAdd: document.getElementById('chat-trigger-add'),
             proxyDirectPort: document.getElementById('proxy-direct-port'),
             proxyFailoverPort: document.getElementById('proxy-failover-port'),
+            proxyCustomPort: document.getElementById('proxy-custom-port'),
             healthPort: document.getElementById('health-port'),
             proxyDirectHost: document.getElementById('proxy-direct-host'),
-            proxyFailoverHost: document.getElementById('proxy-failover-host')
+            proxyFailoverHost: document.getElementById('proxy-failover-host'),
+            proxyCustomHost: document.getElementById('proxy-custom-host')
         };
 
         const featureControlIds = new Set([
+            'anticheatEnabled',
+            'anticheatScaffoldEnabled',
+            'anticheatAutoblockEnabled',
+            'anticheatStasisEnabled',
+            'anticheatPossibleAlertsEnabled',
+            'anticheatTeamAlertsEnabled',
             'scanMode',
             'countTags',
             'tabStatsEnabled',
@@ -4697,6 +4691,7 @@
             'shareTagsIncludeNicks',
             'shareTagsIncludeThreats',
             'autoGamblerEnabled',
+            'quickMathsEnabled',
             'autoDodgeEnabled',
             'autoDodgeDelaySeconds',
             'autoDodgeTaggedPlayers',
@@ -4706,13 +4701,11 @@
             'autoDodgeMinStars',
             'enderDustReminderEnabled',
             'enderDustReminderThreshold',
-            'slumberDailyRewardsReminderEnabled',
             'gamblerGeorgeReminderEnabled',
             'partyOverviewEnabled',
             'autoSkinDenickEnabled',
             'autoStatsDenickEnabled',
             'denickChatAnnouncementsEnabled',
-            'socialOverlayAddsEnabled',
             'lobbyChatStatsEnabled',
             'lobbyChatStatsMentionEnabled',
             'lobbyChatStatsDmEnabled',
@@ -4731,7 +4724,7 @@
             'sessionTrackingEnabled',
             'gameRecapEnabled',
             'replayDetailsEnabled',
-            'sessionRecapStyle',
+            'sessionGoalGames',
             'denickPartyAnnounceEnabled',
             'showTagsInTabStats',
             'nametagOverlayEnabled',
@@ -4753,7 +4746,6 @@
             'nametagOthersSuffix',
             'nametagOthersSuffixFallback',
             'apiKillSwitchEnabled',
-            'proxyHealthWarningsEnabled',
             'chatTriggerInput',
             'chatTriggerList',
             'chatTriggerAdd'
@@ -5063,15 +5055,15 @@
             renderSettingsSaveState();
         });
         const ordinaryGroups = {
-            keys: ['hypixel','urchin','urchinadmin','aurora','seraph'],
+            keys: ['hypixel','urchin','urchinadmin','aurora'],
             scan: ['minFkdr','minStars','minSkywarsKdr','minSkywarsWlr','minSkywarsLevel'],
-            server: ['proxyDirectPort','proxyFailoverPort','healthPort','proxyDirectHost','proxyFailoverHost']
+            server: ['proxyDirectPort','proxyFailoverPort','proxyCustomPort','healthPort','proxyDirectHost','proxyFailoverHost','proxyCustomHost']
         };
         for (const [group, keys] of Object.entries(ordinaryGroups)) for (const key of keys) {
             const el = ids[key]; if (!el) continue;
             el.addEventListener('input', () => { ordinaryDrafts.add(el); settingsTouched = true; setSettingsSaveState(el.id, 'Editing\u2026'); });
             el.addEventListener('change', () => {
-                if (!el.checkValidity() || (el.type === 'number' && !el.value.trim())) { setSettingsSaveState(el.id, 'Check value'); return; }
+                if (!el.checkValidity() || (el.type === 'number' && !el.value.trim() && key !== 'proxyCustomPort')) { setSettingsSaveState(el.id, 'Check value'); return; }
                 ordinaryDrafts.delete(el);
                 saveOrdinaryPatch({ [group]: { [key]: el.type === 'number' ? Number(el.value) : el.value.trim() } }, [el]);
             });
@@ -5100,6 +5092,19 @@
                 if (label) label.textContent = input.checked ? 'ON' : 'OFF';
             });
         }
+
+        const anticheatDetectorGroup = document.getElementById('anticheat-detectors');
+        const anticheatDetectorInputs = Array.from(anticheatDetectorGroup.querySelectorAll('input[type="checkbox"]'));
+
+        function syncAntiCheatDetectorControls() {
+            const disabled = !ids.anticheatEnabled.checked;
+            anticheatDetectorGroup.classList.toggle('is-disabled', disabled);
+            anticheatDetectorInputs.forEach(input => {
+                input.disabled = disabled;
+            });
+        }
+
+        ids.anticheatEnabled.addEventListener('change', syncAntiCheatDetectorControls);
 
         const TABLIST_FIELDS = ['name', 'stars', 'tags', 'fkdr', 'dailyfkdr', 'weeklyfkdr', 'monthlyfkdr', 'kdr', 'wlr', 'finals', 'wins', 'ws', 'guild', 'ping'];
         const TABLIST_FIELD_LABELS = {
@@ -5454,7 +5459,7 @@
                 ]
             },
             { label: 'Aurora', source: 'aurora', stats: [['ping', 'Average Ping']] },
-            { label: 'Urchin / Seraph', source: 'intelligence', stats: [['tag', 'Player Tag']] },
+            { label: 'Urchin', source: 'intelligence', stats: [['tag', 'Player Tag']] },
             {
                 label: 'Coral Sessions',
                 source: 'coral',
@@ -5579,7 +5584,17 @@
 
         function createCustomStatSelect(select) {
             if (!select || customStatSelectControllers.has(select)) return;
-            const searchable = !['tab-stats-preset', 'tab-stats-label-style', 'nametag-tag-display-mode'].includes(select.id);
+            const rankSelect = select.id === 'nickroll-rank';
+            const nickrollSelect = rankSelect || select.id === 'nickroll-skinMode';
+            const nickrollLabel = rankSelect ? 'Nickname rank' : 'Skin';
+            const searchable = !nickrollSelect && !['tab-stats-preset', 'tab-stats-label-style', 'nametag-tag-display-mode'].includes(select.id);
+            const optionMarkup = option => {
+                const label = option?.textContent || 'Choose a stat';
+                if (!rankSelect) return escapeHtml(label);
+                const color = option?.value?.startsWith('VIP') ? 'vip' : option?.value?.startsWith('MVP') ? 'mvp' : 'none';
+                const plus = label.endsWith('+');
+                return `<span class="nickroll-rank-${color}">${escapeHtml(plus ? label.slice(0, -1) : label)}${plus ? '<span class="nickroll-rank-plus">+</span>' : ''}</span>`;
+            };
             const popoverId = `stat-select-popover-${++customStatSelectSequence}`;
             const shell = document.createElement('span');
             shell.className = 'stat-select-shell';
@@ -5596,6 +5611,7 @@
             trigger.setAttribute('aria-haspopup', 'listbox');
             trigger.setAttribute('aria-expanded', 'false');
             trigger.setAttribute('aria-controls', popoverId);
+            if (nickrollSelect) trigger.setAttribute('aria-label', nickrollLabel);
             trigger.innerHTML = '<span class="stat-select-value"></span><span class="stat-select-trigger-icon" aria-hidden="true"></span>';
             shell.appendChild(trigger);
 
@@ -5610,11 +5626,12 @@
             const list = popover.querySelector('.stat-select-list');
             const empty = popover.querySelector('.stat-select-empty');
             if (!searchable) { search.parentElement.hidden = true; list.setAttribute('aria-label', select.id === 'tab-stats-preset' ? 'Preset' : select.id === 'tab-stats-label-style' ? 'Stat labels' : 'Tag display'); }
+            if (nickrollSelect) list.setAttribute('aria-label', nickrollLabel);
             const controller = { select, shell, trigger, popover, search, list, empty, open: false, rebuild: null };
 
             controller.rebuild = () => {
                 const selected = select.options[select.selectedIndex] || select.options[0];
-                trigger.querySelector('.stat-select-value').textContent = selected?.textContent || 'Choose a stat';
+                trigger.querySelector('.stat-select-value').innerHTML = optionMarkup(selected);
                 trigger.title = selected?.textContent || 'Choose a stat';
                 trigger.disabled = select.disabled;
                 shell.classList.toggle('is-disabled', select.disabled);
@@ -5628,7 +5645,7 @@
                     button.setAttribute('aria-selected', option.value === select.value ? 'true' : 'false');
                     button.dataset.value = option.value;
                     button.dataset.search = `${option.textContent} ${groupLabel}`.toLowerCase();
-                    button.innerHTML = `<span>${escapeHtml(option.textContent)}</span><i aria-hidden="true"></i>`;
+                    button.innerHTML = `<span>${optionMarkup(option)}</span><i aria-hidden="true"></i>`;
                     target.appendChild(button);
                 };
 
@@ -5721,6 +5738,7 @@
                 controller.show();
             });
             select.addEventListener('change', () => controller.rebuild());
+            if (nickrollSelect) select.addEventListener('select-display-change', () => controller.rebuild());
             customStatSelectControllers.set(select, controller);
             controller.rebuild();
         }
@@ -6257,6 +6275,9 @@
 
         function checkedSessionFields(containerId) {
             const fields = Array.from(document.querySelectorAll(`#${containerId} input[type="checkbox"]:checked`)).map(input => input.value);
+            if (containerId === 'session-recap-fields') {
+                return fields;
+            }
             const chart = document.querySelector(`#${containerId} input[value="gamesByMode"]`);
             if (chart && !chart.checked) fields.push('hideGamesByMode');
             return fields;
@@ -6270,9 +6291,6 @@
         }
 
         function effectiveSessionRecapFields() {
-            const style = ids.sessionRecapStyle?.value || 'detailed';
-            if (style === 'compact') return ['result', 'duration', 'game_stats'];
-            if (style === 'detailed') return ['result', 'duration', 'game_stats', 'session_totals', 'goals'];
             return checkedSessionFields('session-recap-fields');
         }
 
@@ -6280,30 +6298,39 @@
             const preview = document.getElementById('session-recap-preview');
             if (!preview) return;
             const enabled = Boolean(ids.gameRecapEnabled?.checked);
-            const style = ids.sessionRecapStyle?.value || 'compact';
             const fields = new Set(effectiveSessionRecapFields());
-            const lines = [];
-            const metric = (label, value, color = 'white') => `<span class="session-recap-metric">${label}: <span class="${color}">${value}</span></span>`;
-            lines.push(`<span class="gold">[FURY]</span>${fields.has('result') ? ' <span class="green">VICTORY</span>' : ''}`);
-            lines.push(`<span class="white">BedWars</span>${fields.has('duration') ? '<span class="session-recap-separator">&middot;</span>5m 12s' : ''}`);
-            if (fields.has('game_stats')) {
-                lines.push([metric('Finals', 2, 'pink'), metric('Beds', 1, 'red'), metric('Kills', 3, 'pink')].join('<span class="session-recap-separator">&middot;</span>'));
-                if (style === 'detailed') lines.push([metric('Deaths', 1, 'red'), metric('Bed lost', 'No'), metric('Final killed', 'No')].join('<span class="session-recap-separator">&middot;</span>'));
+            const bitmapPreview = require('./src/launcher/renderer/launcher_recap_preview');
+            if (enabled) {
+                const scoreboard = require('./src/stats/recapScoreboard').scoreboardRecapMessages({
+                    game: 'Bedwars', result: 'win', duration: '11m 06s', variant: 'Solos', map: 'Airshow',
+                    stats: [{ label: 'Finals', value: 6, color: '§a' },
+                        { label: 'Beds', value: 3, color: '§e' }, { label: 'Kills', value: 9, color: '§b' },
+                        { label: 'Deaths', value: 2, color: '§c' },
+                        { label: 'Stars', value: '+0.02', color: '§6' }],
+                    fields: [...fields], session: { wins: 6, losses: 2, fkdr: 4, games: 8 },
+                    gamesGoal: fields.has('goals') ? Number(ids.sessionGoalGames.value) : 0, games: 8
+                });
+                if (!scoreboard.length) {
+                    bitmapPreview.clear(preview);
+                    preview.textContent = 'Select information to show in the recap.';
+                } else bitmapPreview.render(preview, scoreboard).catch(error => {
+                    preview.textContent = 'Recap preview could not be loaded.';
+                    console.error('[Fury] Recap preview:', error);
+                });
+            } else {
+                bitmapPreview.clear(preview);
+                preview.innerHTML = '<div class="dark">Post-game recap is disabled.</div>';
             }
-            if (fields.has('session_totals')) lines.push(`<span class="session-recap-totals">Session: <span class="green">10W</span> / <span class="red">4L</span><span class="session-recap-separator">&middot;</span>FKDR: <span class="gold">6.00</span></span>`);
-            if (fields.has('goals') && Number(state.settings?.features?.sessionGoalWins || 0) > 0) {
-                const target = Math.max(1, Number(state.settings?.features?.sessionGoalWins || 0));
-                lines.push(`Goal wins: <span class="gold">${Math.min(10,target)} / ${target}</span>${target <= 10 ? ' <span class="green">&#10003;</span>' : ''}`);
-            }
-            preview.innerHTML = enabled ? lines.map(line => `<div>${line}</div>`).join('') : '<div class="dark">Post-game recap is disabled.</div>';
+            preview.classList.add('session-scoreboard-preview');
             const customSection = document.getElementById('session-recap-fields')?.closest('.session-field-section');
-            if (customSection) customSection.hidden = style !== 'custom';
+            if (customSection) customSection.hidden = false;
+            document.getElementById('session-games-goal-field').hidden = !fields.has('goals');
             document.querySelector('.session-recap-designer')?.classList.toggle('session-recap-disabled', !enabled);
         }
 
         [
             ids.gameRecapEnabled,
-            ids.sessionRecapStyle,
+            ids.sessionGoalGames,
             ...document.querySelectorAll('#session-recap-fields input')
         ].filter(Boolean).forEach(control => control.addEventListener('change', renderSessionRecapPreview));
 
@@ -6314,6 +6341,12 @@
                     countTags: true
                 },
                 features: {
+                    anticheatEnabled: ids.anticheatEnabled.checked,
+                    anticheatScaffoldEnabled: ids.anticheatScaffoldEnabled.checked,
+                    anticheatAutoblockEnabled: ids.anticheatAutoblockEnabled.checked,
+                    anticheatStasisEnabled: ids.anticheatStasisEnabled.checked,
+                    anticheatPossibleAlertsEnabled: ids.anticheatPossibleAlertsEnabled.checked,
+                    anticheatTeamAlertsEnabled: ids.anticheatTeamAlertsEnabled.checked,
                     tabStatsEnabled: ids.tabStatsEnabled.checked,
                     autoScanOnGameStart: true,
                     shareTagsAuto: ids.shareTagsAuto.checked,
@@ -6324,6 +6357,7 @@
                     shareTagsIncludeNicks: ids.shareTagsIncludeNicks.checked,
                     shareTagsIncludeThreats: ids.shareTagsIncludeThreats.checked,
                     autoGamblerEnabled: ids.autoGamblerEnabled.checked,
+                    quickMathsEnabled: ids.quickMathsEnabled.checked,
                     autoDodgeEnabled: ids.autoDodgeEnabled.checked,
                     autoDodgeDelaySeconds: Number(ids.autoDodgeDelaySeconds.value),
                     autoDodgeTaggedPlayers: ids.autoDodgeTaggedPlayers.checked,
@@ -6334,13 +6368,11 @@
                     autoDodgeMinStars: Number(ids.autoDodgeMinStars.value),
                     enderDustReminderEnabled: ids.enderDustReminderEnabled.checked,
                     enderDustReminderThreshold: Number(ids.enderDustReminderThreshold.value),
-                    slumberDailyRewardsReminderEnabled: ids.slumberDailyRewardsReminderEnabled.checked,
                     gamblerGeorgeReminderEnabled: ids.gamblerGeorgeReminderEnabled.checked,
                     partyOverviewEnabled: true,
                     autoSkinDenickEnabled: ids.autoSkinDenickEnabled.checked,
                     autoStatsDenickEnabled: ids.autoStatsDenickEnabled.checked,
                     denickChatAnnouncementsEnabled: ids.denickChatAnnouncementsEnabled.checked,
-                    socialOverlayAddsEnabled: ids.socialOverlayAddsEnabled.checked,
                     lobbyChatStatsEnabled: ids.lobbyChatStatsEnabled.checked,
                     lobbyChatStatsMentionEnabled: ids.lobbyChatStatsMentionEnabled.checked,
                     lobbyChatStatsDmEnabled: ids.lobbyChatStatsDmEnabled.checked,
@@ -6362,8 +6394,9 @@
                     replayDetailsEnabled: ids.replayDetailsEnabled.checked,
                     sessionBoundaryMinutes: 30,
                     sessionRetention: 0,
-                    sessionRecapStyle: ids.sessionRecapStyle.value,
+                    sessionRecapStyle: 'scoreboard',
                     sessionRecapFields: checkedSessionFields('session-recap-fields'),
+                    sessionGoalGames: require('./src/session/settings').normalizeGoal(ids.sessionGoalGames.value),
                     sessionBedwarsFields: checkedSessionFields('session-bedwars-fields'),
                     sessionSkywarsFields: checkedSessionFields('session-skywars-fields'),
                     sessionDuelsFields: checkedSessionFields('session-duels-fields'),
@@ -6393,7 +6426,6 @@
                     nametagOthersSuffix: ids.nametagOthersSuffix.value,
                     nametagOthersSuffixFallback: ids.nametagOthersSuffixFallback.value,
                     apiKillSwitchEnabled: ids.apiKillSwitchEnabled.checked,
-                    proxyHealthWarningsEnabled: ids.proxyHealthWarningsEnabled.checked
                 }
             };
         }
@@ -6468,6 +6500,12 @@
         }
 
         [
+            ids.anticheatEnabled,
+            ids.anticheatScaffoldEnabled,
+            ids.anticheatAutoblockEnabled,
+            ids.anticheatStasisEnabled,
+            ids.anticheatPossibleAlertsEnabled,
+            ids.anticheatTeamAlertsEnabled,
             ids.scanMode,
             ids.countTags,
             ids.tabStatsEnabled,
@@ -6479,6 +6517,7 @@
             ids.shareTagsIncludeNicks,
             ids.shareTagsIncludeThreats,
             ids.autoGamblerEnabled,
+            ids.quickMathsEnabled,
             ids.autoDodgeEnabled,
             ids.autoDodgeDelaySeconds,
             ids.autoDodgeTaggedPlayers,
@@ -6488,12 +6527,10 @@
             ids.autoDodgeMinStars,
             ids.enderDustReminderEnabled,
             ids.enderDustReminderThreshold,
-            ids.slumberDailyRewardsReminderEnabled,
             ids.gamblerGeorgeReminderEnabled,
             ids.autoSkinDenickEnabled,
             ids.autoStatsDenickEnabled,
             ids.denickChatAnnouncementsEnabled,
-            ids.socialOverlayAddsEnabled,
             ids.lobbyChatStatsEnabled,
             ids.lobbyChatStatsMentionEnabled,
             ids.lobbyChatStatsDmEnabled,
@@ -6513,7 +6550,7 @@
             ids.sessionTrackingEnabled,
             ids.gameRecapEnabled,
             ids.replayDetailsEnabled,
-            ids.sessionRecapStyle,
+            ids.sessionGoalGames,
             ids.denickPartyAnnounceEnabled,
             ids.showTagsInTabStats,
             ids.nametagOverlayEnabled,
@@ -6535,7 +6572,6 @@
             ids.nametagOthersSuffix,
             ids.nametagOthersSuffixFallback,
             ids.apiKillSwitchEnabled,
-            ids.proxyHealthWarningsEnabled
         ]
             .filter(Boolean)
             .forEach((el) => el.addEventListener('change', scheduleFeatureAutoSave));
@@ -6577,6 +6613,8 @@
 
         async function saveChatTriggers(triggers) {
             const clean = normalizeChatTriggerList(triggers);
+            const status = document.getElementById('chat-trigger-status');
+            if (status) status.textContent = 'Saving…';
             setSettingsSaveState('triggers', 'Saving\u2026');
             document.getElementById('save-status').textContent = 'Updating chat triggers...';
             try {
@@ -6584,10 +6622,12 @@
                 if (!state.settings) state.settings = {};
                 state.settings.chatTriggers = saved;
                 renderChatTriggers(saved.triggers || []);
+                if (status) status.textContent = 'Saved';
                 setSettingsSaveState('triggers', 'Saved');
                 document.getElementById('save-status').textContent = 'Chat triggers updated';
                 await refresh();
             } catch (e) {
+                if (status) status.textContent = 'Could not save phrases. Please try again.';
                 setSettingsSaveState('triggers', 'Couldn\u2019t save');
                 document.getElementById('save-status').textContent = 'Chat trigger update failed';
             } finally {
@@ -6598,6 +6638,8 @@
         function addChatTriggerFromInput() {
             const value = String(ids.chatTriggerInput?.value || '').replace(/\s+/g, ' ').trim();
             if (!value || value.length > 24) {
+                const status = document.getElementById('chat-trigger-status');
+                if (status) status.textContent = 'Trigger must be 1–24 characters';
                 document.getElementById('save-status').textContent = 'Trigger must be 1-24 chars';
                 setTimeout(() => document.getElementById('save-status').textContent = 'Ready', 1400);
                 return;
@@ -6660,8 +6702,13 @@
             return names[text] || text.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[_-]/g, ' ').replace(/^./, c => c.toUpperCase());
         }
 
+        function profileReviewChanges(changes = []) {
+            return changes.filter(change => [change.from, change.to].every(value => value == null || ['boolean', 'string', 'number'].includes(typeof value)));
+        }
+
         function renderProfileChangeRows(changes) {
-            if (!changes.length) return '<div class="profile-detail-status"><strong>You?re all set.</strong> Your current setup already matches this profile.</div>';
+            changes = profileReviewChanges(changes);
+            if (!changes.length) return '<p>No simple setting changes to show.</p>';
             const families = [
                 ['Automation & scanning', /^(autoDodge|scan|min|autoScan)/i],
                 ['Names & chat', /^(nametag|denick|autoSkin|autoStats|show|share|lobbyChat|pregameChat|party|chat|accent)/i],
@@ -6671,24 +6718,12 @@
             ];
             const grouped = families.map(([label]) => ({ label, changes: [] }));
             changes.forEach(change => grouped[families.findIndex(([, pattern]) => pattern.test(change.key || 'other'))].changes.push(change));
-            const chips = values => values.map(value => `<span class="profile-option">${escapeHtml(profileReadableValue(value))}</span>`).join('');
             const row = change => {
-                let detail;
-                if (Array.isArray(change.from) && Array.isArray(change.to)) {
-                    const added = change.to.filter(v => !change.from.includes(v));
-                    const removed = change.from.filter(v => !change.to.includes(v));
-                    const before = change.from.filter(v => change.to.includes(v));
-                    const after = change.to.filter(v => change.from.includes(v));
-                    const reordered = JSON.stringify(before) !== JSON.stringify(after);
-                    detail = `${added.length ? `<div class="profile-option-line profile-change-added"><b>Add</b>${chips(added)}</div>` : ''}${removed.length ? `<div class="profile-option-line profile-change-removed"><b>Remove</b>${chips(removed)}</div>` : ''}${reordered ? '<div class="profile-option-line"><b>Reorder</b><span>Display order updated</span></div>' : ''}
-                        <details class="profile-order-detail"><summary>View full lists &amp; order</summary><div><span>Current</span><ol>${change.from.map(v => `<li>${escapeHtml(profileReadableValue(v))}</li>`).join('') || '<li>None</li>'}</ol><span>With this profile</span><ol>${change.to.map(v => `<li>${escapeHtml(profileReadableValue(v))}</li>`).join('') || '<li>None</li>'}</ol></div></details>`;
-                } else {
-                    detail = `<div class="profile-value-pair"><span><small>Current</small>${escapeHtml(profileReadableValue(change.from))}</span><span class="profile-value-arrow" aria-hidden="true">&#8594;</span><span><small>With this profile</small><strong class="${change.to === true ? 'profile-change-added' : change.to === false ? 'profile-change-removed' : ''}">${escapeHtml(profileReadableValue(change.to))}</strong></span></div>`;
-                }
+                const detail = `<div class="profile-value-pair"><span><small>Current</small>${escapeHtml(profileReadableValue(change.from))}</span><span class="profile-value-arrow" aria-hidden="true">&#8594;</span><span><small>With this profile</small><strong class="${change.to === true || change.to === 'on' ? 'profile-change-added' : change.to === false || change.to === 'off' ? 'profile-change-removed' : ''}">${escapeHtml(profileReadableValue(change.to))}</strong></span></div>`;
                 const label = (change.label || profileReadableValue(change.key)).replace(/\bFields\b/gi, 'stats').replace(/\bEnabled\b/gi, '').replace(/\bDenick Party Announce\b/i, 'Party denick announcements').replace(/\bNametag Teammates Prefix\b/i, 'Teammate nametag prefix').trim();
                 return `<div class="profile-change-item"><h4>${escapeHtml(label)}</h4><div class="profile-change-description">${detail}</div></div>`;
             };
-            return `<div class="profile-change-groups">${grouped.filter(g => g.changes.length).map(g => `<section class="profile-change-group"><div class="profile-change-group-heading"><h3>${g.label}</h3><span>${g.changes.length}</span></div>${g.changes.map(row).join('')}</section>`).join('')}</div>`;
+            return `<div class="profile-change-groups">${grouped.filter(g => g.changes.length).map(g => `<section class="profile-change-group"><div class="profile-change-group-heading"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5h13M8 12h13M8 19h13M3 5h.01M3 12h.01M3 19h.01"/></svg><h3>${g.label}</h3><span>${g.changes.length} ${g.changes.length === 1 ? 'change' : 'changes'}</span></div>${g.changes.map(row).join('')}</section>`).join('')}</div>`;
         }
 
         function renderProfileIconArtwork(icon) {
@@ -6722,11 +6757,7 @@
         }
 
         function renderProfileDetailContent(profile) {
-            const preview = profile.preview || {};
-            const enabled = Array.isArray(preview.enabled) ? preview.enabled : [];
-            const disabled = Array.isArray(preview.disabled) ? preview.disabled : [];
-            const configured = Array.isArray(preview.configured) ? preview.configured : [];
-            const changes = Array.isArray(profile.applyChanges) ? profile.applyChanges : [];
+            const changes = profileReviewChanges(profile.applyChanges || []);
             const missing = Array.isArray(profile.missingSettings) ? profile.missingSettings : [];
             const missingHelp = profile.readOnly
                 ? 'Applying this built-in profile leaves these new settings unchanged until a future app update configures them.'
@@ -6734,33 +6765,31 @@
             const missingSection = missing.length
                 ? `<section class="profile-detail-section missing"><h3>Needs configuration</h3>${renderProfileDetailList(missing, 'No settings are missing.')}<p>${escapeHtml(missingHelp)}</p></section>`
                 : '';
-            return `<div class="profile-plan-intro"><p>${escapeHtml(profile.description || 'Your saved proxy setup.')}</p><span class="profile-plan-count">${changes.length ? `${changes.length} settings to update` : 'Matches your setup'}</span></div>
-                <section class="profile-detail-changes"><h3>Your setup, with this profile</h3><p>Only settings that change are shown below.</p>${renderProfileChangeRows(changes)}</section>
-                ${missingSection}
-                <details class="profile-plan-overview"><summary>Explore everything in this profile</summary><div class="profile-detail-grid">
-                    <section class="profile-detail-section"><h3>Enabled features</h3>${renderProfileDetailList(enabled, 'None.')}</section>
-                    <section class="profile-detail-section"><h3>Disabled features</h3>${renderProfileDetailList(disabled, 'None.')}</section>
-                    <section class="profile-detail-section"><h3>Behavior</h3>${renderProfileDetailList(configured, 'Uses profile defaults.')}</section>
-                </div></details>`;
+            return `<div class="profile-plan-intro"><div><h3>${changes.length ? `${changes.length} change${changes.length === 1 ? '' : 's'} to your setup` : 'No simple setting changes'}</h3><p>Review what changes before you apply this profile.</p></div></div>
+                <section class="profile-detail-changes" aria-label="Setting changes">${renderProfileChangeRows(changes)}</section>
+                ${missingSection}`;
         }
 
         let profileReviewName = null;
         function renderProfileAccordion(profile, badges, tags, customActions, expanded) {
-            const preview = profile.preview || {};
-            const enabled = preview.enabled || [], disabled = preview.disabled || [], configured = preview.configured || [];
-            const changes = profile.applyChanges || [];
+            const groups = require('./src/launcher/renderer/launcher_profile_summary').summarizeProfile(profile);
             const description = profile.source === 'builtin'
-                ? (/super/i.test(profile.label) ? 'For winstreaking.' : /normal/i.test(profile.label) ? 'For everyday play.' : /chill/i.test(profile.label) ? 'For casual games with friends.' : profile.description)
+                ? (/super/i.test(profile.label) ? 'For win streaks.' : /normal/i.test(profile.label) ? 'For everyday play.' : /chill/i.test(profile.label) ? 'For casual games with friends.' : profile.description)
                 : profile.description;
-            const summary = [['Scanning', /scan.*(?:all|threat)|threat scan/i.test(configured.join(' '))], ['Auto Dodge', enabled.includes('Auto Dodge')], ['Nametags', enabled.includes('Name tags')]];
-            const states = summary.map(([label, on]) => `<span class="fury-profile-quick-state"><span>${label}</span><b class="${on ? 'on' : 'off'}">${on ? 'On' : 'Off'}</b></span>`).join('');
-            const tone = profile.source !== 'builtin' ? 'custom' : /super/i.test(profile.label) ? 'competitive' : /chill/i.test(profile.label) ? 'casual' : 'everyday';
-            const count = changes.length ? `${changes.length} setting${changes.length === 1 ? '' : 's'} will change` : 'Matches your setup';
-            const missing = profile.missingSettings || [];
-            return `<article class="profile-card fury-profile-library-card ${expanded ? 'reviewing' : ''}" data-profile-tone="${tone}" data-profile-card="${escapeHtml(profile.name)}">
-                <div class="fury-profile-summary-copy"><span class="fury-profile-title">${escapeHtml(profile.label)}</span><span class="profile-tags">${badges}${tags}</span><span class="fury-profile-description">${escapeHtml(description || 'Custom setup.')}</span></div>
-                <div class="fury-profile-quick-states">${states}</div>
-                <div class="fury-profile-footer"><button data-profile-action="review" data-profile-name="${escapeHtml(profile.name)}" aria-pressed="${expanded}">Review changes</button><span>${count}</span><details class="fury-profile-more"><summary>More</summary><div><button data-profile-action="export" data-profile-name="${escapeHtml(profile.name)}">Export</button>${customActions}</div></details></div>
+            const name = escapeHtml(profile.name);
+            const panelId = `profile-preview-${encodeURIComponent(profile.name)}`;
+            const states = groups.slice(0, 3).map(group => `<div class="fury-profile-feature-row"><span class="fury-feature-mark">${group.icon}</span><span>${escapeHtml(group.label)} <strong class="fury-profile-status ${group.state === 'Off' ? 'is-off' : ['On', 'Threats', 'All players'].includes(group.state) ? 'is-on' : ''}">${escapeHtml(group.state)}</strong></span></div>`).join('');
+            const status = profile.active ? `<span class="profile-badge active">${profile.modified ? 'Current ? Modified' : 'Current'}</span>` : '';
+            const missing = profile.missingSettings?.length ? '<span class="profile-badge missing">Needs update</span>' : '';
+            return `<article class="profile-card fury-profile-library-card ${expanded ? 'reviewing' : ''}" data-profile-card="${name}">
+                <button class="fury-profile-expand" data-profile-action="review" data-profile-name="${name}" aria-expanded="${expanded}" aria-controls="${panelId}">
+                    <span class="fury-profile-chevron" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></svg></span><span class="fury-profile-identity" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 6h10c2 0 3 2 4 5l1 6c.5 3-2 4-4 2l-3-3H9l-3 3c-2 2-4.5 1-4-2l1-6c1-3 2-5 4-5Z"/><path d="M6 9v5M3.5 11.5h5M16 10h.01M19 13h.01"/></svg></span>
+                    <span class="fury-profile-summary-copy"><span class="fury-profile-title">${escapeHtml(profile.label.replace(/\s*\(Recommended\)/i, ''))}</span><span class="fury-profile-description">${escapeHtml(description || 'Custom setup.')}</span></span>
+                    <span class="profile-tags">${status}${missing}</span>
+                </button>
+                <div id="${panelId}" class="fury-profile-expanded" ${expanded ? '' : 'hidden'}>
+                    ${expanded ? `<section class="fury-profile-includes"><h3>This profile</h3>${states}<details class="fury-profile-more"><summary>More options</summary><div><button data-profile-action="export" data-profile-name="${name}">Export</button>${customActions}</div></details></section>${renderProfileReview(profile)}` : ''}
+                </div>
             </article>`;
         }
 
@@ -6797,7 +6826,7 @@
             if (!target) return;
             const restoreFocus = target.contains(document.activeElement) || document.getElementById('fury-profile-review')?.contains(document.activeElement)
                 ? profileFocusRestorer() : null;
-            if (!profiles.some(profile => profile.name === profileReviewName)) profileReviewName = active || profiles[0]?.name;
+            if (profileReviewName === null || (profileReviewName && !profiles.some(profile => profile.name === profileReviewName))) profileReviewName = active || profiles[0]?.name;
             const expandedName = profileReviewName;
             target.innerHTML = profiles.map(profile => {
                 const badges = [
@@ -6811,7 +6840,6 @@
                     : `<button data-profile-action="edit" data-profile-name="${escapeHtml(profile.name)}">Edit</button><button data-profile-action="delete" data-profile-name="${escapeHtml(profile.name)}">Delete</button>`;
                 return renderProfileAccordion(profile, badges, tags, customActions, profile.name === expandedName);
             }).join('') || '<div class="note">No profiles yet. Save your current setup below, or import a profile file.</div>';
-            renderProfileReview(profiles.find(profile => profile.name === profileReviewName));
             if (profileDetailState) {
                 const viewedProfile = profiles.find(profile => profile.name === profileDetailState);
                 if (viewedProfile) document.getElementById('profile-detail-content').innerHTML = renderProfileDetailContent(viewedProfile);
@@ -6821,13 +6849,15 @@
         }
 
         function renderProfileReview(profile) {
-            const dock = document.getElementById('fury-profile-review');
-            if (!dock) return;
-            if (!profile) { dock.innerHTML = '<h3>Review changes</h3><p>No profiles available.</p>'; return; }
-            const groups = require('./src/launcher/renderer/launcher_profile_summary').summarizeProfile(profile).filter(group => group.changes);
-            const format = value => Array.isArray(value) ? `${value.length} selected` : typeof value === 'boolean' ? (value ? 'On' : 'Off') : value == null ? 'Not set' : typeof value === 'object' ? 'Custom' : String(value);
-            const rows = groups.map(group => `<div class="fury-review-row"><span class="fury-feature-mark">${group.icon}</span><strong>${escapeHtml(group.changeLabel)}</strong><span class="fury-review-value ${group.from === false ? 'off' : group.from === true ? 'on' : ''}" title="${escapeHtml(profileValueText(group.from))}">${escapeHtml(format(group.from))}</span><span class="fury-review-arrow" aria-hidden="true">&#8594;</span><span class="fury-review-value ${group.to === false ? 'off' : group.to === true ? 'on' : ''}" title="${escapeHtml(profileValueText(group.to))}">${escapeHtml(format(group.to))}</span></div>`).join('');
-            dock.innerHTML = `<div class="fury-review-heading"><h3>Review changes</h3><strong>${escapeHtml(profile.label)}</strong></div><div class="fury-review-rows">${rows || '<p>Matches your setup.</p>'}</div><div class="fury-review-footer"><button class="fury-profile-all-changes" data-profile-action="details" data-profile-name="${escapeHtml(profile.name)}">All ${(profile.applyChanges || []).length} setting changes</button><button class="primary" data-profile-action="apply" data-profile-name="${escapeHtml(profile.name)}">Apply profile</button></div>`;
+            const changes = profileReviewChanges(profile.applyChanges || []);
+            const groups = require('./src/launcher/renderer/launcher_profile_summary').summarizeProfile({ ...profile, applyChanges: changes }).filter(group => group.changes).slice(0, 2);
+            const format = value => typeof value === 'boolean' ? (value ? 'On' : 'Off') : value == null ? 'Not set' : String(value).replace(/^./, letter => letter.toUpperCase());
+            const rows = groups.map(group => {
+                const complex = [group.from, group.to].some(value => value !== null && typeof value === 'object');
+                const values = complex ? '<span class="fury-review-value">Options updated</span>' : `<span class="fury-review-values"><span>${escapeHtml(format(group.from))}</span><span aria-hidden="true">&#8594;</span><strong>${escapeHtml(format(group.to))}</strong></span>`;
+                return `<div class="fury-review-row"><span class="fury-feature-mark">${group.icon}</span><strong>${escapeHtml(group.changeLabel.replace(/^Nametag Teammates Prefix$/i, 'Teammate prefix').replace(/^Auto Dodge Nicked Players$/i, 'Dodge nicked players'))}:</strong>${values}</div>`;
+            }).join('');
+            return `<section id="fury-profile-review" class="fury-profile-inline-review"><h3>Changes to your setup</h3><div class="fury-review-rows">${rows || `<p>${changes.length ? 'Your saved settings will be updated.' : 'No simple setting changes to show.'}</p>`}</div><button class="fury-profile-all-changes" data-profile-action="details" data-profile-name="${escapeHtml(profile.name)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5h13M8 12h13M8 19h13M3 5h.01M3 12h.01M3 19h.01"/></svg>${changes.length ? `Review ${changes.length} change${changes.length === 1 ? '' : 's'}` : 'Review changes'} &#8250;</button></section><div class="fury-profile-apply"><button class="primary" data-profile-action="apply" data-profile-name="${escapeHtml(profile.name)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 4 4L20 5"/></svg>Apply ${escapeHtml(profile.label.replace(/\s*\(Recommended\)/i, ''))}</button></div>`;
         }
 
         function profileFocusRestorer() {
@@ -6865,10 +6895,10 @@
             const modal = document.getElementById('profile-detail-modal');
             rememberProfileFocus(modal);
             profileDetailState = profile.name;
-            document.getElementById('profile-detail-title').textContent = profile.label;
+            document.getElementById('profile-detail-title').textContent = profile.label.replace(/\s*\(Recommended\)/i, '');
             document.getElementById('profile-detail-content').innerHTML = renderProfileDetailContent(profile);
             document.getElementById('profile-detail-content').scrollTop = 0;
-            document.getElementById('profile-detail-apply').textContent = profile.active && !profile.modified ? 'Profile is active' : 'Apply profile';
+            document.getElementById('profile-detail-apply').textContent = profile.active && !profile.modified ? 'Profile is active' : `Apply ${profile.label.replace(/\s*\(Recommended\)/i, '')}`;
             modal.classList.remove('hidden');
             if (!modal.open) modal.showModal();
             setTimeout(() => document.querySelector('#profile-detail-modal [data-profile-detail-close]')?.focus(), 0);
@@ -6965,8 +6995,6 @@
         }
 
         function overlayAutoAddText() {
-            const features = state?.settings?.features || {};
-            if (features.socialOverlayAddsEnabled === false) return 'Off';
             return 'Lobby only';
         }
 
@@ -7656,55 +7684,6 @@
             } else status.textContent = 'Waiting for Slumber Minion data.';
         }
 
-        function renderSlumberDailyRewardsStatus(reminder = null) {
-            latestSlumberDailyRewards = reminder;
-            const status = document.getElementById('slumber-daily-rewards-status-copy');
-            const list = document.getElementById('slumber-daily-rewards-list');
-            if (!status) return;
-            const enabled = Boolean(ids.slumberDailyRewardsReminderEnabled?.checked);
-            const rewards = Array.isArray(reminder?.rewards) ? reminder.rewards : [];
-            if (reminder?.error && !rewards.length) {
-                status.textContent = reminder.error;
-                if (list) list.innerHTML = '';
-                return;
-            }
-            if (!rewards.length) {
-                status.textContent = enabled
-                    ? 'Waiting for Slumber NPC reward data.'
-                    : 'Turn on alerts to get one message when rewards reset.';
-                if (list) list.innerHTML = '';
-                return;
-            }
-
-            const ready = rewards.filter(reward => reward?.available);
-            const waiting = rewards.filter(reward => !reward?.available);
-            const readyNames = ready.map(reward => reward.npc).join(', ');
-            const waitingText = waiting.length
-                ? ` ${waiting.length} NPC ${waiting.length === 1 ? 'is' : 'are'} still completed.`
-                : '';
-            status.textContent = ready.length
-                ? `${ready.length} ready now: ${readyNames}.${waitingText}`
-                : `All ${rewards.length} tracked NPC rewards are completed.`;
-            if (!enabled) status.textContent += ' Automatic alerts are off.';
-            if (reminder?.lastCheckedAt) status.textContent += ` Checked ${new Date(reminder.lastCheckedAt).toLocaleString()}.`;
-            if (reminder?.profileName) status.textContent += ` Account: ${reminder.profileName}.`;
-            if (reminder?.error) status.textContent += ` ${reminder.error}`;
-            if (list) {
-                const visibleRewards = document.getElementById('slumber-daily-rewards-incomplete-only')?.checked ? ready : rewards;
-                list.innerHTML = visibleRewards.map((reward) => {
-                    const availability = reward.available
-                        ? 'READY'
-                        : `COMPLETED · ${reward.remainingText || 'waiting'} left`;
-                    return `
-                        <div class="slumber-daily-reward-row">
-                            <strong>${escapeHtml(reward.npc || 'Unknown NPC')}</strong>
-                            <span class="${reward.available ? 'good-text' : 'bad-text'}">Available <b>${escapeHtml(availability)}</b></span>
-                        </div>
-                    `;
-                }).join('');
-            }
-        }
-
         function renderGamblerGeorgeReminderStatus(reminder = null) {
             const status = document.getElementById('gambler-george-reminder-status-copy');
             if (!status) return;
@@ -7730,7 +7709,6 @@
             ids.urchin.value = settings.keys.urchin || '';
             ids.urchinadmin.value = settings.keys.urchinadmin || '';
             ids.aurora.value = settings.keys.aurora || '';
-            ids.seraph.value = settings.keys.seraph || '';
             const hypixelUpdatedAt = settings.keyMeta?.hypixelUpdatedAt || '';
             const hypixelAge = keyAgeText(hypixelUpdatedAt);
             document.getElementById('key-hypixel-meta').innerHTML = hypixelUpdatedAt
@@ -7745,6 +7723,13 @@
             ids.countTags.checked = true;
             const features = settings.features || {};
             const featureOn = (key, fallback = true) => features[key] !== undefined ? Boolean(features[key]) : fallback;
+            ids.anticheatEnabled.checked = featureOn('anticheatEnabled');
+            ids.anticheatScaffoldEnabled.checked = featureOn('anticheatScaffoldEnabled');
+            ids.anticheatAutoblockEnabled.checked = featureOn('anticheatAutoblockEnabled', false);
+            ids.anticheatStasisEnabled.checked = featureOn('anticheatStasisEnabled', false);
+            ids.anticheatPossibleAlertsEnabled.checked = featureOn('anticheatPossibleAlertsEnabled');
+            ids.anticheatTeamAlertsEnabled.checked = featureOn('anticheatTeamAlertsEnabled', false);
+            syncAntiCheatDetectorControls();
             ids.tabStatsEnabled.checked = featureOn('tabStatsEnabled', false);
             ids.autoScanOnGameStart.checked = true;
             ids.shareTagsAuto.checked = featureOn('shareTagsAuto', false);
@@ -7756,6 +7741,7 @@
             renderScanModeButtons();
             renderPartySharePreview();
             ids.autoGamblerEnabled.checked = featureOn('autoGamblerEnabled', false);
+            ids.quickMathsEnabled.checked = featureOn('quickMathsEnabled', false);
             ids.autoDodgeEnabled.checked = featureOn('autoDodgeEnabled', false);
             ids.autoDodgeDelaySeconds.value = Number.isFinite(Number(features.autoDodgeDelaySeconds))
                 ? Number(features.autoDodgeDelaySeconds)
@@ -7773,12 +7759,10 @@
             ids.enderDustReminderThreshold.value = Number.isFinite(Number(features.enderDustReminderThreshold))
                 ? Math.min(300, Math.max(1, Math.round(Number(features.enderDustReminderThreshold))))
                 : 250;
-            ids.slumberDailyRewardsReminderEnabled.checked = featureOn('slumberDailyRewardsReminderEnabled', false);
             ids.gamblerGeorgeReminderEnabled.checked = featureOn('gamblerGeorgeReminderEnabled', true);
             ids.autoSkinDenickEnabled.checked = featureOn('autoSkinDenickEnabled', true);
             ids.autoStatsDenickEnabled.checked = featureOn('autoStatsDenickEnabled', true);
             ids.denickChatAnnouncementsEnabled.checked = featureOn('denickChatAnnouncementsEnabled', true);
-            ids.socialOverlayAddsEnabled.checked = featureOn('socialOverlayAddsEnabled', true);
             ids.lobbyChatStatsEnabled.checked = featureOn('lobbyChatStatsEnabled', true);
             ids.lobbyChatStatsMentionEnabled.checked = featureOn('lobbyChatStatsMentionEnabled', true);
             ids.lobbyChatStatsDmEnabled.checked = featureOn('lobbyChatStatsDmEnabled', true);
@@ -7798,8 +7782,8 @@
             ids.sessionTrackingEnabled.checked = featureOn('sessionTrackingEnabled', true);
             ids.gameRecapEnabled.checked = featureOn('gameRecapEnabled', true);
             ids.replayDetailsEnabled.checked = featureOn('replayDetailsEnabled', true);
-            ids.sessionRecapStyle.value = ['compact', 'detailed', 'custom'].includes(features.sessionRecapStyle) ? features.sessionRecapStyle : 'detailed';
-            setCheckedSessionFields('session-recap-fields', features.sessionRecapFields, ['result', 'duration', 'game_stats', 'session_totals', 'goals']);
+            ids.sessionGoalGames.value = Number(features.sessionGoalGames) || 0;
+            setCheckedSessionFields('session-recap-fields', require('./src/session/settings').normalizeRecapFields(features.sessionRecapFields));
             setCheckedSessionFields('session-bedwars-fields', features.sessionBedwarsFields, ['wins', 'losses', 'finals', 'finalDeaths', 'beds', 'bedsLost', 'kills', 'deaths', 'wlr', 'fkdr', 'kdr', 'bblr', 'games', 'stars']);
             setCheckedSessionFields('session-skywars-fields', features.sessionSkywarsFields, ['wins', 'losses', 'kills', 'deaths', 'wlr', 'kdr', 'games', 'assists']);
             setCheckedSessionFields('session-duels-fields', features.sessionDuelsFields, ['wins', 'losses', 'kills', 'deaths', 'wlr', 'kdr']);
@@ -7846,14 +7830,15 @@
             renderNametagPreview();
 
             ids.apiKillSwitchEnabled.checked = featureOn('apiKillSwitchEnabled', false);
-            ids.proxyHealthWarningsEnabled.checked = featureOn('proxyHealthWarningsEnabled', true);
             renderChatTriggers(settings.chatTriggers?.triggers || []);
             syncSwitchLabels();
             ids.proxyDirectPort.value = settings.server.proxyDirectPort;
             ids.proxyFailoverPort.value = settings.server.proxyFailoverPort;
+            ids.proxyCustomPort.value = settings.server.proxyCustomPort || '';
             ids.healthPort.value = settings.server.healthPort;
             ids.proxyDirectHost.value = settings.server.proxyDirectHost;
             ids.proxyFailoverHost.value = settings.server.proxyFailoverHost;
+            ids.proxyCustomHost.value = settings.server.proxyCustomHost;
             renderServerPreview(settings.server);
             windowsSettingsDesign?.sync();
             return true;
@@ -7863,6 +7848,7 @@
             const rows = [
                 ['Direct proxy', settings.server.proxyDirectPort, ports.proxyDirect],
                 ['Failover proxy', settings.server.proxyFailoverPort, ports.proxyFailover],
+                ...(settings.server.proxyCustomPort ? [['Custom server', settings.server.proxyCustomPort, ports.proxyCustom]] : []),
                 ['Health service', settings.server.healthPort, ports.health]
             ];
             document.getElementById('port-list').innerHTML = rows.map(([label, port, open]) => (
@@ -7901,9 +7887,11 @@
             return {
                 proxyDirectPort: Number(ids.proxyDirectPort?.value),
                 proxyFailoverPort: Number(ids.proxyFailoverPort?.value),
+                proxyCustomPort: Number(ids.proxyCustomPort?.value),
                 healthPort: Number(ids.healthPort?.value),
                 proxyDirectHost: String(ids.proxyDirectHost?.value || '').trim(),
-                proxyFailoverHost: String(ids.proxyFailoverHost?.value || '').trim()
+                proxyFailoverHost: String(ids.proxyFailoverHost?.value || '').trim(),
+                proxyCustomHost: String(ids.proxyCustomHost?.value || '').trim()
             };
         }
 
@@ -7917,7 +7905,9 @@
                 directPort: previewPort(draft.proxyDirectPort, server.proxyDirectPort, 25565),
                 directHost: previewHost(draft.proxyDirectHost, server.proxyDirectHost, 'mc.hypixel.net'),
                 failoverPort: previewPort(draft.proxyFailoverPort, server.proxyFailoverPort, 25566),
-                failoverHost: previewHost(draft.proxyFailoverHost, server.proxyFailoverHost, 'hypixel.fast')
+                failoverHost: previewHost(draft.proxyFailoverHost, server.proxyFailoverHost, 'hypixel.fast'),
+                customPort: draft.proxyCustomPort === 0 ? 0 : previewPort(draft.proxyCustomPort, server.proxyCustomPort, 0),
+                customHost: previewHost(draft.proxyCustomHost, server.proxyCustomHost, 'mc.hypixel.net')
             };
             const setText = (id, value) => {
                 const element = document.getElementById(id);
@@ -7927,6 +7917,7 @@
             setText('server-preview-direct-host', values.directHost);
             setText('server-preview-failover-port', values.failoverPort);
             setText('server-preview-failover-host', values.failoverHost);
+            setText('server-preview-custom-host', values.customHost);
             windowsDesign?.renderAddresses(values);
             document.getElementById('server-preview-direct-port')?.closest('.minecraft-server-address')?.setAttribute('aria-label', `Direct proxy address localhost:${values.directPort}`);
             document.getElementById('server-preview-failover-port')?.closest('.minecraft-server-address')?.setAttribute('aria-label', `Failover proxy address localhost:${values.failoverPort}`);
@@ -7943,10 +7934,10 @@
                 const badge = document.querySelector(`[data-network-status="${name}"]`);
                 const detail = document.querySelector(`[data-network-detail="${name}"]`);
                 if (badge) {
-                    badge.textContent = ({available:'Port free',active:'In use by Fury',conflict:'Port in use',duplicate:'Same port',invalid:'Check port'})[item.state] || item.state;
+                    badge.textContent = ({available:'Port free',active:'In use by Fury',inactive:'Not configured',conflict:'Port in use',duplicate:'Same port',invalid:'Check port'})[item.state] || item.state;
                     badge.className = networkStateTone(item.state);
                 }
-                if (detail) { detail.textContent = item.detail; detail.hidden = ['available','active'].includes(item.state); }
+                if (detail) { detail.textContent = item.detail; detail.hidden = ['available','active','inactive'].includes(item.state); }
             });
             Object.entries(result.hosts || {}).forEach(([name, item]) => {
                 const target = document.querySelector(`[data-network-host-status="${name}"]`);
@@ -7981,9 +7972,11 @@
         function renderNetworkStudio(settings, service = {}) {
             const payload = currentNetworkPayload();
             renderServerPreview(settings.server, payload);
-            for (const key of ['direct','failover']) {
+            for (const key of ['direct','failover','custom']) {
                 const address = document.querySelector(`#proxy-${key}-port`)?.closest('.fury-connection-body')?.querySelector('.fury-connection-address');
-                if (address) address.textContent = `Minecraft address: localhost:${document.getElementById(`proxy-${key}-port`).value}`;
+                if (address) address.textContent = payload[`proxy${key[0].toUpperCase()}${key.slice(1)}Port`]
+                    ? `Minecraft address: localhost:${document.getElementById(`proxy-${key}-port`).value}`
+                    : 'Add a local port to enable this connection.';
             }
             const running = Boolean(service.running);
             const live = document.getElementById('network-live-status');
@@ -8271,7 +8264,8 @@
         function denickHistoryFingerprint(history = {}) {
             return JSON.stringify({
                 filters: denickFilters(),
-                history
+                time: denickFilters().time === 'all' ? null : Math.floor(Date.now() / 60000),
+                history: history.revision || history
             });
         }
 
@@ -8295,9 +8289,9 @@
         function renderDenickHistory(history = {}) {
             if (!document.getElementById('denick-list')) return;
             updateDenickFilterControl();
-            const players = filteredDenickPlayers(history);
             const fingerprint = denickHistoryFingerprint(history);
             if (fingerprint === renderedDenickHistoryFingerprint) return;
+            const players = filteredDenickPlayers(history);
             const scrollPosition = captureDenickPageScroll();
             document.getElementById('denick-total-players').textContent = history.totalPlayers ?? 0;
             document.getElementById('denick-total-nicks').textContent = history.totalNicks ?? 0;
@@ -9747,9 +9741,9 @@
                 profileEventsInitialized = true;
             }
             renderWhenChanged('settings', next.settings, () => renderSettings(next.settings));
+            hypixelKeyReminderView.update(next.settings);
             windowsSettingsDesign?.syncState(next);
             renderReminderStatus(next.reminders?.enderDust || null);
-            renderSlumberDailyRewardsStatus(next.reminders?.slumberDailyRewards || null);
             const reminderAccount = document.getElementById('reminder-account-copy');
             if (reminderAccount) reminderAccount.textContent = next.reminders?.account
                 ? `Showing ${next.reminders.account.name || 'the selected account'} · progress refreshes while Fury is open.`
@@ -9807,6 +9801,7 @@
                     const historyScope = historyResponseClient.scope;
                     const response = await ipcRenderer.invoke('state:get', {
                         activePage: activePageName(),
+                        denickHistoryRevision: state?.denickHistory?.revision,
                         ...(furyDesign ? { historyContract: HISTORY_VERSION } : {})
                     });
                     const next = historyResponseClient.accept(response, historyScope);
@@ -9844,6 +9839,7 @@
         }
 
         function activatePage(page) {
+            const overlayVisibilityChanged = (activePageName() === 'overlay') !== (page === 'overlay');
             document.documentElement.dataset.workspacePage = page;
             window.NesterTheme?.applySidebar(document.documentElement.dataset.sidebarPreference || localStorage.getItem('fury-sidebar-v1') || 'expanded', false);
             closeCustomStatSelect(openCustomStatSelect);
@@ -9871,7 +9867,7 @@
             document.title = `Fury - ${activeLabel}`;
             if (page === 'console') renderLogs();
             if (page === 'sessions') renderSessionHistory(state?.sessionHistory || {});
-            if (page === 'denicks' || page === 'sessions' || page === 'dashboard' || page === 'reminders') refresh();
+            if (overlayVisibilityChanged || page === 'denicks' || page === 'sessions' || page === 'dashboard' || page === 'reminders') refresh();
         }
 
         const GLOBAL_SEARCH_SETTINGS_CATEGORIES = {
@@ -9884,8 +9880,10 @@
             overlay: { label: 'Overlay', aliases: 'players stats board live columns', description: 'Live player board and overlay preview.' },
             sessions: { label: 'Sessions', aliases: 'history games matches recap calendar day week month', description: 'Tracked games, session history, and match recaps.' },
             denicks: { label: 'Nicks', aliases: 'nicknames denick disguised players identities mappings', description: 'Saved nickname mappings and matched identities.' },
-            reminders: { label: 'Reminders', aliases: 'alerts slumber dust daily rewards notifications gambler george quest bet wins', description: 'Slumber collection and reward alerts.' },
+            nickroll: { label: 'Nick Reroller', aliases: 'nickroll reroll og names filters words rank skin timing', description: 'Configure nickname matching and rolling.' },
+            reminders: { label: 'Reminders', aliases: 'alerts slumber dust notifications gambler george quest bet wins', description: 'Slumber collection and reward alerts.' },
             profiles: { label: 'Profiles', aliases: 'presets setups playstyle configuration', description: 'Saved playstyle and launcher setups.' },
+            anticheat: { label: 'AntiCheat', aliases: 'scaffold autoblock stasis blink flags teammates', description: 'Choose which cheats Fury detects and which alerts appear in game.' },
             settings: { label: 'Settings', aliases: 'preferences options configuration controls', description: 'Appearance, scanning, automation, API, and network controls.' },
             console: { label: 'Console Logs', aliases: 'logs debug diagnostics output errors', description: 'Live proxy output and diagnostics.' }
         };
@@ -9898,7 +9896,7 @@
             overlay: 'player board live stats fullscreen hud',
             chat: 'messages dm mentions party announcements',
             hud: 'tab list nametags name tags in game display',
-            api: 'keys hypixel urchin aurora seraph integration',
+            api: 'keys hypixel urchin aurora integration',
             proxy: 'network server connection port host route engine',
             reminders: 'alerts slumber dust rewards notifications gambler george quest bet wins',
             profiles: 'presets setup playstyle configuration',
@@ -10098,6 +10096,15 @@
                     categoryLabel: GLOBAL_SEARCH_SETTINGS_CATEGORIES[category] || category,
                     label: context.label, description: context.description,
                     aliases: 'toggle enable disable on off switch turn activate deactivate', element: context.root, control
+                });
+            });
+
+            document.querySelectorAll('[data-page="anticheat"] .switch input[type="checkbox"]').forEach((control) => {
+                const context = globalSearchToggleContext(control);
+                add({
+                    kind: 'toggle', page: 'anticheat', pageLabel: 'AntiCheat',
+                    label: context.label, description: context.description,
+                    aliases: 'toggle enable disable on off switch flag alert', element: context.root, control
                 });
             });
 
@@ -10431,7 +10438,6 @@
                     urchin: ids.urchin.value.trim(),
                     urchinadmin: ids.urchinadmin.value.trim(),
                     aurora: ids.aurora.value.trim(),
-                    seraph: ids.seraph.value.trim()
                 },
                 scan: {
                     scanMode: ids.scanMode.value,
@@ -10443,6 +10449,12 @@
                     countTags: true
                 },
                 features: {
+                    anticheatEnabled: ids.anticheatEnabled.checked,
+                    anticheatScaffoldEnabled: ids.anticheatScaffoldEnabled.checked,
+                    anticheatAutoblockEnabled: ids.anticheatAutoblockEnabled.checked,
+                    anticheatStasisEnabled: ids.anticheatStasisEnabled.checked,
+                    anticheatPossibleAlertsEnabled: ids.anticheatPossibleAlertsEnabled.checked,
+                    anticheatTeamAlertsEnabled: ids.anticheatTeamAlertsEnabled.checked,
                     tabStatsEnabled: ids.tabStatsEnabled.checked,
                     autoScanOnGameStart: true,
                     shareTagsAuto: ids.shareTagsAuto.checked,
@@ -10453,6 +10465,7 @@
                     shareTagsIncludeNicks: ids.shareTagsIncludeNicks.checked,
                     shareTagsIncludeThreats: ids.shareTagsIncludeThreats.checked,
                     autoGamblerEnabled: ids.autoGamblerEnabled.checked,
+                    quickMathsEnabled: ids.quickMathsEnabled.checked,
                     autoDodgeEnabled: ids.autoDodgeEnabled.checked,
                     autoDodgeDelaySeconds: Number(ids.autoDodgeDelaySeconds.value),
                     autoDodgeTaggedPlayers: ids.autoDodgeTaggedPlayers.checked,
@@ -10463,13 +10476,11 @@
                     autoDodgeMinStars: Number(ids.autoDodgeMinStars.value),
                     enderDustReminderEnabled: ids.enderDustReminderEnabled.checked,
                     enderDustReminderThreshold: Number(ids.enderDustReminderThreshold.value),
-                    slumberDailyRewardsReminderEnabled: ids.slumberDailyRewardsReminderEnabled.checked,
                     gamblerGeorgeReminderEnabled: ids.gamblerGeorgeReminderEnabled.checked,
                     partyOverviewEnabled: true,
                     autoSkinDenickEnabled: ids.autoSkinDenickEnabled.checked,
                     autoStatsDenickEnabled: ids.autoStatsDenickEnabled.checked,
                     denickChatAnnouncementsEnabled: ids.denickChatAnnouncementsEnabled.checked,
-                    socialOverlayAddsEnabled: ids.socialOverlayAddsEnabled.checked,
                     lobbyChatStatsEnabled: ids.lobbyChatStatsEnabled.checked,
                     lobbyChatStatsMentionEnabled: ids.lobbyChatStatsMentionEnabled.checked,
                     lobbyChatStatsDmEnabled: ids.lobbyChatStatsDmEnabled.checked,
@@ -10491,9 +10502,10 @@
                     replayDetailsEnabled: ids.replayDetailsEnabled.checked,
                     sessionBoundaryMinutes: 30,
                     sessionRetention: 0,
-                    sessionRecapStyle: ids.sessionRecapStyle.value,
+                    sessionRecapStyle: 'scoreboard',
                     sessionRecapFields: checkedSessionFields('session-recap-fields'),
                     sessionBedwarsFields: checkedSessionFields('session-bedwars-fields'),
+                    sessionGoalGames: require('./src/session/settings').normalizeGoal(ids.sessionGoalGames.value),
                     sessionSkywarsFields: checkedSessionFields('session-skywars-fields'),
                     sessionDuelsFields: checkedSessionFields('session-duels-fields'),
                     denickPartyAnnounceEnabled: ids.denickPartyAnnounceEnabled.checked,
@@ -10522,7 +10534,7 @@
                     nametagOthersSuffix: ids.nametagOthersSuffix.value,
                     nametagOthersSuffixFallback: ids.nametagOthersSuffixFallback.value,
                     apiKillSwitchEnabled: ids.apiKillSwitchEnabled.checked,
-                    proxyHealthWarningsEnabled: ids.proxyHealthWarningsEnabled.checked
+                    proxyHealthWarningsEnabled: state?.settings?.features?.proxyHealthWarningsEnabled !== false
                 },
                 chatTriggers: {
                     triggers: currentChatTriggers()
@@ -10530,9 +10542,11 @@
                 server: {
                     proxyDirectPort: Number(ids.proxyDirectPort.value),
                     proxyFailoverPort: Number(ids.proxyFailoverPort.value),
+                    proxyCustomPort: Number(ids.proxyCustomPort.value),
                     healthPort: Number(ids.healthPort.value),
                     proxyDirectHost: ids.proxyDirectHost.value.trim(),
-                    proxyFailoverHost: ids.proxyFailoverHost.value.trim()
+                    proxyFailoverHost: ids.proxyFailoverHost.value.trim(),
+                    proxyCustomHost: ids.proxyCustomHost.value.trim()
                 }
             };
         }
@@ -10614,6 +10628,13 @@
                 setTimeout(() => document.getElementById('save-status').textContent = 'Ready', 1400);
             });
         });
+        const hypixelKeyReminderView = require('./src/launcher/renderer/launcher_hypixel_key_reminder').mount({
+            document,
+            invoke: (...args) => ipcRenderer.invoke(...args),
+            openExternal: url => shell.openExternal(url),
+            refresh,
+            setStatus: setLauncherStatus
+        });
         document.querySelectorAll('[data-key-replace]').forEach((button) => {
             button.addEventListener('click', () => {
                 const input = ids[button.dataset.keyReplace];
@@ -10643,14 +10664,6 @@
                 }
             });
         });
-        const incompleteDailyFilter = document.getElementById('slumber-daily-rewards-incomplete-only');
-        if (incompleteDailyFilter) {
-            incompleteDailyFilter.checked = localStorage.getItem('fury-daily-rewards-incomplete-only-v1') === 'true';
-            incompleteDailyFilter.addEventListener('change', () => {
-                localStorage.setItem('fury-daily-rewards-incomplete-only-v1', String(incompleteDailyFilter.checked));
-                renderSlumberDailyRewardsStatus(latestSlumberDailyRewards);
-            });
-        }
         document.getElementById('ender-dust-reminder-check')?.addEventListener('click', async (event) => {
             const button = event.currentTarget;
             const original = button.textContent;
@@ -10664,7 +10677,6 @@
                 if (generation !== accountGeneration) return;
                 state = { ...(state || {}), reminders };
                 renderReminderStatus(reminders?.enderDust || null);
-                renderSlumberDailyRewardsStatus(reminders?.slumberDailyRewards || null);
             } catch (error) {
                 if (status) status.textContent = error?.message || 'Could not check Ender Dust.';
             } finally {
@@ -10672,7 +10684,7 @@
                 button.textContent = original;
             }
         });
-        [ids.proxyDirectPort, ids.proxyFailoverPort, ids.healthPort, ids.proxyDirectHost, ids.proxyFailoverHost].filter(Boolean).forEach((input) => {
+        [ids.proxyDirectPort, ids.proxyFailoverPort, ids.proxyCustomPort, ids.healthPort, ids.proxyDirectHost, ids.proxyFailoverHost, ids.proxyCustomHost].filter(Boolean).forEach((input) => {
             input.addEventListener('input', () => {
                 const settings = state?.settings;
                 if (settings) renderNetworkStudio(settings, state?.services?.proxy || {});
@@ -10682,12 +10694,14 @@
             const defaults = {
                 proxyDirectPort: 25565,
                 proxyFailoverPort: 25566,
+                proxyCustomPort: 0,
                 proxyDirectHost: 'mc.hypixel.net',
-                proxyFailoverHost: 'hypixel.fast'
+                proxyFailoverHost: 'hypixel.fast',
+                proxyCustomHost: 'mc.hypixel.net'
             };
             Object.entries(defaults).forEach(([key, value]) => {
                 if (!ids[key]) return;
-                ids[key].value = value;
+                ids[key].value = key === 'proxyCustomPort' ? '' : value;
                 ids[key].dispatchEvent(new Event('input', { bubbles: true }));
             });
             Object.keys(defaults).forEach(key => ordinaryDrafts.delete(ids[key]));
@@ -10698,6 +10712,7 @@
             clipboard.writeText([
                 `Direct: localhost:${config.proxyDirectPort} → ${config.proxyDirectHost}`,
                 `Failover: localhost:${config.proxyFailoverPort} → ${config.proxyFailoverHost}`,
+                ...(config.proxyCustomPort ? [`Custom: localhost:${config.proxyCustomPort} → ${config.proxyCustomHost}`] : []),
                 `Health: http://127.0.0.1:${config.healthPort}`
             ].join('\n'));
             document.getElementById('save-status').textContent = 'Network configuration copied';
@@ -11346,7 +11361,7 @@
             const profile = state?.profiles?.profiles?.find(item => item.name === name);
             if (!profile) return;
             try {
-                if (action === 'review') { profileReviewName = name; renderProfiles(state.profiles); return; }
+                if (action === 'review') { profileReviewName = profileReviewName === name ? '' : name; renderProfiles(state.profiles); return; }
                 if (action === 'apply') return applyLauncherProfile(name);
                 if (action === 'details') return openProfileDetail(profile);
                 if (action === 'export') {
@@ -11495,6 +11510,8 @@
             if (document.hidden) {
                 clearTimeout(refreshTimer);
                 refreshTimer = null;
+                // Report the hidden view once before suspending its heartbeat.
+                if (activePageName() === 'overlay') refresh();
             } else {
                 refreshLoop();
             }
@@ -11527,7 +11544,7 @@
                     sessionHistory: { sessions: [], accounts: [], summary: {} }, reminders: {} };
                 sessionAccountFilter = ''; sessionModeFilter = ''; sessionResultFilter = ''; sessionOpponentFilter = '';
                 furyDesign.clearAccount();
-                renderReminderStatus(null); renderSlumberDailyRewardsStatus(null); renderGamblerGeorgeReminderStatus(null);
+                renderReminderStatus(null); renderGamblerGeorgeReminderStatus(null);
                 document.getElementById('reminder-account-copy').textContent = `Loading ${account.name}…`;
                 furyDesign.update(state);
                 renderNametagPreview();
@@ -11535,7 +11552,7 @@
                 catch (error) { accountGeneration++; state = previous; await refresh(); throw error; }
             }
         });
-        [ids.tabStatsPreset, ids.tabStatsLabelStyle, ids.nametagTagDisplayMode].forEach(createCustomStatSelect);
+        [ids.tabStatsPreset, ids.tabStatsLabelStyle, ids.nametagTagDisplayMode, document.getElementById('nickroll-rank'), document.getElementById('nickroll-skinMode')].forEach(createCustomStatSelect);
         initializeGlobalSearch();
 
         require('./src/launcher/renderer/launcher_shutdown').installRendererShutdown(ipcRenderer, async () => {
@@ -11543,6 +11560,7 @@
             // Freeze interaction; do not promote uncommitted/invalid drafts.
             document.body.inert = true;
             flushAccent();
+            await furyDesign?.flushNickroll();
             if (featureSaveTimer) {
                 clearTimeout(featureSaveTimer); featureSaveTimer = null;
                 saveFeatureControlsNow();

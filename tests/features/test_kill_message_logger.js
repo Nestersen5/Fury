@@ -40,7 +40,7 @@ function harness(options = {}) {
                 yaw: returning ? -45 : 45, pitch: returning ? -15 : 15, flags: 31 }
             : { ...absolute, flags: 0 };
         server('position', packet);
-        assert.equal(disconnected.length, 0, 'preview teleport must not disconnect');
+        assert.equal(disconnected.length, 0, `preview teleport must not disconnect: ${JSON.stringify(disconnected)}`);
         assert.deepStrictEqual(packet, { ...absolute, flags: 0 }, 'relative coordinates must resolve against the locked position');
         const ack = { ...absolute, onGround: false };
         const confirm = () => {
@@ -82,7 +82,10 @@ function harness(options = {}) {
     }
     const chat = (component, position = 0) => server('chat', { position, message: JSON.stringify(component) });
     const automation = createQuickBuy({ presetDir: path.join(dir, 'presets'), minimumStillMs: 0,
-        canStart: () => options.denied || null, snapshotSettleMs: 0, timeoutMs: 120, totalTimeoutMs: 1000,
+        // Exercise menu/teleport ownership without requiring a shared CI runner
+        // to service every synthetic response within 120 ms. Missing-response
+        // cases below still wait for the real deadline and assert disconnection.
+        canStart: () => options.denied || null, snapshotSettleMs: 0, timeoutMs: 2000, totalTimeoutMs: 15000,
         sendClient: (name, data) => clientPackets.push([name, data]), sendChat: text => messages.push(stripAnsi(text)),
         disconnect: reason => disconnected.push(reason),
         sendUpstream: (name, data) => {

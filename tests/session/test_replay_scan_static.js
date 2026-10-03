@@ -25,7 +25,6 @@ assert(/threatConfig: \{ minFkdr: 3\.0, minStars: 1000,/.test(runner), 'replay s
 assert(!/\n\s+state,\n/.test(runner), 'replay scan must not share the global state object');
 assert(runner.includes('setLastScanSummary: () => {}'), 'replay scan must not overwrite the live scan summary');
 assert(runner.includes('setLastScanResults: () => {}'), 'replay scan must not feed /share');
-assert(runner.includes('trackTags: () => {}'), 'replay scan must not write the tag log');
 
 const run = block('async function runReplayScan()', '\n        }\n');
 assert(run.includes('shareStream: null'), 'replay scan never broadcasts to party');
@@ -66,7 +65,8 @@ assert(proxy.includes('const roster = new Set(players.map(player => player.name)
 assert(proxy.includes('await performReplayScan(client, replayLobby, localNicks, null, {'), 'replay /scan uses its own player map, not the live one');
 assert(/isOwnPlayer: \(\) => false,\s*getCachedPlayerProfile/.test(run), 'your own row is scanned when you played in that game');
 assert(/partyArrivalTracker\.observePlayerInfo\(data, action\);\s*observeReplayTabEntries\(data, action\);\s*const filteredPlayerInfo/.test(proxy), 'the tab copy sees every entry before any filtering');
-assert(/if \(meta\.name === 'login' \|\| meta\.name === 'respawn'\) \{\s*replayTabEntries\.clear\(\);/.test(proxy), 'the tab copy starts afresh on each world change');
+const worldChange = block("if (meta.name === 'login' || meta.name === 'respawn') {", '\n            }');
+assert(worldChange.includes('replayTabEntries.clear();'), 'the tab copy starts afresh on each world change');
 
 // Clips are listed once on entering a replay, and only when there are any.
 const announce = block('function announceReplayClips(attempt = 0)', '\n        }\n');

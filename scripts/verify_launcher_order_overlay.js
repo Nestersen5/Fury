@@ -11,7 +11,9 @@ module.exports = async function verifyLauncherOrderOverlay({ page, output }) {
     for (const [width,height] of [[1440,900],[1024,680]]) {
         await page.waitForFunction('!featureSaveTimer && !featureSaveInFlight && !featureSaveQueued && !settingsSaveInFlight');
         await page.setViewport({width,height,deviceScaleFactor:1});
-        await page.evaluate(`clearTimeout(refreshTimer);activatePage('overlay');clearTimeout(refreshTimer);overlayState.orders.BEDWARS=Object.keys(OVERLAY_STAT_DEFS.BEDWARS);overlayTableSignature='';renderOverlay({connected:true,gameActive:true,currentGamemode:'BEDWARS',gameSessionId:'test',overlayPlayers:[{name:'Player_long_name',mode:'BEDWARS',stats:{stars:300,fkdr:6.5,wlr:2.5,wins:18117,finals:55004,beds:24269,ws:100},tags:[]}]});`);
+        await page.evaluate("clearTimeout(refreshTimer);activatePage('overlay')");
+        await page.waitForFunction('!refreshInFlight');
+        await page.evaluate(`clearTimeout(refreshTimer);overlayState.orders.BEDWARS=Object.keys(OVERLAY_STAT_DEFS.BEDWARS);overlayTableSignature='';renderOverlay({connected:true,gameActive:true,currentGamemode:'BEDWARS',gameSessionId:'test',overlayPlayers:[{name:'Player_long_name',mode:'BEDWARS',stats:{stars:300,fkdr:6.5,wlr:2.5,wins:18117,finals:55004,beds:24269,ws:100},tags:[]}]});`);
         if (await page.$eval('#overlay-layout-drawer',e=>e.hidden)) await page.evaluate(()=>document.querySelector('#overlay-layout-toggle').click());
         await page.evaluate(()=>FuryNotifications.dismissAll());
         await delay(300);

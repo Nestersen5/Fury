@@ -38,6 +38,15 @@ try {
             assert.strictEqual(engine.killMessagePatternSignature(line), engine.killMessagePatternSignature(liveLine),
                 `${pattern.key} must match arbitrary players rather than the example identity`);
             assert.strictEqual(engine.detectKillMessageOwner(liveLine), 'TestKiller', `${pattern.key} owner`);
+            if (line.startsWith('ExampleVictim')) {
+                assert.deepStrictEqual(engine.detectKnownKillMessageForStats(liveLine), {
+                    victim: 'TestVictim', killer: 'TestKiller', final: /\bfinal\s+#[\d,]+\b/i.test(liveLine)
+                }, `${pattern.key} local kill`);
+                assert.strictEqual(engine.detectKnownKillMessageForStats(`${liveLine} FINAL KILL!`)?.final, true,
+                    `${pattern.key} final kill marker`);
+            } else {
+                assert.strictEqual(engine.detectKnownKillMessageForStats(liveLine), null, `${pattern.key} bed line`);
+            }
         }
         const liveRegular = pattern.lines[0].replaceAll('ExampleVictim', 'TestVictim').replaceAll('ExampleKiller', 'TestKiller');
         assert.strictEqual(engine.detectKillMessageCosmeticFromChat(liveRegular)?.key, pattern.key, `${pattern.key} works before any capture`);
@@ -45,16 +54,23 @@ try {
 
     engine.finalizeKillMessageCapture({
         client: {}, key: 'woofwoof', name: 'Woof Woof',
-        lines: seed.find(pattern => pattern.key === 'woofwoof').lines.map(line => line.replaceAll('ExampleKiller', 'LocalPlayer'))
+        lines: seed.find(pattern => pattern.key === 'woofwoof').lines.map((line, index) => index === 0
+            ? 'ExampleVictim was tickled by LocalPlayer.' : line.replaceAll('ExampleKiller', 'LocalPlayer'))
     });
     const saved = JSON.parse(fs.readFileSync(personalFile, 'utf8'));
     assert.deepStrictEqual(Object.keys(saved.patterns), ['woofwoof'], 'recording saves personal overrides only');
+    assert.deepStrictEqual(engine.detectKnownKillMessageForStats('TestVictim was tickled by TestKiller.'),
+        { victim: 'TestVictim', killer: 'TestKiller', final: false }, 'new preview captures become countable');
     const restarted = makeEngine();
     restarted.ensureDefaultKillMessagePatterns();
     const loaded = restarted.loadKillMessagePatternStore();
     assert.strictEqual(Object.keys(loaded.patterns).length, 32, 'saved captures retain other bundled defaults');
     assert.ok(loaded.patterns.woofwoof.samples[0].text.includes('LocalPlayer'), 'recorded overrides survive restart');
     assert.strictEqual(restarted.detectKillMessageCosmetic('TestVictim was melted by TestKiller.')?.key, 'fire');
+    assert.strictEqual(engine.detectKnownKillMessageForStats('TestVictim: I was bitten by TestKiller.'), null,
+        'player chat must not count as a kill');
+    assert.strictEqual(engine.detectKnownKillMessageForStats('TestVictim waved at TestKiller.'), null,
+        'unrecognized lines must not count as kills');
     assert.strictEqual(fs.readFileSync(seedPath, 'utf8'), originalSeed, 'the shipped seed stays unchanged');
 
     fs.writeFileSync(personalFile, '{invalid json');

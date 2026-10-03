@@ -83,7 +83,7 @@ assert.deepStrictEqual(compactOverlayTags([
     { source: 'Urchin', title: 'Urchin Report', value: 'Scaffold Report' },
     { source: 'Seraph', title: 'Seraph Blacklist', value: 'Cheating' },
     { source: 'Urchin', title: 'Urchin API Status', value: 'API FAIL' }
-]), ['U:Scaffold', 'S:Cheating']);
+]), ['U:Scaffold']);
 
 const row = {
     stats: { fkdr: 4.821 },
@@ -94,7 +94,7 @@ const row = {
 };
 assert.strictEqual(
     formatLobbyChatAnnotation(row, { fkdrColor: '§c' }),
-    ' §8[§fFKDR: §c4.82 §8| §e[Scaffold Report] §e[Cheating]§8]'
+    ' §8[§fFKDR: §c4.82 §8| §e[Scaffold Report]§8]'
 );
 assert.strictEqual(formatLobbyChatAnnotation({ lookupFailed: true, stats: { fkdr: 2 } }), '');
 assert.strictEqual(formatLobbyChatAnnotation({ isNicked: true, stats: { fkdr: 2 } }), '');
@@ -126,8 +126,8 @@ const hoverRow = {
             reasons: 'legit scaffold, autoblock'
         },
         {
-            source: 'Seraph',
-            title: 'Seraph Blacklist',
+            source: 'Urchin',
+            title: 'Urchin Report',
             value: 'Cheating',
             addedBy: 'Unknown',
             when: 'Unknown',
@@ -143,7 +143,7 @@ assert.strictEqual(annotatedMsg.extra[0].extra[1].text, 'Player: 3/4 anyone?');
 const suffixExtras = annotatedMsg.extra[1].extra;
 const tagComponents = suffixExtras.filter(node => node && node.hoverEvent);
 assert.strictEqual(tagComponents.length, 2, 'both tags should have hover events');
-assert.strictEqual(tagComponents[0].text, '[Scaffold Report]');
+assert.strictEqual(tagComponents[0].text, '[Scaffold Report · AB]');
 assert.strictEqual(tagComponents[0].color, 'yellow', 'unclassified reports retain a readable warning color');
 assert.strictEqual(tagComponents[0].hoverEvent.action, 'show_text');
 assert.ok(tagComponents[0].hoverEvent.value.includes('Reason'));
@@ -186,25 +186,25 @@ console.log('Chat overlay annotation tests passed.');
         { source: 'Urchin', title: 'Urchin API Status', value: 'FAIL' }
     ];
     const badges = buildOverlayTagComponents(reports, { clickName: 'DemoPlayer' });
-    assert.deepStrictEqual(badges.map(badge => badge.text), ['[Blatant]', '[+2]']);
+    assert.deepStrictEqual(badges.map(badge => badge.text), ['[Blatant · AB]', '[+1]']);
     assert.strictEqual(badges[0].color, 'red');
-    assert.strictEqual(badges[0].clickEvent.value, '/tagdetails DemoPlayer');
+    assert.strictEqual(badges[0].clickEvent.value, '/urchin DemoPlayer');
     const hover = badges[0].hoverEvent.value;
-    for (const value of ['§b§lUrchin', '§b§lSeraph', '§7Reason: §fAutoblock', '§7Reason: §fScaffold', '§7Added by: §fReviewerB', '§7Date: §f2026-09-14']) {
+    for (const value of ['§b§lUrchin', '§7Reason: §fAutoblock', '§7Added by: §fReviewerB', '§7Date: §f2026-09-15']) {
         assert(hover.includes(value), `merged colored hover must retain ${value}`);
     }
     assert(badges[1].hoverEvent.value.includes('Replays needed'));
-    assert(badges[1].hoverEvent.value.includes('Targeted queues'));
-    assert.deepStrictEqual(groupTags(reports).map(group => group.label), ['Blatant', 'Caution', 'Sniper'], 'Urchin-backed tags outrank Seraph-only tags');
-    assert.strictEqual(formatTagBadges(reports), '§c[Blatant] §6[Caution] §d[Sniper]', 'chat badges expose all classifications, merging identical source labels');
+    assert(!badges[1].hoverEvent.value.includes('Targeted queues'));
+    assert.deepStrictEqual(groupTags(reports).map(group => group.label), ['Blatant', 'Caution'], 'retired reports are ignored');
+    assert.strictEqual(formatTagBadges(reports), '§c[Blatant · AB] §6[Caution]', 'chat badges expose classifications and reason labels');
     assert.strictEqual(formatTabTags(reports), '§d[Blatant] §d[Caution]', 'tab shows only Urchin-backed tags in pink when Urchin reports exist');
-    assert.strictEqual(formatTabTags([reports[2], reports[3]]), '§3[Blatant] §3[Sniper]', 'tab shows Seraph-only tags in dark aqua');
-    assert.deepStrictEqual(groupTags(reports)[0].reports.map(report => report.source), ['Urchin', 'Seraph'], 'Urchin reports lead within a merged group');
-    assert.deepStrictEqual(buildOverlayTagComponents([reports[3], reports[0]]).map(badge => badge.text), ['[Caution]', '[+1]'], 'Urchin tag leads the chat badge over a Seraph tag');
+    assert.strictEqual(formatTabTags([reports[2], reports[3]]), '', 'tab ignores retired provider tags');
+    assert.deepStrictEqual(groupTags(reports)[0].reports.map(report => report.source), ['Urchin'], 'retired reports cannot merge into Urchin tags');
+    assert.deepStrictEqual(buildOverlayTagComponents([reports[3], reports[0]]).map(badge => badge.text), ['[Caution]'], 'retired tags do not produce badges');
     const lines = tagDetailLines('demoplayer');
     const buttons = lines.at(-1).extra;
-    assert.deepStrictEqual(buttons.map(button => button.clickEvent.value), ['/urchin demoplayer', '/seraph demoplayer']);
-    assert(lines.some(line => line.text.includes('ReviewerC')), 'detail panel retains both reports');
+    assert.deepStrictEqual(buttons.map(button => button.clickEvent.value), ['/urchin demoplayer']);
+    assert(!lines.some(line => line.text.includes('ReviewerC')), 'detail panel excludes retired reports');
     assert.strictEqual(buildOverlayTagComponents([{ source: 'Urchin', value: 'Replays' }])[0].color, 'yellow');
     assert.strictEqual(buildOverlayTagComponents([{ source: 'Urchin', value: 'Legit Sniper' }])[0].color, 'green');
     assert.deepStrictEqual(buildOverlayTagComponents([]), []);
@@ -212,12 +212,97 @@ console.log('Chat overlay annotation tests passed.');
     assert([...hover.matchAll(/§([0-9a-f])/g)].every(match => ['b', '7', 'f'].includes(match[1])), 'hover uses only aqua, gray, and white');
     const commandLines = tagDetailLines('DemoPlayer', [reports[1]], { source: 'Urchin' });
     assert.deepStrictEqual(commandLines.map(line => line.text), [
-        '§b§lUrchin §7» §fDemoPlayer',
-        '  §bBlatant',
-        '  §7Reason: §fAutoblock',
-        '  §7Added by: §fReviewerB §7| §7Date: §f2026-09-15'
+        '§d§lUrchin §8» §f§lDemoPlayer §8· §71 report',
+        '§8§m--------------------------------',
+        '  §c§lBlatant Cheater · AB',
+        '    §7Reason: §fAutoblock',
+        '    §7Added by: §7ReviewerB §8· §72026-09-15',
+        '§8§m--------------------------------'
     ], 'source commands use one heading and compact report blocks without duplicate source buttons');
-    const confirmed = [{ source: 'Seraph', value: 'Confirmed' }];
+    const confirmed = [{ source: 'Urchin', value: 'Confirmed' }];
     assert.strictEqual(buildOverlayTagComponents(confirmed)[0].text, '[C.Cheater]');
-    assert.strictEqual(formatTabTags(confirmed), '§3[C.Cheater]');
+    assert.strictEqual(formatTabTags(confirmed), '§d[C.Cheater]');
 }
+
+// Reason summaries stay local to chat presentation; source reports and the
+// classifications consumed by tab/overlay/dodge code remain unchanged.
+{
+    const { tagReasonLabels } = require('../../src/stats/tagReasonLabels');
+    const { formatTagBadges, formatTabTags, tagDetailLines } = require('../../src/stats/tagDisplay');
+    const report = reasons => ({ source: 'Urchin', value: 'Caution', reasons });
+    const labels = reason => tagReasonLabels([report(reason)]);
+    for (const [reason, expected] of [
+        ['4q blatant', ['Blatant', '4Q']],
+        ['scaff nuke 4q', ['Scaffold', 'Nuker']],
+        ['scaffold, all the works (didnt nuke idk)', ['Scaffold']],
+        ['autoblock? not today big dawg, Team > 4q', ['AB?']],
+        ['legitscaff, 4q sniping', ['Scaffold', '4Q']],
+        ['AB, lagrange, blink, timer, auto clutch', ['AB', 'Lag Abuse']],
+        ['aim assist and velocity in op', ['Aim', 'Velocity']],
+        ['playing with cheater', ['Cheat Party']],
+        ['playing with a blatant cheater', ['Cheat Party']],
+        ["q’ing with cheaters", ['Cheat Party']],
+        ["q'ing with ccc", []],
+        ['4q doubles', ['4Q']],
+        ['blisted on other apis, ban from hypixel', ['History']],
+        ['INSTANT crossmap', ['Crossmap']],
+        ['fastmine', ['Fastmine']],
+        ['hopping', ['Bhop']],
+        ['auto clutch, timer', ['Timer', 'AutoClutch']],
+        ['No reason listed', []],
+        ['No specific cheats listed', []],
+        ['No detailed tooltip available', []],
+        ['Replays needed', []],
+        ['sniping', []],
+        ['§cScaff§r, §dnuke', ['Scaffold', 'Nuker']],
+        ['not cheating, no scaffold or nuker', []],
+        ["doesn't use autoblock", []],
+        ['scaffold not confirmed', []],
+        ['maybe lag switch', ['Lag Abuse?']],
+        ['not sure if using scaffold', ['Scaffold?']],
+        ['fights against bhoppers', []],
+        ['his teammate uses scaffold', []],
+        ['[SHOUT] [BLUE] Player: sniped by a blatant bhopper', []],
+        ['"autoblock, scaffold" is what someone said', []],
+        ['bought a punch bow and obsidian', []],
+        ['annoying punch bow player', ['Annoying']],
+        ['bow spamming and camping', ['Annoying']],
+        ['deliberate stalling', ['Annoying']],
+        ['not annoying, does not bow spam', []],
+        ['ab, blink, this guy and his tm8 keep invis jump speed pot rushing can he not tell', ['Annoying', 'AB']],
+        ['scaffold but no nuker', ['Scaffold']]
+    ]) {
+        assert.deepStrictEqual(labels(reason), expected, reason);
+    }
+    assert.deepStrictEqual(tagReasonLabels([{ ...report('annoying'), source: 'Seraph' }]), []);
+    assert.deepStrictEqual(tagReasonLabels([{ ...report('scaffold'), source: '' }]), []);
+    assert.deepStrictEqual(tagReasonLabels([{ ...report('scaffold'), title: 'Urchin API Status' }]), []);
+    assert.deepStrictEqual(tagReasonLabels([report('AB?'), report('autoblock')]), ['AB']);
+    assert.deepStrictEqual(tagReasonLabels([report('autoblock'), report('AB?')]), ['AB']);
+    assert.deepStrictEqual(tagReasonLabels([report('Blatant autoblock')], 'Blatant'), ['AB']);
+
+    const reports = Object.freeze([
+        Object.freeze({ ...report('annoying punch bow player'), addedBy: 'Reviewer', when: '2026-10-03' }),
+        Object.freeze(report('playing with cheater')),
+        Object.freeze({ source: 'Urchin', value: 'Replays', reasons: 'No reason listed' })
+    ]);
+    const before = JSON.stringify(reports);
+    const components = buildOverlayTagComponents(reports, { clickName: 'LabelPlayer' });
+    assert.deepStrictEqual(components.map(node => node.text), ['[Caution · Annoying · Cheat Party]', '[+1]']);
+    assert.strictEqual(components[0].color, 'gold');
+    assert.strictEqual(components[0].clickEvent.value, '/urchin LabelPlayer');
+    assert.strictEqual(components[1].clickEvent.value, '/tagdetails LabelPlayer');
+    for (const text of ['annoying punch bow player', 'playing with cheater', 'Reviewer', '2026-10-03']) {
+        assert(components[0].hoverEvent.value.includes(text), `full hover retains ${text}`);
+    }
+    assert.strictEqual(formatTagBadges(reports), '§6[Caution · Annoying · Cheat Party] §e[Replays]');
+    assert.strictEqual(formatTabTags(reports), '§d[Caution] §d[Replays]');
+    const cachedDetails = tagDetailLines('labelplayer');
+    assert(cachedDetails.some(line => line.text === '  §6§lCaution · Annoying §8· §7Urchin'));
+    assert(cachedDetails.some(line => line.text === '  §6§lCaution · Cheat Party §8· §7Urchin'));
+    assert(cachedDetails.some(line => line.text.includes('annoying punch bow player')));
+    assert.deepStrictEqual(tagDetailLines('labelplayer', reports), cachedDetails);
+    assert.strictEqual(JSON.stringify(reports), before, 'summaries never mutate provider data');
+}
+
+console.log('Urchin reason label tests passed.');

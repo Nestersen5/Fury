@@ -218,8 +218,6 @@ html.fury-redesign.fury-settings-roomy .network-health-row >div:not(.feature-tog
 html.fury-redesign.fury-settings-roomy .network-health-row >.feature-toggle { grid-column:2!important; }
 html.fury-redesign.fury-settings-roomy .network-actions,.fury-network-footer { gap:16px!important;padding-top:18px!important; }
 
-/* Keep the daily filter on the same centerline as its Off/On control. */
-html.fury-redesign.fury-settings-roomy .reminder-daily-filter { height:42px!important;min-height:42px!important;margin:0!important;padding:0 12px!important;line-height:20px!important;border-radius:8px!important; }
 
 /* Profile states: actual green checks / red crosses, no decorative rectangles. */
 html.fury-redesign.fury-settings-roomy .fury-profile-features { gap:22px;padding:12px 0; }
@@ -305,7 +303,6 @@ html.fury-redesign.fury-settings-roomy #queue-time-settings .queue-time-row >div
 html.fury-redesign.fury-settings-roomy #queue-time-settings .note { max-width:none; }
 html.fury-redesign.fury-settings-roomy #queue-time-settings .feature-toggle { justify-self:end; }
 
-html.fury-redesign.fury-settings-roomy .overlay-concept-module:has(#social-overlay-adds-enabled) > .concept-module-hero { margin-bottom:0!important;padding-bottom:0!important;border-bottom:0!important; }
 /* Approved control design: text-led cards, solid selections and soft steppers.
    Existing inputs, labels and events remain the source of state. */
 html.fury-redesign.fury-settings-roomy {
@@ -591,6 +588,9 @@ html.fury-redesign.fury-settings-roomy .fury-message-types { display:grid;grid-t
 html.fury-redesign.fury-settings-roomy .fury-message-type { min-width:0;text-align:center; }
 html.fury-redesign.fury-settings-roomy .fury-message-type >.fury-choice-tile { display:flex!important;width:100%!important;max-width:none!important; }
 html.fury-redesign.fury-settings-roomy .fury-message-type >small { display:block;margin-top:8px;font-style:italic;font-size:12px!important;color:var(--fury-muted); }
+html.fury-redesign .fury-message-type >.fury-manage-phrases { margin-top:8px;padding:4px 8px;min-height:28px;border:0;background:transparent;color:var(--fury-gold);font-size:12px;text-decoration:underline;text-underline-offset:3px; }
+html.fury-redesign .fury-chat-triggers #chat-trigger-input { min-height:42px;padding:0 12px;border:1px solid var(--fury-border);border-radius:8px;background:var(--fury-inset);color:var(--fury-text); }
+html.fury-redesign .fury-chat-triggers #chat-trigger-status { margin:16px 0 0!important;min-height:18px;color:var(--fury-muted); }
 @container fury-settings (max-width:620px) {
     html.fury-redesign.fury-settings-roomy .settings-subpage .fury-overlay-panel { padding-left:18px!important;padding-right:18px!important; }
     html.fury-redesign.fury-settings-roomy .fury-overlay-row { gap:16px; }
@@ -629,6 +629,12 @@ html.fury-redesign.fury-settings-roomy [data-settings-subpage="sessions"] .sessi
 html.fury-redesign.fury-settings-roomy [data-settings-subpage="sessions"] .minecraft-session-recap { padding:24px!important;border:1px solid var(--fury-border);border-radius:10px;background:var(--fury-inset)!important;font-size:17px!important;line-height:1.8!important;overflow-wrap:anywhere; }
 html.fury-redesign.fury-settings-roomy [data-settings-subpage="sessions"] .minecraft-session-recap >div { margin:0 0 10px; }
 html.fury-redesign.fury-settings-roomy [data-settings-subpage="sessions"] .minecraft-session-recap >div:last-child { margin-bottom:0; }
+#session-recap-fields label[hidden],#session-games-goal-field[hidden] { display:none!important; }
+html.fury-redesign.fury-settings-roomy [data-settings-subpage="sessions"] .session-scoreboard-preview {
+    display:block!important;overflow-x:auto;min-height:0!important;padding:16px!important;
+}
+.session-scoreboard-preview canvas { display:block;width:648px;height:auto;max-width:none;image-rendering:pixelated;margin:0 auto; }
+.session-scoreboard-preview >div { text-align:center;white-space:pre-wrap; }
 .session-recap-metric { display:inline-block;white-space:nowrap; }
 .session-recap-separator { display:inline-block;margin:0 18px;color:#8b949e; }
 .session-recap-totals { display:block;padding-top:10px; }
@@ -746,6 +752,9 @@ html.fury-redesign .fury-connection-footer { display:flex;align-items:center;jus
 .fury-connection-footer >span { color:var(--fury-muted);font-size:13px; }
 .fury-connection-actions { display:flex;gap:12px;flex-wrap:wrap; }
 .fury-connections [hidden] { display:none!important; }
+/* Keep expiry visible when the existing Hypixel card is collapsed. */
+html.fury-redesign #hypixel-key-reminder-summary[data-reminder-alert="true"] { display:block!important;color:var(--fury-gold);white-space:normal; }
+html.fury-redesign #hypixel-key-reminder { flex-direction:column;gap:4px!important; }
 .fury-connection-heading:focus-visible { outline:2px solid var(--fury-gold);outline-offset:-3px; }
 @media(max-width:1200px) {
  html.fury-redesign .fury-connection-fields { grid-template-columns:minmax(100px,.6fr) minmax(180px,1fr) auto;gap:14px;align-items:end; }

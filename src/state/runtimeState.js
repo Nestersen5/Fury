@@ -1,5 +1,7 @@
 'use strict';
 
+const { normalizeRecapFields } = require('../session/settings');
+
 // Shared mutable runtime state for proxy.js.
 //
 // Per the split plan, feature flags and API keys are reassigned from many
@@ -15,7 +17,6 @@ const state = {
         hypixel: '',
         urchin: '',
         aurora: '',
-        seraph: ''
     },
 
     // Global API kill switch: when true, the axios interceptor installed in
@@ -31,7 +32,6 @@ const state = {
     autoSkinDenickEnabled: true,
     autoStatsDenickEnabled: true,
     denickChatAnnouncementsEnabled: true,
-    socialOverlayAddsEnabled: true,
     lobbyChatStatsEnabled: true,
     lobbyChatStatsMentionEnabled: true,
     lobbyChatStatsDmEnabled: true,
@@ -51,8 +51,8 @@ const state = {
     replayDetailsEnabled: true,
     sessionBoundaryMinutes: 30,
     sessionRetention: 0,
-    sessionRecapStyle: 'detailed',
-    sessionRecapFields: ['result', 'duration', 'game_stats', 'session_totals', 'goals'],
+    sessionRecapStyle: 'scoreboard',
+    sessionRecapFields: normalizeRecapFields(),
     sessionBedwarsFields: ['wins', 'losses', 'finals', 'finalDeaths', 'beds', 'bedsLost', 'kills', 'deaths', 'wlr', 'fkdr', 'kdr', 'bblr', 'games', 'stars'],
     sessionSkywarsFields: ['wins', 'losses', 'kills', 'deaths', 'wlr', 'kdr', 'games', 'assists'],
     sessionDuelsFields: ['wins', 'losses', 'kills', 'deaths', 'wlr', 'kdr'],

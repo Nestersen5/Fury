@@ -3,12 +3,14 @@
 const cards = require('./launcher_session_card');
 const accountSkins = require('./launcher_account_skin');
 const ICONS = {
+    nickroll:'<path d="M4 7h11a5 5 0 0 1 5 5M16 3l4 4-4 4M20 17H9a5 5 0 0 1-5-5M8 13l-4 4 4 4"/>',
     dashboard:'<path d="m3 10 9-8 9 8M5 9v12h14V9M9 21v-7h6v7"/>',
     overlay:'<rect x="2" y="3" width="20" height="14" rx="1"/><path d="M8 22h8M12 17v5"/>',
     sessions:'<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M7 2v5M17 2v5M3 10h18M7 14h3M7 18h6"/>',
     denicks:'<circle cx="12" cy="6" r="4"/><path d="M3 22v-2a9 9 0 0 1 18 0v2"/>',
     reminders:'<path d="M4 17c3-3 1-5 2-10a6 6 0 0 1 12 0c1 5-1 7 2 10H4ZM9 21c2 2 4 2 6 0M12 1v2"/>',
     profiles:'<path d="m2 7 10-5 10 5-10 5L2 7Zm0 5 10 5 10-5M2 17l10 5 10-5"/>',
+    anticheat:'<path d="m12 2 9 4v6c0 5.5-3.5 9-9 11-5.5-2-9-5.5-9-11V6l9-4Z"/><path d="m8 12 3 3 5-6"/>',
     settings:'<path d="m9 2-.7 3-2.6 1.5L3 5.7 1 9l2 2v3l-2 2 2 3.3 2.7-.8L8.3 20l.7 3h4l.7-3 2.6-1.5 2.7.8 2-3.3-2-2v-3l2-2-2-3.3-2.7.8L13.7 5 13 2H9Z" transform="translate(1 -1) scale(.95)"/><circle cx="12" cy="12" r="3.5"/>',
     console:'<path d="M4 1h10l6 6v16H4V1Zm10 0v7h6M8 12h8M8 16h8M8 20h5"/>',
     chevron:'<path d="m6 9 6 6 6-6"/>', close:'<path d="m5 5 14 14M19 5 5 19"/>', copy:'<rect x="8" y="7" width="13" height="15" rx="2"/><path d="M16 7V2H3v16h5"/>', download:'<path d="M12 2v13m-5-5 5 5 5-5M3 16v6h18v-6"/>'
@@ -59,22 +61,36 @@ function mount({ document, invoke, clipboard, nativeImage, navigate, settingsPag
     const options=node('details','fury-connection-options','<summary>Connection options</summary>');
     const optionsBody=node('div','fury-connection-disclosure fury-route-menu','<div class="fury-route-menu-heading"><h3>Connection options</h3></div>');
     const routeList=$('.join-addresses');
-    const directRoute=routeList.children[0],backupRoute=routeList.children[1];
+    const directRoute=routeList.children[0],backupRoute=routeList.children[1],customRoute=routeList.children[2];
     directRoute.classList.add('fury-direct-route');backupRoute.classList.add('fury-backup-route');
     directRoute.querySelector('label').textContent='Direct';
     backupRoute.querySelector('label').textContent='Proxy';
     $('#join-direct-help').textContent='The address in the connection bar.';
     $('#join-failover-help').textContent='Connect through proxy when you cannot join Hypixel directly';
-    for(const route of [directRoute,backupRoute]) {
+    for(const route of [directRoute,backupRoute,customRoute]) {
         const destination=route.querySelector('.join-destination');
         destination.prepend(node('span','fury-route-arrow','\u2192'));
     }
     const backupCopy=$('[data-copy-route="failover"]');backupCopy.dataset.copyLabel='Copy address';backupCopy.textContent='Copy address';
+    const customCopy=$('[data-copy-route="custom"]');customCopy.dataset.copyLabel='Copy address';customCopy.textContent='Copy address';
     optionsBody.append(routeList);options.append(optionsBody);
     const copyStatus=$('.join-copy-status');copyStatus.classList.add('fury-connection-copy-status');
     guide.replaceChildren(connectionIdentity,directField,setup,options,copyStatus);
-    setup.addEventListener('toggle',()=>{if(setup.open)options.open=false;});
-    options.addEventListener('toggle',()=>{if(options.open)setup.open=false;});
+    const connectionWindow=document.defaultView,connectionScroller=$('main');
+    function fitConnectionDisclosure(){
+        const body=setup.open?setupBody:options.open?optionsBody:null;
+        if(!body)return;
+        const height=`${Math.max(0,connectionWindow.innerHeight-body.getBoundingClientRect().top-12)}px`;
+        if(body.style.maxHeight!==height)body.style.maxHeight=height;
+    }
+    function syncConnectionDisclosure(){
+        const method=setup.open||options.open?'addEventListener':'removeEventListener';
+        connectionWindow[method]('resize',fitConnectionDisclosure);
+        connectionScroller[method]('scroll',fitConnectionDisclosure);
+        fitConnectionDisclosure();
+    }
+    setup.addEventListener('toggle',()=>{if(setup.open)options.open=false;syncConnectionDisclosure();});
+    options.addEventListener('toggle',()=>{if(options.open)setup.open=false;syncConnectionDisclosure();});
     document.addEventListener('click',event=>{if(!guide.contains(event.target)){setup.open=false;options.open=false;}});
     guide.addEventListener('keydown',event=>{if(event.key==='Escape'){const opened=setup.open?setup:options.open?options:null;if(opened){opened.open=false;opened.querySelector('summary').focus();event.stopPropagation();}}});
     const dashboardRight=node('div','fury-dashboard-right');guide.after(dashboardRight);
@@ -306,21 +322,23 @@ function mount({ document, invoke, clipboard, nativeImage, navigate, settingsPag
     const recentTarget=$('.fury-recent-content');let recentKey='';
     const pages = require('./launcher_redesign_pages').mount({ document, node, button, getState, openManager, validateNetwork });
     const nicks = require('./launcher_redesign_nicks').mount({ document, node, button, escape });
+    const nickroll = require('./launcher_nickroll').mount({ document, invoke, refresh });
     const refinedSettings = require('./launcher_settings_refinement').mount({document,node,button});
     const inGameAppearance = require('./launcher_ingame_appearance').mount({document});
     require('./launcher_segmented_controls').mount(document);
     const onboarding=require('./launcher_onboarding').mount({document,node,button,invoke,clipboard,navigate,getState,refresh,skin:avatar});
     function update(next){onboarding.update();renderAccounts();renderLogs();convertChecks();fitOverlay();pages.update(next);
+        nickroll.update(next);
         $('#proxy-start').hidden=Boolean(next.services?.proxy?.running);$('#proxy-stop').hidden=!next.services?.proxy?.running;
         const proxyRunning=Boolean(next.services?.proxy?.running);
         connectionStatus.textContent=proxyRunning?'Proxy running':'Proxy stopped';connectionStatus.classList.toggle('running',proxyRunning);
-        services.querySelector('div').innerHTML=['Hypixel','Urchin','Aurora','Seraph'].map(name=>`<button data-fury-api="${name.toLowerCase()}"><strong>${name}</strong><span class="${next.settings?.keys?.[name.toLowerCase()]?'good':''}"><i class="status-dot ${next.settings?.keys?.[name.toLowerCase()]?'good':''}"></i>${next.settings?.keys?.[name.toLowerCase()]?'Configured':'Not configured'}</span>${svg('chevron')}</button>`).join('');services.querySelectorAll('button').forEach(b=>b.onclick=()=>{navigate('settings');settingsPage('api',false);$(`[data-api-card="${b.dataset.furyApi}"]`)?.scrollIntoView({block:'nearest'});});
+        services.querySelector('div').innerHTML=['Hypixel','Urchin','Aurora'].map(name=>`<button data-fury-api="${name.toLowerCase()}"><strong>${name}</strong><span class="${next.settings?.keys?.[name.toLowerCase()]?'good':''}"><i class="status-dot ${next.settings?.keys?.[name.toLowerCase()]?'good':''}"></i>${next.settings?.keys?.[name.toLowerCase()]?'Configured':'Not configured'}</span>${svg('chevron')}</button>`).join('');services.querySelectorAll('button').forEach(b=>b.onclick=()=>{navigate('settings');settingsPage('api',false);$(`[data-api-card="${b.dataset.furyApi}"]`)?.scrollIntoView({block:'nearest'});});
         const latest=next.sessionHistory?.sessions?.[0],key=JSON.stringify([next.accountKey,next.viewedAccount?.key,next.viewedAccount?.name,latest?.id,latest?.durationMs]);
         if(key!==recentKey){recentKey=key;recentTarget.innerHTML=latest?`<div class="fury-recent-identity"><span class="fury-recent-avatar">${avatar(next.viewedAccount,44)}</span><div><h3>${escape(latest.name)}</h3><p>Recent session</p></div></div><div class="fury-recent-meta"><span>Day<strong>${escape(cards.date(latest.startedAt))}</strong></span><span>Started<strong>${cards.time(latest.startedAt)}</strong></span><span>Finished<strong>${latest.active?'Live':cards.time(latest.endedAt||latest.lastSeen)}</strong></span><span>Duration<strong>${cards.duration(latest.durationMs)}</strong></span></div>`:`<div class="fury-empty-inline">${svg('sessions')}<div><strong>No sessions yet</strong><p>${next.viewedAccount?'Your next session for '+escape(next.viewedAccount.name)+' will appear here.':'Your first session will appear here after you connect.'}</p></div></div>`;if(latest)recentTarget.append(button('Open session <span aria-hidden="true">&#8250;</span>',()=>{navigate('sessions');setTimeout(()=>$('#session-history-list details')?.setAttribute('open',''),100);},'fury-gold-outline'));}
         $$('.fury-sidebar-options button').forEach(b=>b.classList.toggle('active',b.dataset.sidebarChoice===(document.documentElement.dataset.sidebarPreference||document.documentElement.dataset.sidebar)));
         refinedSettings.update();
         inGameAppearance.update();
     }
-    return { update, renderSessions, renderLogs, renderNicks:nicks.render, openManager, showIngame, clearAccount(){calendarView.clear();sessionsKey='';sessionsDay='';recentKey='';cardGeneration++;cardsById.clear();openSessionCards.clear();$('#session-history-list').replaceChildren();recentTarget.replaceChildren();pages.clearAccount();}, showSignIn:signIn };
+    return { update, flushNickroll: nickroll.flush, renderSessions, renderLogs, renderNicks:nicks.render, openManager, showIngame, clearAccount(){calendarView.clear();sessionsKey='';sessionsDay='';recentKey='';cardGeneration++;cardsById.clear();openSessionCards.clear();$('#session-history-list').replaceChildren();recentTarget.replaceChildren();pages.clearAccount();}, showSignIn:signIn };
 }
 module.exports={mount};

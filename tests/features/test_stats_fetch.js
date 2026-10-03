@@ -60,7 +60,6 @@ function delay(ms) {
                 urchinRawCalls += 1;
                 return { ok: true, tag: 'raw' };
             },
-            getSeraphRaw: async () => null,
             getAuroraPingRaw: async () => ({ ok: true, requestStatus: 'ok', ping: 42 }),
             getHypixelStatusRaw: async () => 'offline',
             makePingData: (overrides = {}) => ({ ...overrides }),
@@ -89,6 +88,7 @@ function delay(ms) {
         assert.strictEqual(urchinRawCalls, 0, 'Batch Urchin override should satisfy the shared lookup when available');
         assert.strictEqual(withOverride.data.urchin.tag, 'batch');
         assert.strictEqual(plain.data.player.displayname, 'TestPlayer');
+        assert(!Object.hasOwn(plain.data, 'seraph'), 'stats payload omits the retired provider');
         assert.strictEqual(observedPlayerResponses.length, 1, 'each fresh Player API response should be observed once');
         assert.strictEqual(observedPlayerResponses[0].player.stats.Bedwars.slumber.minion.ender_dust, 275, 'the observer should receive the unmodified Player API response');
         assert.strictEqual(observedPlayerResponses[0].player.stats.Bedwars.slumber.quest.lastCompleted.gambler_george, 1_700_000_000_000, 'the observer should receive the unmodified daily-reward timestamps');

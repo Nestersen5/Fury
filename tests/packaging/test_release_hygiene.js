@@ -15,7 +15,8 @@ function expectFile(relativePath) {
 
 expectFile('.gitignore');
 expectFile('.env.example');
-expectFile('docs/RELEASE_ARTIFACTS.md');
+const deploymentSource = fs.existsSync(path.join(root, 'scripts/prepare_release.js'));
+if (deploymentSource) expectFile('docs/PUBLIC_RELEASE_CHECKLIST.md');
 expectFile(path.join('assets', 'fury-icon.ico'));
 
 const gitignore = read('.gitignore');
@@ -54,12 +55,24 @@ const envExample = read('.env.example');
     assert(envExample.includes(name), `.env.example should document ${name}`);
 });
 
+if (deploymentSource) {
+const checklist = read('docs/PUBLIC_RELEASE_CHECKLIST.md');
+[
+    'npm test',
+    'without registration',
+    'Microsoft authentication'
+].forEach(text => {
+    assert(checklist.includes(text), `PUBLIC_RELEASE_CHECKLIST.md should mention ${text}`);
+});
+}
+
 const privateCosmeticSearchIp = ['92', '5', '52', '168'].join('.');
 [
     'launcher.js',
     'proxy.js',
     'docs/COSMETIC_SEARCH_API.md',
-    '.env.example'
+    '.env.example',
+    ...(deploymentSource ? ['docs/PUBLIC_RELEASE_CHECKLIST.md'] : [])
 ].forEach(relativePath => {
     assert(!read(relativePath).includes(privateCosmeticSearchIp), `${relativePath} should not contain a private cosmetic-search IP`);
 });
@@ -89,9 +102,21 @@ assert(
     'the development launcher windows must use the Fury icon too'
 );
 
-// Public source excludes deployment-owned website and tracker files.
-for (const excluded of ['AGENTS.md', '.agents', 'website', 'cloudflare/download-stats']) {
-    assert(!fs.existsSync(path.join(root, excluded)), `Public source must exclude ${excluded}`);
+// The Cloudflare account identifier belongs in CLOUDFLARE_ACCOUNT_ID, never in
+// committed configuration. The D1 database_id stays: Wrangler needs it to
+// resolve the binding, and it is inert without the account and a token.
+if (deploymentSource) {
+const wrangler = JSON.parse(read(path.join('cloudflare', 'download-stats', 'wrangler.json')));
+assert(!('account_id' in wrangler), 'wrangler.json must not commit a Cloudflare account identifier');
+assert(
+    read(path.join('cloudflare', 'download-stats', 'README.md')).includes('CLOUDFLARE_ACCOUNT_ID'),
+    'the tracker README must document where the Cloudflare account identifier comes from'
+);
+} else {
+    for (const excluded of ['AGENTS.md', '.agents', 'website', 'cloudflare/download-stats',
+        'scripts/publish_release.js', 'scripts/release_plan.js', 'docs/PUBLIC_RELEASE_CHECKLIST.md']) {
+        assert(!fs.existsSync(path.join(root, excluded)), `Public source must exclude ${excluded}`);
+    }
 }
 
 // Developer-specific sign-in fixtures stay out of the repository; packaged

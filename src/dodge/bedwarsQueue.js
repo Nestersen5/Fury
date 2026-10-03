@@ -39,6 +39,12 @@ function pregameLobbyIdForScoreboard(scoreboardText = '') {
     return normalizePregameLobbyId(labeled?.[1]);
 }
 
+function isPrivateBedwarsScoreboard(scoreboardText = '') {
+    const clean = cleanScoreboardText(scoreboardText);
+    const match = clean.match(/\b\d{1,2}\/\d{1,2}\/\d{2,4}\s+([A-Za-z0-9]{2,16})\s*\[P\]/);
+    return Boolean(normalizePregameLobbyId(match?.[1]));
+}
+
 function requeueCommandForScoreboard(scoreboardText = '') {
     const clean = cleanScoreboardText(scoreboardText);
     // "4v4v4v4" must stay before "4v4" in the alternation so Fours wins the match.
@@ -51,4 +57,4 @@ function requeueCommandForScoreboard(scoreboardText = '') {
         : { label: 'Unknown', command: DEFAULT_REQUEUE_COMMAND, fallback: true, teamSize: null };
 }
 
-module.exports = { pregameLobbyIdForScoreboard, requeueCommandForScoreboard };
+module.exports = { pregameLobbyIdForScoreboard, isPrivateBedwarsScoreboard, requeueCommandForScoreboard };

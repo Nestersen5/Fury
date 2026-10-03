@@ -87,7 +87,7 @@ assert(proxy.includes("require('./src/denick/history.js')"), 'Proxy should impor
 assert(/createDenickHistory\(\{[\s\S]*historyFile: DENICKED_HISTORY_FILE[\s\S]*writeJsonOffThread[\s\S]*\}\)/.test(proxy), 'Proxy should wire createDenickHistory with the history file and off-thread writer');
 assert(!/function appendDenickHistory\(entry = \{\}\)/.test(proxy), 'appendDenickHistory should live in src/denick/history.js, not proxy.js');
 assert(!/function normalizeDenickHistory\(raw\)/.test(proxy), 'normalizeDenickHistory should live in src/denick/history.js, not proxy.js');
-assert(/function appendDenickHistory\(entry = \{\}\)[\s\S]*writeJsonOffThread\(historyFile, players, 'DenickHistory'\)/.test(denickHistoryModule), 'Denick history module should write off-thread using the injected file path');
+assert(/writeJsonOffThread\(historyFile, players, 'DenickHistory',/.test(denickHistoryModule), 'Denick history module should write off-thread with an acknowledgement');
 assert(/function normalizeDenickHistory\(raw\)[\s\S]*finalizeDenickPlayerEvents\(current\)/.test(denickHistoryModule), 'Denick history normalization should finalize player events with dedupe + cap');
 assert(proxy.includes("require('./src/denick/api.js')"), 'Proxy should import the denick api module');
 assert(/createDenickApi\(\{[\s\S]*cosmeticApiNamesFile: COSMETIC_API_NAMES_FILE[\s\S]*\}\)/.test(proxy), 'Proxy should wire createDenickApi with the cosmetic api-names file');
@@ -157,9 +157,10 @@ const duelsBlock = matchBlock(proxy, /const DUELS_MODE_DEFS = \[/, /\];/);
 });
 assert(!duelsBlock.toLowerCase().includes('_kit'), 'Duels mode definitions must not include kit prefixes');
 
-assert(!/data-page-tab="(?:anticheat|cosmetics)"/.test(launcherHtml), 'Anti-cheat/cosmetics launcher tabs must stay hidden');
+assert(/data-page-tab="anticheat"/.test(launcherHtml), 'AntiCheat launcher tab should be visible');
+assert(!/data-page-tab="cosmetics"/.test(launcherHtml), 'Cosmetics launcher tab must stay hidden');
 assert(!/data-settings-subpage-button="(?:anticheat|cosmetics)"/.test(launcherHtml), 'Anti-cheat/cosmetics settings buttons must stay hidden');
-assert(!/data-page="anticheat"/.test(launcherHtml), 'The removed anti-cheat page must not come back');
+assert(/data-page="anticheat"/.test(launcherHtml), 'AntiCheat page should be available');
 assert(!/data-page="cosmetics"/.test(launcherHtml), 'The removed cosmetic-model page must not come back');
 assert(!/data-settings-subpage="anticheat"/.test(launcherHtml), 'Anti-cheat settings panel should not be exposed');
 assert(!/data-settings-subpage="cosmetics"/.test(launcherHtml), 'Cosmetics settings panel should not be exposed');

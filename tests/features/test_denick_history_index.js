@@ -36,11 +36,11 @@ assert.deepStrictEqual(index.get('oldnick'), {
 });
 assert.strictEqual(index.size, 2);
 
-{
+(async () => {
     const writes = [];
     const history = createDenickHistory({
         historyFile: `missing-denick-history-${Date.now()}.json`,
-        writeJsonOffThread: (file, value) => writes.push(value)
+        writeJsonOffThread: (file, value, label, done) => { writes.push(structuredClone(value)); done(); }
     });
     history.appendDenickHistory({ nick: 'FirstNick', realIGN: 'RealPlayer', method: 'manual' });
     history.appendDenickHistory({ nick: 'SecondNick', realIGN: 'RealPlayer', method: 'skin' });
@@ -54,7 +54,9 @@ assert.strictEqual(index.size, 2);
     const secondRemoval = history.removeDenickMapping('realplayer', 'secondnick');
     assert.strictEqual(secondRemoval.removedPlayer, true, 'the identity row disappears after its last saved nick is removed');
     assert.strictEqual(history.loadDenickHistoryStore().players.length, 0);
-    assert.ok(writes.length >= 4, 'each append and removal is persisted');
-}
+    await history.flush({ strict: true });
+    assert.strictEqual(writes.length, 1, 'nearby changes persist together');
+    assert.deepStrictEqual(writes[0], [], 'the batch persists the final removal');
 
 console.log('Denick history index tests passed.');
+})().catch(error => { console.error(error); process.exitCode = 1; });
