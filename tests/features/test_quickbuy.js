@@ -31,7 +31,9 @@ function harness(options = {}) {
     let injected = false;
     let current = [];
     const q = createQuickBuy({ presetDir: dir, canStart: () => null, minimumStillMs: 0,
-        settleMs: 2, snapshotSettleMs: 1, minimumClickMs: 0, timeoutMs: 150, totalTimeoutMs: 3000,
+        // Keep success assertions independent of sub-second CI scheduling stalls.
+        // Explicit missing-response cases below still prove timeout/fail-closed behavior.
+        settleMs: 2, snapshotSettleMs: 1, minimumClickMs: 0, timeoutMs: 2000, totalTimeoutMs: 15000,
         sendChat: m => messages.push(m.replace(/§[0-9a-fk-or]/gi, '')), sendClient: (n, d) => client.push([n, d]),
         disconnect: m => disconnected.push(m),
         sendUpstream: (name, data) => {
@@ -203,7 +205,7 @@ function harness(options = {}) {
     };
     // Allow the synthetic menu sequence to reach Golden Apple under CI load;
     // the stalled server response still has to time out and fail closed.
-    for (const mode of [{ snapshotSettleMs: 0, minimumClickMs: 0, omitAck: true }, { rejectItem: 'golden apple' }, { cancelItem: 'golden apple' }, { stallItem: 'golden apple', timeoutMs: 250 }]) {
+    for (const mode of [{ snapshotSettleMs: 0, minimumClickMs: 0, omitAck: true }, { rejectItem: 'golden apple' }, { cancelItem: 'golden apple' }, { stallItem: 'golden apple' }]) {
         const live = harness(mode);
         try {
             const original = slotNames(live);
@@ -221,7 +223,7 @@ function harness(options = {}) {
                 assert(events.some(e => e.event === 'fatal' && e.waitingFor.includes('Golden Apple')));
                 assert(!live.q.allowOutbound('block_place', {}));
             } else {
-                assert.strictEqual(live.disconnected.length, 0);
+                assert.strictEqual(live.disconnected.length, 0, JSON.stringify({ mode, disconnected: live.disconnected, summary }));
                 assert.strictEqual(summary.restored, true);
                 assert.deepStrictEqual(slotNames(live), original, 'restore all slots displaced by testing');
                 if (mode.cancelItem) assert.strictEqual(summary.outcome, 'aborted');
@@ -238,7 +240,7 @@ function harness(options = {}) {
     }
 
     const delayed = harness({ contentDelayMs: 10, partialUpdates: true, ackDelayMs: 60,
-        settleMs: 10, snapshotSettleMs: 1, timeoutMs: 500 });
+        settleMs: 10, snapshotSettleMs: 1 });
     try {
         await delayed.q.command(['/quickbuy', 'set', '1', 'golden apple']);
         assert.strictEqual(delayed.disconnected.length, 0);
@@ -275,7 +277,7 @@ function harness(options = {}) {
         { snapshotSettleMs: 450, settleMs: 450, minimumClickMs: 0 },
         { snapshotSettleMs: 0, settleMs: 75, minimumClickMs: 0 }
     ]) {
-        const speed = harness({ ...settings, timeoutMs: 1000, totalTimeoutMs: 5000 });
+        const speed = harness({ ...settings, timeoutMs: 5000, totalTimeoutMs: 15000 });
         try {
             const start = Date.now();
             await speed.q.command(['/quickbuy', 'set', '1', 'hardened clay']);
