@@ -17,6 +17,7 @@ const target = require('./launcher_verification_target').verificationTarget('lau
         ...target.args, ...uiTestArguments(),
         `--remote-debugging-port=${debugPort}`,
         '--remote-debugging-address=127.0.0.1',
+        '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding',
         `--proxy-server=${env.HTTPS_PROXY}`
     ], env, 'Quick Maths launcher verification');
     let browser;
