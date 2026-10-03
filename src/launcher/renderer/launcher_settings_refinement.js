@@ -132,12 +132,24 @@ function mount({document,node,button}){
         if(description){const note=node('small','');note.textContent=description;copy.append(note);}
         const toggle=node('div','feature-toggle');toggle.append(label);row.append(copy,toggle);panel.append(row);return row;
     }
-    const overlayPanel=overlaySection('Overlay');overlayPanel.classList.add('overlay-concept-module');
-    overlayRow(overlayPanel,'social-overlay-adds-enabled','Use Overlay','Add players from mentions, direct messages, and party invites.','overlay-sources-title');
-    const triggerPanel=overlaySection('Chat triggers');triggerPanel.classList.add('fury-phrase-editor');
-    const triggerHelp=node('p','');triggerHelp.textContent='Add senders to Overlay when their message contains a phrase.';
+    const triggerDialog=node('dialog','fury-dialog fury-chat-triggers', '<header><div><h2 id="chat-triggers-title">Chat triggers</h2></div></header>');
+    triggerDialog.id='chat-triggers-dialog';triggerDialog.setAttribute('aria-labelledby','chat-triggers-title');
+    const triggerPanel=node('div','fury-phrase-editor');
+    const triggerHelp=node('p','');triggerHelp.textContent='Show player stats when a lobby message contains a phrase. Matching senders also appear while the Overlay tab is open.';
     const triggerInput=$('#chat-trigger-input');triggerInput.placeholder='Add a phrase…';triggerInput.setAttribute('aria-label','Chat trigger phrase');
     triggerPanel.append(triggerHelp,triggerInput.closest('.feature-trigger-input'),$('#chat-trigger-list'));
+    const triggerStatus=node('p','note');triggerStatus.id='chat-trigger-status';triggerStatus.setAttribute('role','status');triggerPanel.append(triggerStatus);
+    const triggerClose=button('<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg>',()=>triggerDialog.close(),'fury-close');
+    triggerClose.setAttribute('aria-label','Close chat triggers');triggerDialog.querySelector('header').append(triggerClose);
+    triggerDialog.append(triggerPanel);document.body.append(triggerDialog);
+    let triggerReturnFocus=null;
+    function openTriggers(){if(triggerDialog.open)return;triggerReturnFocus=document.activeElement;triggerDialog.showModal();triggerInput.focus();}
+    triggerDialog.addEventListener('close',()=>triggerReturnFocus?.focus());
+    triggerDialog.addEventListener('click',event=>{
+        if(event.target!==triggerDialog)return;
+        const rect=triggerDialog.getBoundingClientRect();
+        if(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom)triggerDialog.close();
+    });
     const statsPanel=overlaySection('Player stats in chat');
     overlayRow(statsPanel,'pregame-chat-stats-enabled','Pregame lobby','BedWars waiting rooms');
     overlayRow(statsPanel,'lobby-chat-stats-enabled','Lobby stats','Only visible to you');
@@ -147,7 +159,9 @@ function mount({document,node,button}){
         const input=document.getElementById(id),label=input.closest('label'),choice=node('div','fury-message-type');
         label.className='switch fury-chip';label.querySelector('.fury-chip-label').textContent=title;
         input.setAttribute('aria-label',title);input.dataset.notificationLabel=title;choice.append(label);
-        if(id==='lobby-chat-stats-trigger-enabled'){const note=node('small','');note.textContent='Uses the phrases above.';choice.append(note);}
+        if(id==='lobby-chat-stats-trigger-enabled'){
+            const manage=button('Manage phrases',openTriggers,'fury-manage-phrases');manage.id='chat-trigger-manage';manage.setAttribute('aria-haspopup','dialog');manage.setAttribute('aria-controls',triggerDialog.id);choice.append(manage);
+        }
         sources.append(choice);
     }
     statsPanel.append(sourceHeading,sources);

@@ -1,5 +1,7 @@
 'use strict';
 
+const { createUsage } = require('../../features/chat_controller');
+
 const path = require('path');
 const { randomUUID } = require('crypto');
 const { simplifyNbt } = require('./menuMonitor');
@@ -278,7 +280,14 @@ function createKillMessageLogger({ automation, dir, sendChat, account = () => nu
             if (lastFile) say(`File: §f${lastFile}`);
             return;
         }
-        if (sub !== 'start') { say('§f/kmlog start §8· §f/kmlog status §8· §f/kmlog cancel'); return; }
+        if (sub !== 'start') {
+            const help = createUsage(sendChat, 'Kill Message recorder', 'Record cosmetic previews automatically.');
+            help.section('Controls');
+            help.command('/kmlog start', 'Start recording cosmetic previews.');
+            help.command('/kmlog status', 'Show progress and the saved file.');
+            help.command('/kmlog cancel', 'Cancel the current recording.');
+            return;
+        }
         if (busy) { say('Already recording. §f/kmlog cancel §7to stop.'); return; }
         busy = true;
         report = null;

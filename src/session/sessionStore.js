@@ -19,6 +19,7 @@ const { diffSessionSnapshots } = require('./sessionSnapshot.js');
 const { hasCardStatMovement, pruneEmptyModeStats } = require('./cardStatsPolicy');
 const { dedupeGameEvents, MAX_GAME_EVENTS } = require('./gameEvents.js');
 const { RESULT_SOURCES } = require('./gameResult.js');
+const { observedSessionDelta, archiveObservedGames } = require('./observedStats');
 
 const STORE_VERSION = 4;
 // Ended sessions collapse to a small summary (snapshots dropped), so keeping
@@ -66,7 +67,7 @@ function normalizeGameRecord(raw = {}) {
         events: dedupeGameEvents(Array.isArray(raw.events) ? raw.events.slice(-MAX_GAME_EVENTS) : []),
         delta: raw.delta && typeof raw.delta === 'object' ? raw.delta : null,
         verificationStatus: status,
-        localModes: status === 'local' && Array.isArray(raw.localModes) ? raw.localModes : null,
+        localModes: Array.isArray(raw.localModes) ? raw.localModes : null,
         verificationAttempts: Math.max(0, Number(raw.verificationAttempts) || 0),
         nextVerificationAt: Math.max(0, Number(raw.nextVerificationAt) || 0),
         lastVerificationAt: Math.max(0, Number(raw.lastVerificationAt) || 0),
@@ -188,7 +189,7 @@ function sessionDeltaFor(session) {
         const summary = recoverSessionSummary(session);
         const stats = summary.stats || {};
         const achievements = summary.achievements || {};
-        return {
+        return observedSessionDelta(session, {
             from: session.startedAt,
             to: session.endedAt || session.lastSeen,
             spanMs: Number(session.summary.spanMs) || 0,
@@ -197,9 +198,9 @@ function sessionDeltaFor(session) {
             achievements,
             stats,
             root: { delta: { stats, achievements } }
-        };
+        });
     }
-    return diffSessionSnapshots(session.baseline, session.latest);
+    return observedSessionDelta(session, diffSessionSnapshots(session.baseline, session.latest));
 }
 
 function normalizeSession(raw = {}, maxGames = DEFAULT_MAX_GAMES_PER_SESSION) {
@@ -214,7 +215,7 @@ function normalizeSession(raw = {}, maxGames = DEFAULT_MAX_GAMES_PER_SESSION) {
         lastSeen: Number(raw.lastSeen) || Number(raw.startedAt) || 0,
         endedAt: Number(raw.endedAt) || 0,
         trackingSource: raw.trackingSource === 'local' ? 'local' : 'api',
-        localTracking: raw.trackingSource === 'local' ? require('./localTracking').normalizeLocal(raw.localTracking) : null,
+        localTracking: raw.trackingSource === 'local' || raw.localTracking ? require('./localTracking').normalizeLocal(raw.localTracking) : null,
         baseline: raw.baseline && typeof raw.baseline === 'object' ? raw.baseline : null,
         latest: raw.latest && typeof raw.latest === 'object' ? raw.latest : null,
         summary: raw.summary && typeof raw.summary === 'object' ? raw.summary : null,
@@ -499,6 +500,7 @@ function createSessionStore({
         const at = Number(record?.at) || now();
         const game = normalizeGameRecord({ ...record, id: record?.id || nextGameId(at), at });
         session.games.push(game);
+        if (session.games.length > maxGamesPerSession) archiveObservedGames(session, session.games.slice(0, -maxGamesPerSession));
         session.games = session.games.slice(-maxGamesPerSession);
         session.lastSeen = Math.max(session.lastSeen, game.at);
         commit(store);

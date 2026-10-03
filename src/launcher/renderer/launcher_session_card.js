@@ -268,4 +268,4 @@ async function render(session, { mode: requestedMode, submode = 'overall', field
     const localDay=new Date(session.startedAt),fileDate=[localDay.getFullYear(),String(localDay.getMonth()+1).padStart(2,'0'),String(localDay.getDate()).padStart(2,'0')].join('-');
     return { canvas, width, height, mode: mode.mode, filename: `Fury-${title}-${calendar?calendar.start:fileDate}-${mode.mode}${calendar?`-${calendar.kind}`:''}${selected?`-${selected.label}`:''}.png`, entries };
 }
-module.exports = { render, stats, duration, date, time, relativeDate };
+module.exports = { render, stats, duration, date, time, relativeDate, loadBitmapFont: font };

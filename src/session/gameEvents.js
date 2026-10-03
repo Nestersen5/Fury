@@ -1,6 +1,7 @@
 'use strict';
 
 const { gameEventNormalizationCache } = require('./gameEventNormalizationCache.js');
+const { parseBedDestroyChat } = require('../cosmetics/bedMessages.js');
 
 // Structured, renderer-safe events captured while a supported game is live.
 // API deltas remain the authoritative aggregate counters; this module adds the
@@ -140,13 +141,12 @@ function parseFinalKill(line, resolveKillOwner = null) {
 }
 
 function parseBedBreak(line, ownTeam = null) {
-    if (!/\bBED\s+DESTRUCTION\b|\bBed was (?:bed #[\d,]+ )?destroyed by\b/i.test(line)) return null;
-    const match = line.match(/\b(Your|Red|Blue|Green|Yellow|Aqua|White|Pink|Gr[ae]y)\s+Bed\b[\s\S]*?\bdestroyed by\s+([A-Za-z0-9_]{2,16})\b/i);
+    const match = parseBedDestroyChat(line);
     if (!match) return null;
-    const rawTeam = cleanTeam(match[1]);
+    const rawTeam = cleanTeam(match.team);
     return {
         type: 'bed_break',
-        actor: cleanName(match[2]),
+        actor: cleanName(match.breaker),
         targetTeam: rawTeam === 'Your' ? cleanTeam(ownTeam) : rawTeam,
         confidence: 'confirmed'
     };
@@ -180,16 +180,17 @@ function parseGameEvents(text, {
     resolveKillOwner = null
 } = {}) {
     const line = cleanText(text);
-    if (!line) return [];
+    if (!line || /:/.test(line) || /^(?:(?:Party|Guild|Officer)\s*>|(?:From|To)\s+|\[)/i.test(line)) return [];
     const base = { at, offsetMs: Math.max(0, Number(at) - Number(startedAt || at)), source: 'chat', rawText: line };
     let parsed = parseBedBreak(line, ownTeam) || parseFinalKill(line, resolveKillOwner);
+    if (!parsed && /^(?:BED DESTRUCTION\b|(?:Your|Red|Blue|Green|Yellow|Aqua|White|Pink|Gr[ae]y) Bed\b)/i.test(line)) return [];
 
     if (!parsed) {
         const eliminated = line.match(/^TEAM ELIMINATED\s*>\s*(Red|Blue|Green|Yellow|Aqua|White|Pink|Gr[ae]y)\s+Team\s+has been eliminated[!.]?$/i);
         if (eliminated) parsed = { type: 'team_eliminated', targetTeam: cleanTeam(eliminated[1]), confidence: 'confirmed' };
     }
-    if (!parsed && /\bVICTORY\s*!/i.test(line)) parsed = { type: 'victory', confidence: 'confirmed' };
-    if (!parsed && /\bDEFEAT\s*!/i.test(line)) parsed = { type: 'defeat', confidence: 'confirmed' };
+    if (!parsed && /^VICTORY\s*!?$/i.test(line)) parsed = { type: 'victory', confidence: 'confirmed' };
+    if (!parsed && /^DEFEAT\s*!?$/i.test(line)) parsed = { type: 'defeat', confidence: 'confirmed' };
     if (!parsed) {
         const reconnect = line.match(/\b([A-Za-z0-9_]{2,16})\s+reconnected[.!]?$/i);
         if (reconnect) parsed = { type: 'reconnect', actor: cleanName(reconnect[1]), confidence: 'confirmed' };

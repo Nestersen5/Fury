@@ -57,7 +57,6 @@ function render(page, options = {}) {
         goalMinutes: 60,
         dustReminderEnabled: true,
         dustThreshold: 250,
-        dailyReminderEnabled: true,
         proxyHealthEnabled: true,
         apiKillSwitchEnabled: false,
         autoGamblerEnabled: false,
@@ -87,11 +86,12 @@ assert.deepStrictEqual(
 for (const page of FURY_PAGES) {
     const messages = [];
     createFuryMenu({ sendChat: (_client, message) => messages.push(message) }).render({}, page.key);
-    assert(messages.some(message => message.includes('launcher')));
-    assert(messages.every(message => typeof message === 'string'), 'Removed menus cannot contain clickable controls');
+    assert(JSON.stringify(messages).includes('launcher'));
+    assert(!JSON.stringify(messages).match(/clickEvent|hoverEvent/), 'Removed menus cannot contain clickable controls');
 }
 const commands = [];
 createFuryMenu({ sendChat: (_client, message) => commands.push(message) }).renderHelp({}, 'dodge');
-assert(commands.some(message => message.includes('/dodge on')), 'Direct command examples stay available');
-assert(commands.every(message => typeof message === 'string'));
+assert(JSON.stringify(commands).includes('/dodge on'), 'Direct command examples stay available');
+assert(!JSON.stringify(commands).match(/clickEvent|hoverEvent/));
+assert.strictEqual(commands[0].extra[0].color, 'gold');
 console.log('Fury menu removal and command guide tests passed.');

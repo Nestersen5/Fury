@@ -3,7 +3,6 @@
 const fs = require('fs');
 const path = require('path');
 const { extractEnderDustMinion } = require('../../features/ender_dust_reminder');
-const { extractSlumberDailyRewards, calculateDailyRewardStatuses } = require('../../features/slumber_daily_rewards_reminder');
 const { normalizeGamblerGeorgeReminderState } = require('../../features/gambler_george_reminder');
 
 const REFRESH_INTERVAL_MS = 5 * 60 * 1000;
@@ -52,13 +51,11 @@ function createReminderAccountStore(directory, now = Date.now) {
         const player = raw?.player || raw;
         if (!player || (player.uuid && normalizeUuid(player.uuid) !== uuid)) return null;
         const dust = extractEnderDustMinion(raw);
-        const daily = extractSlumberDailyRewards(raw);
         const previous = reading(uuid) || {};
-        if ((!dust && !daily) || previous.lastCheckedAt > checkedAt) return previous;
+        if (!dust || previous.lastCheckedAt > checkedAt) return previous;
         const next = {
             ...previous, uuid, lastCheckedAt: checkedAt,
-            ...(dust ? { enderDust: { ...dust, lastCheckedAt: checkedAt } } : {}),
-            ...(daily ? { slumberDailyRewards: { ...daily, lastCheckedAt: checkedAt } } : {})
+            enderDust: { ...dust, lastCheckedAt: checkedAt }
         };
         write(`${uuid}.json`, next);
         return next;
@@ -98,11 +95,9 @@ function createRememberedReminders({ store, getSettings, fetchPlayer, getAccount
             : !settings.keys?.hypixel ? 'Add a Hypixel API key to refresh this account.'
             : failure && !(saved?.lastCheckedAt > failure.at) ? failure.message : '';
         const common = { profileName: account?.name || '', error, accountUuid: account?.uuid || null };
-        const daily = saved?.slumberDailyRewards;
         const george = account?.uuid ? store.george(account.uuid) : null;
         const georgeState = normalizeGamblerGeorgeReminderState(george);
         const cooldownRemainingMs = Math.max(0, (georgeState.cooldownUntil || 0) - now());
-        const calculated = calculateDailyRewardStatuses(Array.isArray(daily?.rewards) ? daily.rewards : [], now());
         return {
             account,
             gamblerGeorge: {
@@ -111,7 +106,7 @@ function createRememberedReminders({ store, getSettings, fetchPlayer, getAccount
                 known: Boolean(george), requiredWins: 2,
                 enabled: Boolean(settings.features?.gamblerGeorgeReminderEnabled),
                 autoGamblerEnabled: Boolean(settings.features?.autoGamblerEnabled),
-                paused: !settings.features?.autoGamblerEnabled,
+                paused: false,
                 cooldownRemainingMs, onCooldown: cooldownRemainingMs > 0
             },
             enderDust: {
@@ -119,12 +114,6 @@ function createRememberedReminders({ store, getSettings, fetchPlayer, getAccount
                 ...saved?.enderDust,
                 enabled: Boolean(settings.features?.enderDustReminderEnabled),
                 threshold: settings.features?.enderDustReminderThreshold || 250
-            },
-            slumberDailyRewards: {
-                ...common, ...daily, ...calculated,
-                lastCheckedAt: daily?.lastCheckedAt || 0,
-                readyCount: calculated.rewards.filter(reward => reward.available).length,
-                enabled: Boolean(settings.features?.slumberDailyRewardsReminderEnabled)
             }
         };
     }

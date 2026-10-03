@@ -33,6 +33,31 @@ function createDenickTracker(deps) {
     const autoDenickNickChecks = new Set();
     const autoSkinDenickAttempts = new Map();
     const announcedDenicks = new Set();
+    const removedMappings = new Set(), mappingVersions = new Map();
+    let mappingEpoch = 0;
+    const mappingVersion = name => `${mappingEpoch}:${mappingVersions.get(nickKey(name)) || 0}`;
+    const canAutoDenick = (name, version = mappingVersion(name)) => !removedMappings.has(nickKey(name)) && version === mappingVersion(name);
+
+    function applySavedMappingChange(name, next) {
+        const key = nickKey(name);
+        mappingVersions.set(key, (mappingVersions.get(key) || 0) + 1);
+        const attempt = autoSkinDenickAttempts.get(key);
+        if (attempt?.timer) clearTimeout(attempt.timer);
+        autoSkinDenickAttempts.delete(key);
+        autoDenickStats.delete(key);
+        autoDenickNickChecks.delete(key);
+        autoDenickResults.delete(key);
+        announcedDenicks.delete(key);
+        if (next?.realName) {
+            removedMappings.delete(key);
+            rememberKnownDenickInSession(name, next.realName, next.source);
+        } else removedMappings.add(key);
+    }
+    function clearSavedMappingChanges() {
+        mappingEpoch++;
+        removedMappings.clear();
+        mappingVersions.clear();
+    }
 
     function getAutoDenickResult(name) {
         return autoDenickResults.get(nickKey(name)) || null;
@@ -105,6 +130,7 @@ function createDenickTracker(deps) {
     }
 
     function clear() {
+        clearSavedMappingChanges();
         autoDenickStats.clear();
         autoDenickResults.clear();
         autoDenickNickChecks.clear();
@@ -118,6 +144,10 @@ function createDenickTracker(deps) {
         autoDenickNickChecks,
         autoSkinDenickAttempts,
         getAutoDenickResult,
+        applySavedMappingChange,
+        mappingVersion,
+        canAutoDenick,
+        clearSavedMappingChanges,
         shouldSuppressDenickAnnouncement,
         hasAnnouncedDenick,
         markDenickAnnounced,

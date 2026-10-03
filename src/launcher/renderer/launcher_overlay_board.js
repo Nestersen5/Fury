@@ -63,7 +63,7 @@ function isStatusTag(tag = {}) {
 }
 
 function playerTags(row = {}) {
-    return (Array.isArray(row.tags) ? row.tags : []).filter(tag => tag && (tag.value || typeof tag === 'string'));
+    return (Array.isArray(row.tags) ? row.tags : []).filter(tag => tag && (!tag.source || tag.source === 'Urchin') && (tag.value || typeof tag === 'string'));
 }
 
 function isFlagged(row = {}) {

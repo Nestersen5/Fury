@@ -1,5 +1,7 @@
 'use strict';
 
+const { createUsage } = require('../../features/chat_controller');
+
 // /denick + /denickskin command handlers extracted from proxy.js. Owns the
 // Bordic stat lookup, the cosmetic-search HTTP call, and the in-game chat
 // reporting for both commands. The skin denicker still lives in
@@ -137,9 +139,15 @@ function createDenickCommands({
     }
 
     async function handleDenick(client, args, lobbyPlayers, context = {}) {
-        if (args.length < 2) {
-            sendChat(client, '§cUsage: §e/denick finals <#> beds <#> §6OR §e/denick finalkill <name> beddestroy <name> finals <#>');
-            sendChat(client, '§7Skin denick moved to §e/denickskin <player>§7.');
+        if (args.length < 2 || String(args[1]).toLowerCase() === 'help') {
+            const help = createUsage(message => sendChat(client, message), 'Denick usage',
+                'Search by stats, cosmetics, or both.');
+            help.section('Stats');
+            help.command('/denick finals <number> beds <number>', 'Final kills / beds broken. Use either or both.');
+            help.section('Cosmetics');
+            help.command('/denick <type> <name>', 'Type: finalkill, beddestroy, killmessage. Name: cosmetic, not IGN.');
+            help.section('Combined example');
+            help.command('/denick beddestroy ghosts finals 102000', 'Ghosts bed effect + matching final kills.');
             return;
         }
 

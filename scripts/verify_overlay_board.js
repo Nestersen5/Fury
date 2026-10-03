@@ -5,7 +5,7 @@ const assert = require('assert'), fs = require('fs'), os = require('os'), path =
 const { cleanEnvironment, unusedPorts, startChild, stopChild, assertRunning, eventually, uiTestArguments } = require('./smoke_packaged_app');
 const target = require('./launcher_verification_target').verificationTarget('overlay-board');
 
-// Stats recorded from Hypixel, Urchin, Seraph and Aurora for a real lobby (Sep 2026).
+// Stats recorded from Hypixel, Urchin and Aurora for a real lobby (Sep 2026).
 const LOBBY = {
     Red: [['Nestersen', 1919, 11.21, 4.07, 134], ['tortugos', 474, 35.36, 14.43, 81], ['dusttn', 425, 8.08, 2.64, 147], ['Gamerrbot', 1408, 16.02, 5.13, 240]],
     Blue: [['Sugarcane_TW', 1067, 15.37, 5.46, 134], ['Manhal_IQ_', 4294, 21.49, 5.97, 118], ['nalini25', 880, 4.77, 1.67, 226], ['FrawgTheDawg', 591, 3.61, 2.00, 39]],
@@ -13,7 +13,7 @@ const LOBBY = {
     Yellow: [['Karreuche', 763, 12.23, 3.78, 129], ['jeffreydunphy', 470, 15.83, 4.31, 134], ['AriaBlueberry', 673, 4.02, 1.82, 97], ['R_stars_S', 1212, 6.94, 1.96, 123]]
 };
 const TAGS = {
-    fyechris: [{ source: 'Seraph', title: 'Seraph Blacklist', value: 'Closet Cheater', reasons: 'Legacy - Closet Cheating: legit scaff' }, { source: 'Urchin', title: 'Urchin Report', value: 'Replays Needed' }],
+    fyechris: [{ source: 'Urchin', title: 'Urchin Report', value: 'Replays Needed' }],
     R_stars_S: [{ source: 'Urchin', title: 'Urchin Report', value: 'Replays Needed' }]
 };
 

@@ -11,6 +11,7 @@ const {
     normalizeSessionFeatureSettings
 } = require('./src/session/settings.js');
 const { normalizeGamblerGeorgeReminderState } = require('./features/gambler_george_reminder.js');
+const { SNOOZE_DURATION } = require('./src/reminders/hypixelKeyReminder.js');
 
 const paths = {
     keys: dataPath('statmod_key.txt'),
@@ -67,10 +68,6 @@ function normalizeNametagScope(value, fallback = 'enemies') {
     return normalizeChoice(value, ['enemies', 'teammates', 'everyone'], fallback);
 }
 
-function normalizeNametagSourcePriority(value, fallback = 'urchin') {
-    return normalizeChoice(value, ['urchin', 'seraph'], fallback);
-}
-
 const NAMETAG_STAT_CHOICES = NAMETAG_STAT_TYPES;
 function normalizeNametagStat(value, fallback = 'none') {
     return normalizeNametagStatType(value, fallback);
@@ -116,21 +113,27 @@ function normalizeDodgeIncludePreset(value, fallback = 'custom') {
 }
 
 const defaults = {
-    keys: { hypixel: '', urchin: '', urchinadmin: '', aurora: '', seraph: '' },
-    keyMeta: { hypixelUpdatedAt: '' },
+    keys: { hypixel: '', urchin: '', urchinadmin: '', aurora: '' },
+    keyMeta: { hypixelUpdatedAt: '', hypixelSavedAt: 0, hypixelSnoozedUntil: 0 },
     scan: { scanMode: 'threats', minFkdr: 2, minStars: 400, minSkywarsKdr: 1, minSkywarsWlr: 0.4, minSkywarsLevel: 15, countTags: true },
     features: {
         chatPrefixAccentHex: DEFAULT_CHAT_PREFIX_ACCENT_HEX,
+        anticheatEnabled: true,
+        anticheatScaffoldEnabled: true,
+        anticheatAutoblockEnabled: false,
+        anticheatStasisEnabled: false,
+        anticheatPossibleAlertsEnabled: true,
+        anticheatTeamAlertsEnabled: false,
         accentBedwarsEventLabelsEnabled: true,
         bedwarsSidebarTeamColorsEnabled: true,
         tabStatsEnabled: true,
         autoScanOnGameStart: true,
         autoGamblerEnabled: false,
+        quickMathsEnabled: false,
         autoSkinDenickEnabled: true,
         autoStatsDenickEnabled: true,
         denickChatAnnouncementsEnabled: true,
         denickPartyAnnounceEnabled: true,
-        socialOverlayAddsEnabled: false,
         lobbyChatStatsEnabled: true,
         lobbyChatStatsMentionEnabled: true,
         lobbyChatStatsDmEnabled: true,
@@ -150,7 +153,6 @@ const defaults = {
         enderDustReminderEnabled: true,
         enderDustReminderThreshold: 250,
         enderDustReminderLastReading: null,
-        slumberDailyRewardsReminderEnabled: true,
         gamblerGeorgeReminderEnabled: true,
         gamblerGeorgeReminderState: null,
         partyOverviewEnabled: true,
@@ -197,7 +199,6 @@ const defaults = {
         tabStatsSkywarsFields: TAB_STATS_DEFAULT_FIELDS.SKYWARS,
         tabStatsLabelStyle: 'compact',
         nametagScope: 'enemies',
-        nametagSourcePriority: 'urchin',
         nametagTeammatesEnabled: true,
         nametagTeammatesPrefix: 'none',
         nametagTeammatesPrefixFallback: 'none',
@@ -218,8 +219,10 @@ const defaults = {
     server: {
         proxyDirectPort: 25565,
         proxyFailoverPort: 25568,
+        proxyCustomPort: 0,
         proxyDirectHost: 'mc.hypixel.net',
         proxyFailoverHost: 'hypixel.fast',
+        proxyCustomHost: 'mc.hypixel.net',
         healthPort: 3100
     }
 };
@@ -263,7 +266,7 @@ function loadKeyState() {
     });
 
     if (Object.keys(byLabel).length > 0) {
-        return {
+        const state = {
             keys: {
                 hypixel: byLabel['hypixel api key']
                     || byLabel.hypixel
@@ -276,26 +279,32 @@ function loadKeyState() {
                 urchin: byLabel['urchin api key'] || byLabel.urchin || '',
                 urchinadmin: byLabel['urchin admin api key'] || byLabel.urchinadmin || '',
                 aurora: byLabel['aurora api key'] || byLabel.aurora || '',
-                seraph: byLabel['seraph api key'] || byLabel.seraph || ''
             },
             keyMeta: {
                 hypixelUpdatedAt: (byLabel['hypixel api key updated'] || byLabel['hypixel updated at']) === 'Never'
                     ? ''
-                    : (byLabel['hypixel api key updated'] || byLabel['hypixel updated at'] || '')
+                    : (byLabel['hypixel api key updated'] || byLabel['hypixel updated at'] || ''),
+                hypixelSavedAt: Math.max(0, Number(byLabel['hypixel api key saved at']) || 0),
+                hypixelSnoozedUntil: Math.max(0, Number(byLabel['hypixel reminder snoozed until']) || 0)
             }
         };
+        if (Object.hasOwn(byLabel, 'seraph api key') || Object.hasOwn(byLabel, 'seraph')) {
+            writeKeyState(state.keys, state.keyMeta);
+        }
+        return state;
     }
 
-    return {
+    const state = {
         keys: {
             hypixel: lines[0]?.trim() || '',
             urchin: lines[1]?.trim() || '',
             urchinadmin: '',
             aurora: lines[2]?.trim() || '',
-            seraph: lines[3]?.trim() || ''
         },
         keyMeta: { ...defaults.keyMeta }
     };
+    if (lines.slice(3).some(line => line.trim())) writeKeyState(state.keys, state.keyMeta);
+    return state;
 }
 
 function loadKeys() {
@@ -311,13 +320,29 @@ function saveKeys(keys) {
     // Merge over the currently saved keys so callers that omit a field preserve
     // it instead of resetting it to the default. Passing an explicit '' still
     // clears a key.
-    const next = { ...defaults.keys, ...current.keys, ...(keys || {}) };
+    const next = Object.fromEntries(Object.keys(defaults.keys).map(key =>
+        [key, keys && Object.hasOwn(keys, key) ? keys[key] : current.keys[key]]));
     const keyMeta = { ...defaults.keyMeta, ...current.keyMeta };
-    if (next.hypixel !== current.keys.hypixel || (next.hypixel && !keyMeta.hypixelUpdatedAt)) {
+    if (next.hypixel !== current.keys.hypixel) {
         keyMeta.hypixelUpdatedAt = formatKeyTimestamp();
+        keyMeta.hypixelSavedAt = Date.now();
+        keyMeta.hypixelSnoozedUntil = 0;
     }
-    if (!next.hypixel) keyMeta.hypixelUpdatedAt = '';
+    if (!next.hypixel) Object.assign(keyMeta, defaults.keyMeta);
+    writeKeyState(next, keyMeta);
+}
 
+function snoozeHypixelKeyReminder(expectedKey) {
+    const current = loadKeyState();
+    if (!current.keys.hypixel || current.keys.hypixel !== expectedKey) {
+        throw new Error('The Hypixel key changed. Try again for the current key.');
+    }
+    current.keyMeta.hypixelSnoozedUntil = Date.now() + SNOOZE_DURATION;
+    writeKeyState(current.keys, current.keyMeta);
+    return current.keyMeta;
+}
+
+function writeKeyState(next, keyMeta) {
     fs.writeFileSync(
         paths.keys,
         [
@@ -325,10 +350,11 @@ function saveKeys(keys) {
             '# Edit values after the colon. Keep the labels in place.',
             `Hypixel API key: ${next.hypixel}`,
             `Hypixel API key updated: ${keyMeta.hypixelUpdatedAt || 'Never'}`,
+            `Hypixel API key saved at: ${keyMeta.hypixelSavedAt || 0}`,
+            `Hypixel reminder snoozed until: ${keyMeta.hypixelSnoozedUntil || 0}`,
             `Urchin API key: ${next.urchin}`,
             `Urchin admin API key: ${next.urchinadmin}`,
             `Aurora API key: ${next.aurora}`,
-            `Seraph API key: ${next.seraph}`,
             ''
         ].join('\n'),
         'utf8'
@@ -369,7 +395,9 @@ function loadFeatureSettings() {
         ...defaults.features,
         ...savedFeatures
     };
-    // Social event sources now follow the single Use Overlay switch.
+    delete features.nametagSourcePriority;
+    // Overlay additions follow launcher visibility; ignore retired switches.
+    delete features.socialOverlayAddsEnabled;
     delete features.overlayMentionAddsEnabled;
     delete features.overlayDmAddsEnabled;
     delete features.overlayPartyInviteAddsEnabled;
@@ -442,6 +470,7 @@ function saveFeatureSettings(features) {
             ? Boolean(current.bedwarsSidebarTeamColorsEnabled)
             : Boolean(next.accentBedwarsEventLabelsEnabled);
     writeJson(paths.features, {
+        nickRoll: require('./src/nick/settings').normalizeSettings(next.nickRoll),
         chatPrefixAccentHex: normalizeChatPrefixAccentHex(
             next.chatPrefixAccentHex,
             defaults.features.chatPrefixAccentHex
@@ -450,8 +479,17 @@ function saveFeatureSettings(features) {
             ? Boolean(next.accentBedwarsEventLabelsEnabled)
             : defaults.features.accentBedwarsEventLabelsEnabled,
         bedwarsSidebarTeamColorsEnabled,
+        anticheatEnabled: next.anticheatEnabled !== undefined ? Boolean(next.anticheatEnabled) : defaults.features.anticheatEnabled,
+        anticheatScaffoldEnabled: next.anticheatScaffoldEnabled !== undefined ? Boolean(next.anticheatScaffoldEnabled) : defaults.features.anticheatScaffoldEnabled,
+        anticheatAutoblockEnabled: next.anticheatAutoblockEnabled !== undefined ? Boolean(next.anticheatAutoblockEnabled) : defaults.features.anticheatAutoblockEnabled,
+        anticheatStasisEnabled: next.anticheatStasisEnabled !== undefined ? Boolean(next.anticheatStasisEnabled) : defaults.features.anticheatStasisEnabled,
+        anticheatPossibleAlertsEnabled: next.anticheatPossibleAlertsEnabled !== undefined ? Boolean(next.anticheatPossibleAlertsEnabled) : defaults.features.anticheatPossibleAlertsEnabled,
+        anticheatTeamAlertsEnabled: next.anticheatTeamAlertsEnabled !== undefined ? Boolean(next.anticheatTeamAlertsEnabled) : defaults.features.anticheatTeamAlertsEnabled,
         tabStatsEnabled: Boolean(next.tabStatsEnabled),
         autoScanOnGameStart: true,
+        quickMathsEnabled: next.quickMathsEnabled !== undefined
+            ? Boolean(next.quickMathsEnabled)
+            : defaults.features.quickMathsEnabled,
         autoGamblerEnabled: next.autoGamblerEnabled !== undefined
             ? Boolean(next.autoGamblerEnabled)
             : defaults.features.autoGamblerEnabled,
@@ -459,7 +497,6 @@ function saveFeatureSettings(features) {
         autoStatsDenickEnabled: Boolean(next.autoStatsDenickEnabled),
         denickChatAnnouncementsEnabled: Boolean(next.denickChatAnnouncementsEnabled),
         denickPartyAnnounceEnabled: Boolean(next.denickPartyAnnounceEnabled),
-        socialOverlayAddsEnabled: Boolean(next.socialOverlayAddsEnabled),
         lobbyChatStatsEnabled: Boolean(next.lobbyChatStatsEnabled),
         lobbyChatStatsMentionEnabled: Boolean(next.lobbyChatStatsMentionEnabled),
         lobbyChatStatsDmEnabled: Boolean(next.lobbyChatStatsDmEnabled),
@@ -506,9 +543,6 @@ function saveFeatureSettings(features) {
             defaults.features.enderDustReminderThreshold
         ),
         enderDustReminderLastReading: normalizeEnderDustReminderLastReading(next.enderDustReminderLastReading),
-        slumberDailyRewardsReminderEnabled: next.slumberDailyRewardsReminderEnabled !== undefined
-            ? Boolean(next.slumberDailyRewardsReminderEnabled)
-            : defaults.features.slumberDailyRewardsReminderEnabled,
         gamblerGeorgeReminderEnabled: next.gamblerGeorgeReminderEnabled !== undefined
             ? Boolean(next.gamblerGeorgeReminderEnabled)
             : defaults.features.gamblerGeorgeReminderEnabled,
@@ -619,10 +653,6 @@ function saveFeatureSettings(features) {
             next.nametagScope,
             defaults.features.nametagScope
         ),
-        nametagSourcePriority: normalizeNametagSourcePriority(
-            next.nametagSourcePriority,
-            defaults.features.nametagSourcePriority
-        ),
         // Per-audience nametag config. Each audience (teammates / enemy threats
         // / everyone else) toggles independently and picks a prefix + suffix stat,
         // with an optional fallback for each slot when the primary has no data.
@@ -687,8 +717,10 @@ function loadServerSettings() {
     return {
         proxyDirectPort: Number(loaded.proxyDirectPort) || defaults.server.proxyDirectPort,
         proxyFailoverPort: Number(loaded.proxyFailoverPort) || defaults.server.proxyFailoverPort,
+        proxyCustomPort: Number(loaded.proxyCustomPort) || 0,
         proxyDirectHost: loaded.proxyDirectHost || defaults.server.proxyDirectHost,
         proxyFailoverHost: loaded.proxyFailoverHost || defaults.server.proxyFailoverHost,
+        proxyCustomHost: loaded.proxyCustomHost || defaults.server.proxyCustomHost,
         healthPort: Number(loaded.healthPort) || defaults.server.healthPort
     };
 }
@@ -698,8 +730,10 @@ function saveServerSettings(server) {
     const next = {
         proxyDirectPort: input.proxyDirectPort,
         proxyFailoverPort: input.proxyFailoverPort,
+        proxyCustomPort: input.proxyCustomPort,
         proxyDirectHost: input.proxyDirectHost,
         proxyFailoverHost: input.proxyFailoverHost,
+        proxyCustomHost: input.proxyCustomHost,
         healthPort: input.healthPort
     };
     writeJson(paths.server, { ...defaults.server, ...next });
@@ -736,14 +770,15 @@ module.exports = {
     normalizeShareDestination,
     normalizeNametagScope,
     normalizeNametagStat,
-    normalizeNametagSourcePriority,
     normalizeNametagTagDisplayMode,
     normalizeSessionFeatureSettings,
     NAMETAG_STAT_CHOICES,
     formatKeyTimestamp,
     loadKeys,
+    loadKeyState,
     loadKeyMeta,
     saveKeys,
+    snoozeHypixelKeyReminder,
     loadScanSettings,
     saveScanSettings,
     loadFeatureSettings,

@@ -63,6 +63,7 @@ release-*/
 out/
 website/downloads/
 output/
+artifacts/
 tmp/
 .wrangler/
 .dev.vars
@@ -110,6 +111,7 @@ quickbuy_presets/
 # Mutable local session features
 /game_clips.json
 /rank_book.json
+/nick_names.json
 /json-data.json
 
 # Agent/assistant local state

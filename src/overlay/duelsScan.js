@@ -104,7 +104,7 @@ function createDuelsScanRunner(deps) {
                 text: ` §d● ${displayName}§r `,
                 extra: []
             };
-            const tags = getInteractiveTags(data.urchin, data.seraph, name);
+            const tags = getInteractiveTags(data.urchin, name);
             if (tags && tags.length) header.extra.push(...tags);
             sendChat(client, header);
 

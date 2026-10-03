@@ -59,7 +59,7 @@ const {
 });
 
 // The detailed option retains the extra Yes/No and XP breakdowns covered below.
-const renderGameRecap = (client, recap) => renderGameRecapActual(client, recap, { style: 'detailed' });
+const renderGameRecap = (client, recap) => renderGameRecapActual(client, recap, { style: 'scoreboard' });
 
 // Captures the visible text, the run_command click targets (mode-nav buttons
 // carry their command in clickEvent, not the text), and colours.
@@ -341,13 +341,13 @@ function makeRecap(overrides = {}) {
     const client = fakeClient();
     assert.strictEqual(renderGameRecap(client, makeRecap()), true);
     const text = client.text();
-    assert.ok(text.includes('[FURY]'), 'recap carries the compact Fury header');
-    assert.ok(text.includes('BedWars'), 'card shows the mode');
+    assert.ok(text.includes('BED WARS RECAP'), 'recap uses the scoreboard header');
+    assert.ok(text.includes('BED WARS'), 'card shows the game');
     assert.ok(text.includes('6m 12s'), 'card shows the game duration');
     assert.ok(text.includes('VICTORY'), 'card shows the result badge');
-    assert.ok(text.includes('Finals: 3'), 'finals render as a plain count, not a delta');
-    assert.ok(text.includes('Kills: 7'));
-    assert.ok(text.includes('Session:'), 'card shows the running session footer');
+    assert.ok(text.includes('3 FINALS'), 'finals render as a plain count, not a delta');
+    assert.ok(text.includes('7 KILLS'));
+    assert.ok(text.includes('SESSION'), 'card shows the running session footer');
     assert.ok(text.includes('4W'), 'footer shows session wins');
 }
 
@@ -368,99 +368,19 @@ function makeRecap(overrides = {}) {
 }
 
 {
-    // Things that either happened or did not read as Yes/No, coloured by
-    // whether it is good news.
-    const client = fakeClient();
-    renderGameRecap(client, makeRecap());
-    const text = client.text();
-    assert.ok(client.colored().includes('Bed lost: <green>No'), 'keeping your bed is green No');
-    assert.ok(client.colored().includes('Final killed: <red>Yes'), 'being final killed is red Yes');
-    assert.ok(!text.includes('FDeaths'), 'raw final-death counts are gone');
-    assert.ok(!text.includes('Beds Lost'), 'raw beds-lost counts are gone');
-}
-
-{
-    // The mirror case: bed lost, never final killed.
-    const client = fakeClient();
-    renderGameRecap(client, makeRecap({
-        delta: makeDelta({
-            Bedwars: {
-                losses_bedwars: 1,
-                final_kills_bedwars: 2,
-                beds_lost_bedwars: 1,
-                kills_bedwars: 4,
-                deaths_bedwars: 3
-            },
-            SkyWars: {},
-            Duels: {}
-        }),
-        record: { durationMs: 200_000, result: 'loss', opponents: [] }
-    }));
-    const text = client.text();
-    assert.ok(client.colored().includes('Bed lost: <red>Yes'));
-    assert.ok(client.colored().includes('Final killed: <green>No'));
-}
-
-{
-    // Stars only appear when you actually gained some.
-    const withStars = fakeClient();
-    renderGameRecap(withStars, makeRecap({
-        delta: makeDelta({
-            Bedwars: { final_kills_bedwars: 3, kills_bedwars: 5, Experience: 500 },
-            SkyWars: {},
-            Duels: {}
-        })
-    }));
-    assert.ok(withStars.text().includes('Stars'), 'stars row shows when XP moved');
-
-    const withoutStars = fakeClient();
-    renderGameRecap(withoutStars, makeRecap());
-    assert.ok(!withoutStars.text().includes('Stars'), 'and is omitted when it did not');
-}
-
-{
-    // SkyWars: you die once, so it is a Yes/No rather than a death count.
-    const client = fakeClient();
-    renderGameRecap(client, {
-        game: 'SkyWars',
-        mode: 'SKYWARS',
-        delta: makeDelta({
-            Bedwars: {},
-            SkyWars: { kills: 6, assists: 1, deaths: 1, games: 1, losses: 1 },
-            Duels: {}
-        }),
-        record: { durationMs: 240_000, result: 'loss', opponents: [] },
-        sessionDelta: null
-    });
-    const text = client.text();
-    assert.ok(text.includes('Kills: 6'));
-    assert.ok(text.includes('Assists'));
-    assert.ok(client.colored().includes('Died: <red>Yes'));
-    assert.ok(!text.includes('Deaths:'), 'no raw death count for a one-life mode');
-    assert.ok(!text.includes('WLR'));
-}
-
-{
-    // Duels: rounds only shown for multi-round modes.
-    const single = fakeClient();
-    renderGameRecap(single, {
-        game: 'Duels',
-        mode: 'DUELS',
-        delta: makeDelta({ Bedwars: {}, SkyWars: {}, Duels: { wins: 1, kills: 1, deaths: 0, rounds_played: 1 } }),
-        record: { durationMs: 60_000, result: 'win', opponents: [] },
-        sessionDelta: null
-    });
-    assert.ok(!single.text().includes('Rounds'), 'a 1v1 does not need a rounds row');
-
-    const multi = fakeClient();
-    renderGameRecap(multi, {
-        game: 'Duels',
-        mode: 'DUELS',
-        delta: makeDelta({ Bedwars: {}, SkyWars: {}, Duels: { wins: 2, losses: 1, kills: 2, deaths: 1, rounds_played: 3 } }),
-        record: { durationMs: 180_000, result: 'win', opponents: [] },
-        sessionDelta: null
-    });
-    assert.ok(multi.text().includes('Rounds'), 'a best-of shows how many rounds ran');
+    // Every supported game uses the same layout, with its own headline stats.
+    for (const [game, mode, stats, expected] of [
+        ['SkyWars', 'SKYWARS', { wins: 1, kills: 4, assists: 2 }, '4 KILLS   2 ASSISTS'],
+        ['Duels', 'DUELS', { wins: 1, kills: 2, deaths: 1 }, '2 KILLS   1 DEATHS']
+    ]) {
+        const client = fakeClient();
+        renderGameRecap(client, { game, mode,
+            delta: makeDelta({ Bedwars: {}, SkyWars: {}, Duels: {}, [game]: stats }),
+            record: { durationMs: 180000, result: 'win' }, sessionDelta: null });
+        assert.equal(client.lines.length, 4);
+        assert(client.lines[0].includes('RECAP'));
+        assert(client.lines[2].includes(expected));
+    }
 }
 
 {
@@ -489,18 +409,93 @@ function makeRecap(overrides = {}) {
 // --- recap stays free of encounter history ---------------------------------
 
 {
-    const client = fakeClient();
-    renderGameRecapActual(client, makeRecap(), { goals: { wins: 4 } });
-    assert.strictEqual(client.lines.length, 4, 'compact default is exactly four lines with a goal');
-    assert(client.lines[0].startsWith('[FURY] VICTORY'));
-    assert(client.lines[1].includes('Finals: 3 · Beds: 1 · Kills: 7'));
-    assert(client.lines[2].includes('Session:'));
-    assert(client.lines[3].includes('4/4'));
-    assert(!client.text().includes('---'), 'recap does not flood chat with separator lines');
+    const sample = makeRecap({
+        record: { result: 'win', durationMs: 666000, metadata: { variant: 'Solos' } },
+        sessionDelta: makeDelta({ Bedwars: { games_played_bedwars: 6, wins_bedwars: 4, losses_bedwars: 2 } })
+    });
+    const plain = fakeClient();
+    const goalOnly = { style: 'scoreboard', fields: ['result', 'duration', 'game_stats', 'goals'] };
+    renderGameRecapActual(plain, sample, goalOnly);
+    assert.equal(plain.lines.length, 4, 'Default scoreboard has exactly two content rows and two rules');
+    assert(plain.lines[0].includes('------ BED WARS RECAP ------'));
+    assert(plain.lines[1].includes('VICTORY   11m 06s   Solos'));
+    assert(plain.lines[2].includes('3 FINALS   1 BEDS   7 KILLS'));
+    assert(!plain.text().includes('Session:') && !plain.text().includes('GAMES GOAL'));
+    assert(plain.colored().includes('<yellow>1 BEDS') && plain.colored().includes('<aqua>7 KILLS'),
+        'Scoreboard keeps the selected semantic colors');
+    const { chatTextWidth } = require('../../src/stats/recapScoreboard');
+    for (const map of ['Airshow', '§cAirshow\nDoubles', 'W'.repeat(80), null, undefined, '', '  ']) {
+        const mapped = fakeClient();
+        renderGameRecapActual(mapped, { ...sample, record: { ...sample.record,
+            metadata: { ...sample.record.metadata, map } } }, goalOnly);
+        assert.equal(mapped.lines.length, 4, 'Map information adds no chat rows');
+        assert(mapped.lines.every(line => chatTextWidth(line) <= 320), 'Map names fit standard chat width');
+        if (map === 'Airshow') assert(mapped.lines[1].includes('Solos   Map: Airshow'));
+        else if (map?.startsWith('§')) {
+            assert(mapped.lines[1].includes('Map: Airshow Doubles'));
+            assert(!mapped.colored().includes('<red>Airshow'), 'Map metadata cannot inject chat colors');
+        } else if (map?.startsWith('W')) assert(mapped.lines[1].endsWith('...'));
+        else assert(!mapped.text().includes('Map:'), 'Unknown maps have no placeholder');
+    }
+    const goal = fakeClient();
+    renderGameRecapActual(goal, sample, { ...goalOnly, goals: { games: 10, wins: 10, finals: 30 } });
+    assert.equal(goal.lines.length, 5, 'Only the enabled games goal adds a third content row');
+    assert(goal.lines[3].includes('GAMES GOAL 6/10 [||||||----]'));
+    assert(!goal.text().includes('wins:') && !goal.text().includes('finals:'));
+    for (const line of goal.lines) {
+        const width = helpers.chatTextWidth(line), contentWidth = helpers.chatTextWidth(line.trimStart());
+        const center = width - contentWidth / 2;
+        assert(Math.abs(center - 160) <= 2, 'Chat rows share a center within one half-space');
+        assert(width <= 320, 'Normal scoreboard content fits standard chat width');
+    }
+    for (const target of [0, -1, undefined]) {
+        const client = fakeClient();
+        renderGameRecapActual(client, sample, { ...goalOnly, goals: { games: target } });
+        assert.equal(client.lines.length, 4, 'Disabled games goals add no row or gap');
+    }
+    const complete = fakeClient();
+    renderGameRecapActual(complete, sample, { ...goalOnly, goals: { games: 5 } });
+    assert(complete.lines[3].includes('6/5 [||||||||||]'), 'Completed goals keep their true count with a full bounded bar');
+    const local = fakeClient();
+    renderGameRecapActual(local, {
+        game: 'Duels', mode: 'DUELS', record: { result: 'loss', durationMs: 9000 },
+        delta: { local: true, modes: [{ mode: 'DUELS', kills: 0, deaths: 1 }] },
+        sessionDelta: { local: true, modes: [{ mode: 'DUELS', wins: 1 }] }
+    }, { ...goalOnly, goals: { games: 10 } });
+    assert(local.lines[0].includes('DUELS RECAP') && local.lines[1].includes('DEFEAT'));
+    assert(local.lines[2].includes('0 KILLS   1 DEATHS'));
+    assert(local.lines[3].includes('GAMES GOAL ?/10 [----------]'), 'Unavailable local progress is not an invented zero');
+
+    const combined = fakeClient();
+    renderGameRecapActual(combined, makeRecap(), { goals: { games: 10 } });
+    assert.equal(combined.lines.length, 5, 'Session totals and games goal share one optional row');
+    assert(combined.lines[3].includes('SESSION 4W / 2L   FKDR 2.00   GAMES'));
+    assert(combined.clicks().includes('/session'), 'The session row opens the existing full session command');
+    const sessionOnly = fakeClient();
+    renderGameRecapActual(sessionOnly, sample, { style: 'scoreboard', fields: ['session_totals'], goals: { games: 10 } });
+    assert(sessionOnly.lines[3].includes('SESSION 4W / 2L'));
+    assert(!sessionOnly.text().includes('GAMES'), 'The goal toggle hides a configured target');
+    const incomplete = fakeClient();
+    renderGameRecapActual(incomplete, {
+        game: 'Bedwars', mode: 'BEDWARS', record: { result: 'win', durationMs: 60000 },
+        delta: { local: true, modes: [{ mode: 'BEDWARS', finals: 2, beds: 1, kills: 3 }] },
+        sessionDelta: { local: true, modes: [{ mode: 'BEDWARS', wins: 1 }] }
+    }, { goals: { games: 10 } });
+    assert(incomplete.lines[3].includes('SESSION 1W / ?L   FKDR ?   GAMES ?/10'), 'Partial local session coverage stays explicit');
+}
+
+{
+    for (const legacyStyle of ['compact', 'detailed', 'custom', 'invalid']) {
+        const client = fakeClient(), expected = fakeClient();
+        renderGameRecapActual(client, makeRecap(), { style: legacyStyle, goals: { games: 10 } });
+        renderGameRecapActual(expected, makeRecap(), { style: 'scoreboard', goals: { games: 10 } });
+        assert.deepStrictEqual(client.lines, expected.lines, `${legacyStyle} cannot resurrect an old recap layout`);
+    }
     const custom = fakeClient();
     renderGameRecapActual(custom, makeRecap(), { style: 'custom', fields: ['game_stats'] });
-    assert.strictEqual(custom.lines.length, 2);
-    assert(!custom.text().includes('Session:') && !custom.text().includes('VICTORY'));
+    assert.equal(custom.lines.length, 4);
+    assert(custom.text().includes('VICTORY') && custom.text().includes('3 FINALS'));
+    assert(!custom.text().includes('SESSION'), 'The session toggle is still respected after migration');
 }
 
 {
@@ -685,6 +680,75 @@ function makeRecap(overrides = {}) {
         !client.text().includes('1.00'),
         'and never the lifetime FKDR — no rendered value in this fixture is 1.00'
     );
+}
+
+{
+    // Exercise the production command: a saved loss without API counters
+    // must not be described as a game that never finished.
+    const source = require('fs').readFileSync(require('path').resolve(__dirname, '../../proxy.js'), 'utf8');
+    const start = source.indexOf('        function handleRecapCommand(client) {');
+    const end = source.indexOf('\n        // Nester Deck', start);
+    assert(start >= 0 && end > start);
+    let record = null;
+    const messages = [];
+    const context = require('vm').createContext({
+        normalizeUuid: value => value,
+        sessionStore: { getLastGame: () => record },
+        sendChat: (_client, message) => messages.push(message),
+        renderGameRecap: () => { throw new Error('Unverified counters must not be rendered'); }
+    });
+    require('vm').runInContext(source.slice(start, end), context);
+    const run = () => { messages.length = 0; context.handleRecapCommand({ uuid: 'test' }); return messages.join('\n'); };
+    assert(run().includes('No game recorded yet'));
+    record = { result: 'loss', verificationStatus: 'pending', delta: null };
+    assert(run().includes('§closs') && run().includes('Waiting for Hypixel'));
+    record.verificationStatus = 'unverified';
+    assert(run().includes('§closs') && run().includes('could not be verified'));
+    record.result = null;
+    assert(run().includes('unknown result'));
+    let rendered;
+    context.renderGameRecap = (_client, recap) => { rendered = recap; return true; };
+    context.sessionTracker = { getSessionDelta: () => ({ local: true, modes: [] }) };
+    context.gameForMode = () => 'Bedwars';
+    context.state = {};
+    record = { result: 'loss', verificationStatus: 'pending', mode: 'BEDWARS', durationMs: 60000,
+        localModes: [{ mode: 'BEDWARS', games: 1, wins: 0, losses: 1, kills: 3 }] };
+    assert.equal(run(), '', 'Observed games do not show an unavailable-recap warning');
+    assert.equal(rendered.delta.local, true);
+    assert.equal(rendered.delta.modes[0].kills, 3, '/recap replays observed counters while the API is pending');
+}
+
+{
+    const { normalizeRecapFields, SESSION_RECAP_FIELDS, SESSION_DEFAULTS } = require('../../src/session/settings');
+    const { chatTextWidth } = require('../../src/stats/recapScoreboard');
+    assert.deepEqual(normalizeRecapFields([]), [], 'All-off survives normalization');
+    assert.deepEqual(normalizeRecapFields(['map', 'map', 'invalid']), ['map']);
+    assert.deepEqual(normalizeRecapFields(), SESSION_DEFAULTS.sessionRecapFields);
+    assert(normalizeRecapFields(['game_stats', 'session_totals']).includes('session_wins'));
+    const sample = makeRecap();
+    sample.record.metadata = { map: 'Airshow', variant: 'Solos' };
+    const checks = [
+        ['header', 'RECAP'], ['result', 'VICTORY'], ['duration', '6m 12s'], ['map', 'Map: Airshow'],
+        ['mode', 'Solos'], ['finals', '3 FINALS'], ['beds', '1 BEDS'], ['kills', '7 KILLS'],
+        ['deaths', 'DEATHS'], ['final_deaths', 'FINAL KILLED'], ['beds_lost', 'BED LOST'],
+        ['session_wins', 'SESSION 4W'], ['session_losses', 'SESSION 2L'],
+        ['session_ratio', 'SESSION FKDR 2.00'], ['session_games', 'SESSION PLAYED'], ['goals', 'GAMES GOAL']
+    ];
+    for (const [field, text] of checks) {
+        const client = fakeClient();
+        renderGameRecapActual(client, sample, { fields: [field], goals: { games: 10 } });
+        assert(client.text().includes(text), `${field} can render on its own`);
+        assert.equal(client.lines.length, field === 'header' ? 2 : 1, `${field} has no forced rows`);
+        for (const [other, forbidden] of checks) {
+            if (field !== other) assert(!client.text().includes(forbidden), `${field} does not force ${other}`);
+        }
+    }
+    const empty = fakeClient();
+    assert.equal(renderGameRecapActual(empty, sample, { fields: [], goals: { games: 10 } }), true);
+    assert.deepEqual(empty.lines, [], 'No stray border, mode, badge or goal when every field is off');
+    const all = fakeClient();
+    renderGameRecapActual(all, sample, { fields: SESSION_RECAP_FIELDS, goals: { games: 10 } });
+    assert(all.lines.every(line => chatTextWidth(line) <= 320), 'Additional stats wrap within chat width');
 }
 
 console.log('test_game_recap.js: all assertions passed');

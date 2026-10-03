@@ -37,6 +37,7 @@ function createHypixelCommandQueue(options = {}) {
     }
 
     function settle(entry, result) {
+        entry.signal?.removeEventListener('abort', entry.onAbort);
         if (entry.dedupeKey && pendingByKey.get(entry.dedupeKey) === entry) {
             pendingByKey.delete(entry.dedupeKey);
         }
@@ -104,6 +105,7 @@ function createHypixelCommandQueue(options = {}) {
         if (!clean) return Promise.resolve({ sent: false, reason: 'empty', command: clean });
         if (!clean.startsWith('/')) return Promise.resolve({ sent: false, reason: 'not-command', command: clean });
         if (closed) return Promise.resolve({ sent: false, reason: 'closed', command: clean });
+        if (options.signal?.aborted) return Promise.resolve({ sent: false, reason: 'cancelled', command: clean });
 
         const dedupeKey = String(options.dedupeKey || '').trim();
         const dedupeMs = Math.max(0, Number(options.dedupeMs) || 0);
@@ -123,7 +125,15 @@ function createHypixelCommandQueue(options = {}) {
             resolve,
             promise
         };
+        entry.signal = options.signal;
+        entry.onAbort = () => {
+            const index = entries.indexOf(entry);
+            if (index < 0) return;
+            entries.splice(index, 1);
+            settle(entry, { sent: false, reason: 'cancelled', command: clean });
+        };
         entries.push(entry);
+        entry.signal?.addEventListener('abort', entry.onAbort, { once: true });
         if (dedupeKey) pendingByKey.set(dedupeKey, entry);
         scheduleDrain();
         return promise;

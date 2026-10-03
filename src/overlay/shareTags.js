@@ -134,39 +134,12 @@ function collectUrchinTagTexts(row = {}) {
     return texts;
 }
 
-function collectSeraphTagTexts(row = {}) {
-    const texts = [];
-    const add = (value) => {
-        const clean = cleanText(value);
-        if (clean) texts.push(clean);
-    };
-
-    add(row.sTag);
-    add(row.seraphRaw?.report_type);
-    add(row.seraphRaw?.tooltip);
-    add(row.seraphRaw?.notes);
-    return texts;
-}
-
 function tagTexts(row = {}) {
-    return [
-        ...collectUrchinTagTexts(row),
-        ...collectSeraphTagTexts(row)
-    ];
+    return collectUrchinTagTexts(row);
 }
 
 function preferredTagTexts(row = {}) {
-    const urchinTexts = collectUrchinTagTexts(row);
-    if (urchinTexts.length > 0) return urchinTexts;
-    const seraphTexts = collectSeraphTagTexts(row);
-    if (seraphTexts.length > 0) return seraphTexts;
-    return [];
-}
-
-function preferredTagSource(row = {}) {
-    if (collectUrchinTagTexts(row).length > 0) return 'Urchin';
-    if (collectSeraphTagTexts(row).length > 0) return 'Seraph';
-    return '';
+    return collectUrchinTagTexts(row);
 }
 
 function tagLabels(row = {}) {
@@ -426,7 +399,7 @@ const CHEAT_LIST_COLOR = 'yellow';
 const STAT_LABEL_COLOR = 'white';
 
 function tagLabelColor(row = {}) {
-    return preferredTagSource(row) === 'Seraph' ? 'dark_aqua' : 'light_purple';
+    return 'light_purple';
 }
 
 function seg(value, color, extra) {
@@ -524,7 +497,7 @@ function tagHoverText(row = {}) {
         lines.push(clean.length > 140 ? `${clean.slice(0, 137)}...` : clean);
     });
     if (lines.length === 0) return '';
-    const titleColor = preferredTagSource(row) === 'Seraph' ? '§3' : '§d';
+    const titleColor = '§d';
     return [`${titleColor}§lTag details`, ...lines.slice(0, 5).map(line => `§7${line}`)].join('\n');
 }
 

@@ -154,6 +154,35 @@ const PANEL_COLORS = Object.freeze({
     active: 'green'
 });
 
+function usageSection(name) {
+    return [text('> ', 'gold', { bold: true }), text(name, 'gold', { bold: true })];
+}
+
+function usageCommand(syntax, description, options = {}) {
+    return [text(syntax, 'white', options), text(` - ${description}`, 'gray')];
+}
+
+// Static command usage: visible descriptions, no click or hover events.
+function createUsage(sendChat, titleText, description) {
+    const panel = createPanel(parts => sendChat(line(parts)), { colors: { heading: 'gold' } });
+    panel.title(titleText, '');
+    panel.row([text(description)]);
+    return {
+        section: name => panel.row(usageSection(name)),
+        command: (syntax, description) => panel.row(usageCommand(syntax, description)),
+        detail: description => panel.row([text(`  ${description}`)]),
+        field: (name, value, options = {}) => panel.row([
+            text(`${name}: `, options.inactive ? 'dark_red' : 'dark_aqua'),
+            text(value, options.inactive ? 'red' : 'aqua', { bold: true })
+        ]),
+        instruction: (symbol, label, syntax, color = 'aqua') => panel.row([
+            text(`${symbol} ${label} `, color, { bold: true }), text(syntax, 'white')
+        ]),
+        example: syntax => panel.row([text('Example: '), text(syntax, 'white')]),
+        note: description => panel.row([text('! ', 'yellow', { bold: true }), text(description, 'yellow')])
+    };
+}
+
 function stripMinecraftCodes(value = '') {
     return String(value).replace(/(?:\u00C2?\u00A7|\\u00a7|\\u00A7)[0-9A-FK-OR]/gi, '');
 }
@@ -389,6 +418,9 @@ module.exports = {
     clientPanel,
     component,
     createPanel,
+    createUsage,
+    usageSection,
+    usageCommand,
     divider,
     flag,
     gap,

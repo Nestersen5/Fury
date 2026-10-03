@@ -1,7 +1,7 @@
 'use strict';
 
 // Global API kill switch enforcement. Every feature in the proxy process does
-// its HTTP through the shared axios singleton (hypixel client, urchin, seraph,
+// its HTTP through the shared axios singleton (hypixel client, urchin,
 // aurora, mojang, and stat sources), so one request interceptor
 // is the single chokepoint that guarantees nothing reaches an external API
 // while the switch is ON. Localhost traffic (launcher,

@@ -60,7 +60,7 @@ const seraphTaggedRow = {
 };
 const seraphTagComponent = formatLineComponent(seraphTaggedRow, 'BEDWARS', includeAll, false);
 const seraphTagNode = seraphTagComponent.extra.find(n => n.text === 'Blacklisted');
-assert.strictEqual(seraphTagNode?.color, 'dark_aqua', 'Seraph share tags should use the dark-aqua accent');
+assert.strictEqual(seraphTagNode, undefined, 'retired provider tags are not shared');
 
 // ---- sliceFormattedByVisible cuts on a visible-char boundary ----
 

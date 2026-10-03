@@ -73,6 +73,17 @@ material, logs and crash dumps, and private player data files.
 The website, download tracker, deployment scripts, and private agent guidance
 are also excluded from the public source.
 
+For 1.1.0, the new Scaffold, Autoblock and Stasis detector source and controls
+are part of the public application. The legacy removed anti-cheat systems remain
+retired. Only explicitly allowlisted local-lab regression recordings and the
+nick-book fixture are exported from `tests/features/fixtures/`; private player
+recordings and generated campaign output remain excluded.
+
+The exported `package.json` deterministically omits npm commands owned by
+excluded deployment files. Runtime metadata, dependencies and build settings
+are preserved. The public and private hygiene checks exercise their respective
+source layouts, so public CI never depends on private deployment files.
+
 **Privacy gate.** Every exported text file is scanned for forbidden content
 before anything is written, and the export is refused if any file matches. The
 gate reports `file:line: label` and never prints the offending value. It covers

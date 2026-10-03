@@ -259,9 +259,9 @@ assert.deepStrictEqual(
 
 // --- known tags use text styles; resource-pack glyph mappings remain available ---
 assert.deepStrictEqual(NAMETAG_TAG_DISPLAY_MODES, ['acronyms', 'full']);
-assert.deepStrictEqual(NAMETAG_TAG_SOURCE_COLORS, { urchin: '§d', seraph: '§3' });
+assert.deepStrictEqual(NAMETAG_TAG_SOURCE_COLORS, { urchin: '§d' });
 assert.strictEqual(nametagTagSourceColor('Urchin'), '§d');
-assert.strictEqual(nametagTagSourceColor('S'), '§3');
+assert.strictEqual(nametagTagSourceColor('S'), '');
 assert.strictEqual(normalizeNametagTagDisplayMode('icons'), 'acronyms');
 assert.strictEqual(normalizeNametagTagDisplayMode('glyph'), 'acronyms');
 assert.strictEqual(normalizeNametagTagDisplayMode('acronym'), 'acronyms');
@@ -309,13 +309,13 @@ assert.strictEqual(
 );
 assert.strictEqual(
     formatNametagStat('tag', row({ tags: [{ source: 'Seraph', value: 'Blatant' }] }), { compactTagName, priority: 'seraph', tagDisplayMode: 'acronyms' }),
-    '§3BC',
-    'acronym mode renders a Seraph category in dark aqua'
+    '',
+    'acronym mode ignores retired provider tags'
 );
 assert.strictEqual(
     formatNametagStat('tag', row({ tags: [{ source: 'Seraph', value: 'Blatant' }] }), { compactTagName, priority: 'seraph', tagDisplayMode: 'full' }),
-    '§3Blatant Cheater',
-    'full mode renders a Seraph category in dark aqua'
+    '',
+    'full mode ignores retired provider tags'
 );
 assert.strictEqual(
     formatNametagStat('tag', row({ tags: [{ source: 'Urchin', value: 'Manual Review' }] }), { compactTagName, priority: 'urchin' }),

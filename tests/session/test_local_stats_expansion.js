@@ -7,6 +7,17 @@ const {buildLauncherSessionHistory}=require('../../src/session/launcherSessionHi
 const {buildCalendarStats}=require('../../src/session/calendarStats');
 const start={key:'test',mode:'BEDWARS',ownName:'Tester',ownTeam:'Aqua',observedFromStart:true,standardBedwars:true,identityKnown:true,variant:'Doubles',startedAt:1000};
 const game=createGame(start);
+for(const reward of ['+36 tokens! (Bed Destroyed)', '+36 tokens! (Bed Destruction)']){
+    assert.equal(observe(game,reward,{at:1999}),false,'bed reward is not a bed event');
+    assert.equal(game.counts.beds.available,true);
+    assert.equal(game.counts.bedsLost.available,true);
+}
+for(const announcement of ['YOU GOT LUCKY! You will receive DOUBLE EXP this game!',
+    'YOU GOT LUCKY! You will receive DOUBLE EXP this game!|']){
+    assert.equal(observe(game,announcement,{at:1999}),false,'double EXP announcement is not combat');
+    assert.equal(game.counts.kills.available,true);
+    assert.equal(game.counts.deaths.available,true);
+}
 for(const text of ['Rival was killed by Tester.','Tester fell into the void.','Rival was killed by Tester. FINAL KILL!','Tester fell into the void. FINAL KILL!','BED DESTRUCTION > Red Bed was destroyed by Tester!','BED DESTRUCTION > Your Bed was destroyed by Rival!']){
     observe(game,text,{at:2000});observe(game,text,{at:2001});
 }
@@ -33,6 +44,8 @@ const nick=createGame({...start,identityKnown:false});observeResult(nick,'VICTOR
 const legacy=localModes(normalizeLocal({totals:{BEDWARS:{finals:{value:3,available:true},beds:{value:1,available:true},bedsLost:{value:0,available:true}}}}))[0];
 assert.equal(legacy.finals,3);for(const key of ['games','wins','losses','kills','deaths','finalDeaths','fkdr','kdr','wlr'])assert(!(key in legacy),key+' must remain unknown in old saves');
 const odd=createGame(start);observe(odd,'Rival was mysteriously vaporized.');assert(!('kdr'in localModes({current:odd})[0]));
+const gotKill=createGame(start);observe(gotKill,'Rival got killed by Tester.');
+assert.equal(gotKill.counts.kills.value,1,'a real got-killed message still counts');
 const unknownMode=createGame({...start,variant:null});observeResult(unknownMode,'VICTORY!');assert.equal(localModes({current:unknownMode})[0].breakdown.status,'partial');
 
 (async()=>{

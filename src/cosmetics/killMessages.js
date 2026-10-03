@@ -4,12 +4,12 @@
 // Pattern signatures, scoring, color hints, and the /km recorder command all
 // live here. The detection engine owns the in-memory pattern cache and the
 // active capture session; proxy.js wires it once via createKillMessages and
-// also exposes parseBedDestroyChat (used inside detectKillMessageOwner) as a
-// shared export since it's only consumed here.
+// also exposes the shared bed-message parser used by session tracking.
 
 const fs = require('fs');
 const path = require('path');
 const { normalizeCosmeticKey } = require('./catalog.js');
+const { parseBedDestroyChat } = require('./bedMessages.js');
 
 const KILL_MESSAGE_PREVIEW_SLOTS = [
     { key: 'regular', label: 'Regular Kill' },
@@ -183,6 +183,9 @@ function createKillMessages({
     let activeKillMessageCapture = null;
     let killMessagePatternStoreCache = null;
     let killMessagePatternStoreCacheMtimeMs = -1;
+    let statsSignatureStore = null;
+    let statsSignatures = null;
+    let statsSignatureRefreshAt = 0;
     const defaultPatterns = Object.fromEntries(DEFAULT_KILL_MESSAGE_PATTERNS.map(pattern => {
         const entry = buildKillMessagePatternEntry(pattern, null);
         entry.samples.forEach(Object.freeze);
@@ -302,6 +305,7 @@ function createKillMessages({
             killMessagePatternStoreCache = withDefaultPatterns(next);
             killMessagePatternStoreCacheMtimeMs = Date.now();
         }
+        statsSignatureRefreshAt = 0;
     }
 
     function buildKillMessagePatternEntry(pattern, recordedAt = new Date().toISOString()) {
@@ -345,20 +349,6 @@ function createKillMessages({
             .replace(/^active[_\s-]*/i, '')
             .replace(/_/g, ' ');
         return canonicalKillMessageName(cleaned);
-    }
-
-    function parseBedDestroyChat(text) {
-        const clean = stripAnsi(text || '').replace(/\s+/g, ' ').trim();
-        const match = clean.match(/\bBED\s+DESTRUCTION\b.*?\b(Your|Red|Blue|Green|Yellow|Aqua|White|Pink|Gray|Grey)\s+Bed\b([\s\S]*?)\bby\s+([A-Za-z0-9_]{3,16})\b/i);
-        if (!match) return null;
-        const bedsMatch = String(match[2] || '').match(/\bbed\s+#([\d,]+)/i);
-        return {
-            type: 'beddestroy',
-            team: match[1],
-            beds: bedsMatch ? Number(String(bedsMatch[1]).replace(/,/g, '')) || null : null,
-            breaker: match[3],
-            text: clean
-        };
     }
 
     function detectKillMessageCosmetic(text) {
@@ -422,6 +412,29 @@ function createKillMessages({
         if (endingOwner) return endingOwner[1];
 
         return '';
+    }
+
+    function detectKnownKillMessageForStats(text) {
+        // Exact preview signatures avoid crediting ordinary player chat or a
+        // different cosmetic whose wording only looks similar.
+        const line = stripAnsi(text || '').replace(/\s+/g, ' ').trim();
+        const victim = line.match(/^([A-Za-z0-9_]{2,16})(?=\s|'s\b)/i)?.[1];
+        if (!victim) return null;
+        const killer = detectKillMessageOwner(line);
+        if (!killer || victim.toLowerCase() === killer.toLowerCase()) return null;
+        const final = /\bFINAL KILL!?\s*$/i.test(line) || /\bfinal\s+#[\d,]+\b/i.test(line);
+        const signature = killMessagePatternSignature(line.replace(/\s+FINAL KILL!?\s*$/i, ''));
+        if (!statsSignatureStore || Date.now() >= statsSignatureRefreshAt) {
+            const store = loadKillMessagePatternStore();
+            statsSignatureRefreshAt = Date.now() + 30000;
+            if (statsSignatureStore !== store) {
+                statsSignatureStore = store;
+                statsSignatures = new Set(Object.values(store.patterns || {}).flatMap(entry =>
+                    (entry.samples || []).map(sample => sample.signature).filter(signature => signature.startsWith('<victim>'))
+                ));
+            }
+        }
+        return statsSignatures.has(signature) ? { victim, killer, final } : null;
     }
 
     function detectKillMessageCosmeticFromChat(text, formattedText = text) {
@@ -642,6 +655,7 @@ function createKillMessages({
         parseBedDestroyChat,
         detectKillMessageCosmetic,
         detectKillMessageOwner,
+        detectKnownKillMessageForStats,
         detectKillMessageCosmeticFromChat,
         sendKillMessageRecorderUsage,
         sendKillMessageNameList,

@@ -39,6 +39,10 @@ assert.strictEqual(inferGameResult({ mode: 'BEDWARS', ownTeam: 'Aqua', roster: [
 
 // The API delta is authoritative.
 assert.deepStrictEqual(resolveGameResult('loss', { mode: 'BEDWARS', events: [victory] }), { result: 'loss', source: 'api' });
+assert.deepStrictEqual(resolveGameResult(null, { mode: 'BEDWARS', manualResult: 'win' }),
+    { result: 'win', source: 'manual' });
+assert.deepStrictEqual(resolveGameResult('loss', { mode: 'BEDWARS', manualResult: 'win' }),
+    { result: 'loss', source: 'api' });
 assert.deepStrictEqual(resolveGameResult(null, { mode: 'BEDWARS', events: [], metadata: { team: 'Aqua' }, roster }),
     { result: null, source: null });
 

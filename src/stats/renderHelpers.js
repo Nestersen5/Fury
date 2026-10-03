@@ -132,8 +132,8 @@ function createRenderHelpers({ statValue } = {}) {
         return `${color}§m--------------------------------`;
     }
 
-    function sendUrchinSection(client, title, rows, color = '§6') {
-        sendChat(client, cardDivider('§8'));
+    function sendUrchinSection(client, title, rows, color = '§6', { showTitle = false } = {}) {
+        sendChat(client, showTitle ? `${color}------ ${title} ------` : cardDivider('§8'));
         rows.forEach(row => {
             const cells = row.filter(Boolean);
             sendChat(client, statPair(cells[0], cells[1]));

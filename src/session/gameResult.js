@@ -10,7 +10,7 @@
 //   last_team   — BedWars: every other team on the roster was eliminated
 //                 while the own team never was
 
-const RESULT_SOURCES = ['api', 'title', 'elimination', 'last_team'];
+const RESULT_SOURCES = ['api', 'title', 'elimination', 'last_team', 'manual'];
 
 function isOwnTeamElimination(event, mode, ownTeam) {
     const normalize = value => String(value || '').toLowerCase().replace(/^grey$/, 'gray');
@@ -56,6 +56,10 @@ function inferGameResult({ mode = null, events = [], ownTeam = null, roster = []
 // The API delta is authoritative; watched evidence only fills its gaps.
 function resolveGameResult(apiResult, context = {}) {
     if (apiResult === 'win' || apiResult === 'loss') return { result: apiResult, source: 'api' };
+    if (['win', 'loss'].includes(context.manualResult)) return { result: context.manualResult, source: 'manual' };
+    if (context.resultSource === 'manual' && ['win', 'loss'].includes(context.result)) {
+        return { result: context.result, source: 'manual' };
+    }
     return inferGameResult({
         mode: context.mode,
         events: context.events,

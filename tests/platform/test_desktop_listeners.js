@@ -13,8 +13,8 @@ async function proxyService(lan) {
     const { superviseChild } = require('../../src/bootstrap/childShutdown');
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'fury-proxy-loopback-')), children = [];
     try {
-        const [direct, failover, health, cosmetic, blocked] = await unusedPorts(5);
-        fs.writeFileSync(path.join(root,'server_config.json'),JSON.stringify({proxyDirectPort:direct,proxyFailoverPort:failover,healthPort:health}));
+        const [direct, failover, custom, health, cosmetic, blocked] = await unusedPorts(6);
+        fs.writeFileSync(path.join(root,'server_config.json'),JSON.stringify({proxyDirectPort:direct,proxyFailoverPort:failover,proxyCustomPort:custom,proxyDirectHost:'127.0.0.1',proxyFailoverHost:'localhost',proxyCustomHost:'127.0.0.1',healthPort:health}));
         fs.writeFileSync(path.join(root,'features_config.json'),JSON.stringify({apiKillSwitchEnabled:true,autoSkinDenickEnabled:false,autoStatsDenickEnabled:false}));
         const preload=path.join(root,'no-auth.cjs');
         fs.writeFileSync(preload,`require(${JSON.stringify(require.resolve('prismarine-auth'))}).Authflow.prototype.getMinecraftJavaToken=()=>{throw Error('Real authentication disabled in listener test');};`);
@@ -23,10 +23,18 @@ async function proxyService(lan) {
             const child=spawn(process.execPath,['--require',preload,require.resolve('../../proxy')],{env,cwd:root,windowsHide:true,stdio:['ignore','ignore','pipe','ipc']});
             children.push(child); let errors=''; child.stderr.on('data',x=>errors+=x);
             await eventually(async()=>{assert.equal(child.exitCode,null,errors);assert((await getJson(`http://127.0.0.1:${health}/health`)).ok);},'actual proxy ready');
-            for(const port of [direct,failover]) {
+            assert((await getJson(`http://127.0.0.1:${health}/health`)).ports.proxy.some(route=>route.port===custom&&route.host==='127.0.0.1'));
+            for(const port of [direct,failover,custom]) {
                 for(const host of ['127.0.0.1','localhost','::1']) {
                     const status=await require('minecraft-protocol').ping({host,port,version:'1.8.9',closeTimeout:1000,noPongTimeout:1000});
                     assert(status.version,'Minecraft status response');
+                    const lines=status.description?.text?.split('\n');
+                    assert.equal(lines?.length,2,'the MOTD has two lines');
+                    assert.match(lines[0],/^ +§6§lFURY PROXY$/,'the first line is colored and centered');
+                    assert.match(lines[1],/^§r +§c/,'the second line resets bold before its rainbow address');
+                    assert.equal(lines[1].replace(/^§r +/,'').replace(/§[0-9a-f]/g,''),port===failover?'localhost':'127.0.0.1','the second line shows this route’s target server');
+                    assert.deepEqual(status.players,{online:0,max:1,sample:[]},'the player count belongs to this local proxy');
+                    assert.match(status.favicon,/^data:image\/png;base64,/, 'Fury keeps its own icon in the server list');
                 }
                 for(const item of lan) await refused(item.address,port);
             }
@@ -35,9 +43,9 @@ async function proxyService(lan) {
             activeIpv6.on('error',()=>{}); await once(activeIpv6,'connect');
             const result=await superviseChild(child,env.FURY_SERVICE_INSTANCE).stop(); assert(result.clean&&result.exited,JSON.stringify(result));
             await eventually(()=>assert(activeIpv6.destroyed),'active IPv6 socket closed by F7');
-            for(const port of [direct,failover,health]) await refused('127.0.0.1',port);
+            for(const port of [direct,failover,custom,health]) await refused('127.0.0.1',port);
         }
-        console.log('PASS actual Minecraft direct/failover IPv4/localhost/IPv6, LAN rejection, health loopback and clean F7 Stop -> Start');
+        console.log('PASS actual Minecraft direct/failover/custom IPv4/localhost/IPv6, LAN rejection, health loopback and clean F7 Stop -> Start');
     } finally {
         for(const child of children)if(child.exitCode===null&&child.signalCode===null)child.kill('SIGKILL');
         for(const child of children)await eventually(()=>assert.notEqual(child.exitCode??child.signalCode,null),'proxy cleanup');

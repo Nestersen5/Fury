@@ -10,6 +10,7 @@ const { createSessionTracker } = require('../../src/session/sessionTracker');
 const { createSessionStore } = require('../../src/session/sessionStore');
 const { isOwnTeamElimination } = require('../../src/session/gameResult');
 const { parseGameEvents, normalizeGameEvent, eventSignature } = require('../../src/session/gameEvents');
+const { createKillMessages } = require('../../src/cosmetics/killMessages');
 
 // Exercise the actual proxy chat/finalization wiring without opening Minecraft
 // sockets, using the real tracker and a temporary persistent store.
@@ -33,8 +34,15 @@ async function run(apiAvailable) {
             done(null, { version: 1, stamp: require('../../src/storage/filePublication').readPublicationStamp(file) });
         } };
     const store = createSessionStore(options);
+    const killMessages = createKillMessages({
+        sendChat() {}, stripAnsi: value => String(value).replace(/\u00a7[0-9a-fk-or]/gi, ''),
+        killMessagePatternsFile: path.join(folder, 'kill-message-patterns.json'),
+        getDenickKillMessageNames: () => [], denickCosmeticApiValue: () => null
+    });
     const timers = new Map(); let timerId = 0;
+    const recaps = [];
     const tracker = createSessionTracker({ store, now: () => stamp,
+        onGameRecap: recap => recaps.push(recap),
         getIdentity: () => ({ uuid, name: 'Tester' }), isApiAvailable: () => apiAvailable,
         fetchOwnStats: async () => { fetches++; return { uuid, displayname: 'Tester', stats: { Bedwars: stats } }; },
         setTimeoutImpl: (fn, delay) => { timers.set(++timerId, { fn, at: stamp + delay }); return timerId; },
@@ -46,8 +54,11 @@ async function run(apiAvailable) {
         console, Promise, Date: { now: () => stamp }, state: { sessionTrackingEnabled: true },
         gameActive: true, gameStartTime: stamp, gameSessionId: 1, currentGamemode: 'BEDWARS',
         activeMatchServerId: 'server', sessionGameFinalized: false, localDuelKey: null,
+        pendingBedwarsResultPrompt: null,
         activeSessionGameEvents: [], activeSessionGameMetadata: {}, sessionTracker: tracker,
+        bedwarsStatsDebug: { status: () => ({ active: false }), observeChat() {}, end() {} },
         normalizeGameEvent, eventSignature, parseGameEvents, isOwnTeamElimination,
+        detectKnownKillMessageForStats: killMessages.detectKnownKillMessageForStats,
         client: { username: 'Tester' }, getOwnKnownNames: () => ['Tester'],
         localSessionIdentity: () => ({ ownNames: ['Tester'], identityKnown: true }),
         buildSessionGameMetadata: () => ({ team: 'Aqua', observedFromStart: true }),
@@ -61,7 +72,9 @@ async function run(apiAvailable) {
     const session = () => store.findSession(tracker.getActiveSessionId());
 
     stamp += 5000;
+    chat('Rival was too shy to meet Tester.');
     chat('Enemy was killed by Tester. FINAL KILL!');
+    chat('BED DESTRUCTION > Your Bed was gulped by Enemy!');
     chat('Tester was killed by Enemy. FINAL KILL!');
     assert.equal(session().games.length, 0, 'A personal final death does not finalize the team result');
     chat('TEAM ELIMINATED > Red Team has been eliminated!');
@@ -77,6 +90,7 @@ async function run(apiAvailable) {
     assert.equal(record.durationMs, 10000);
     assert.equal(record.at, stamp);
     assert(record.events.some(event => event.type === 'final_kill' && event.actor === 'Tester'));
+    assert(record.events.some(event => event.type === 'bed_break' && event.targetTeam === 'Aqua' && event.actor === 'Enemy'));
     assert.equal(JSON.parse(fs.readFileSync(sessionFile)).sessions[0].games.length, 1, 'Record is flushed immediately');
     const savedId = record.id;
     const eventCount = record.events.length;
@@ -91,14 +105,18 @@ async function run(apiAvailable) {
         assert.equal(fetches, 1, 'Saving does not fetch ahead of the verification delay');
         assert.equal(record.verificationStatus, 'pending');
         assert.equal(record.verificationAttempts, 0);
+        assert.equal(recaps.length, 1, 'An observed loss emits immediately before API verification');
+        assert.equal(recaps[0].delta.local, true);
+        assert.equal(recaps[0].delta.modes[0].bedsLost, 1);
+        assert.equal(recaps[0].sessionDelta.modes[0].games, 1, 'The session goal advances immediately');
         assert.equal(record.nextVerificationAt, record.at + 15000);
         const pendingReload = createSessionStore(options).getPendingGames()[0];
         assert.equal(pendingReload.game.id, savedId, 'Pending verification survives a reload');
         assert(pendingReload.game.verificationBaseline);
-        await tracker.onGameStart({ ...start, sessionKey: 'next-game' });
         stats = { ...stats, final_kills_bedwars: 21, final_deaths_bedwars: 11 };
         await tracker.processPendingVerifications({ force: true });
         assert.equal(session().games[0].verificationStatus, 'pending', 'Partial API publication must wait for the loss');
+        assert.equal(recaps.length, 1, 'Partial API publication cannot duplicate the recap');
         stats = { ...stats, losses_bedwars: 11 };
         await tracker.processPendingVerifications({ force: true });
         assert.equal(session().games.length, 1);
@@ -106,12 +124,17 @@ async function run(apiAvailable) {
         assert.equal(session().games[0].verificationStatus, 'verified');
         assert.equal(session().games[0].delta.stats.Bedwars.losses_bedwars, 1);
         assert.equal(session().games[0].durationMs, 10000);
+        assert.equal(recaps.length, 1, 'API verification silently updates the original game');
+        assert.equal(tracker.getSessionDelta().modes[0].games, 1, 'Verification never adds goal progress twice');
     } else {
         assert.equal(fetches, 0);
         assert.equal(record.verificationStatus, 'local');
         assert.equal(record.localModes[0].finals, 1);
+        assert.equal(record.localModes[0].kills, 1, 'live cosmetic kill is counted without the API');
         assert.equal(record.localModes[0].finalDeaths, 1);
         assert.equal(record.localModes[0].losses, 1);
+        assert.equal(record.localModes[0].bedsLost, 1, 'Cosmetic own-bed destruction is included in the loss');
+        assert.equal(recaps.length, 1, 'A fully observed local loss emits its recap immediately');
         assert.equal(session().localTracking.current, null);
     }
     tracker.detach();

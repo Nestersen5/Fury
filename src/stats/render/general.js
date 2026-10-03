@@ -6,7 +6,7 @@
 // /ping details, and the session mini-card preview.
 //
 // renderDashboard intentionally stays in proxy.js for now — its inline
-// urchin/seraph tag parser is overlay-tag territory and will move when
+// urchin tag parser is overlay-tag territory and will move when
 // the overlay/tags carve happens. buildPlayerInfoTagComponents is in the
 // same boat and is injected via deps so the meta block can keep working.
 
@@ -174,29 +174,29 @@ function createGeneralRender({ helpers, deps } = {}) {
         });
         sendChat(client, nav);
 
-        sendUrchinSection(client, 'Network', [
+        sendUrchinSection(client, 'LEVEL & PROGRESS', [
             [['Level', `§a${formatDecimalIfNeeded(progress.exact, 2)}`], ['Progress', `§b${formatPercentValue(progress.ratio)}`]],
             [['XP Total', coloredInt(exp, '§e')], ['XP Left', coloredInt(progress.remaining, '§6')]],
             [['XP / Day', coloredInt(xpPerDay, '§b')], ['Levels / Month', `§b${formatDecimalIfNeeded(levelsPerMonth, 2)}`]]
-        ], '§a');
+        ], '§a', { showTitle: true });
 
-        sendUrchinSection(client, 'Account', [
+        sendUrchinSection(client, 'PLAYER PROFILE', [
             [['Rank', `§f${generalRankLabel(p)}`], ['AP', coloredInt(p.achievementPoints, '§e')]],
             [['Karma', coloredInt(p.karma, '§d')], ['Recent Game', `§b${titleCaseWords(p.mostRecentGameType || 'Unknown')}`]],
             [['First Login', `§7${formatDateShort(p.firstLogin)}`], ['Age', `§7${formatDays(accountAgeDays)}`]],
             [['Last Login', `§7${formatDateShort(p.lastLogin)}`], ['Last Logout', `§7${formatDateShort(p.lastLogout)}`]]
-        ], '§a');
+        ], '§a', { showTitle: true });
 
         if (guild) {
-            sendUrchinSection(client, 'Guild', [
+            sendUrchinSection(client, 'GUILD', [
                 [['Name', `§a${guild.name || 'Unknown'}`], ['Tag', guild.tag ? `§6[${guild.tag}]` : '§8None']],
                 [['Rank', `§f${guildMember?.rank || 'Member'}`], ['Members', coloredInt((guild.members || []).length, '§e')]],
                 [['Guild XP', coloredInt(guild.exp, '§b')], ['Joined', `§7${formatDateShort(guildMember?.joined)}`]]
-            ], '§a');
+            ], '§a', { showTitle: true });
         } else {
-            sendUrchinSection(client, 'Guild', [
+            sendUrchinSection(client, 'GUILD', [
                 [['Guild', '§8None or private'], ['Members', '§80']]
-            ], '§a');
+            ], '§a', { showTitle: true });
         }
 
         sendChat(client, `${line}\n`);

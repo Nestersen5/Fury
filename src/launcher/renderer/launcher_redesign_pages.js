@@ -28,8 +28,7 @@ function mount({ document, node, button, getState, openManager, validateNetwork 
     profiles.querySelector('.page-title').after(profileLayout);
     const list=$('#profile-list'),create=$('.profile-create-panel');
     const savePanel=node('details','fury-profile-save','<summary>Save current setup</summary>');
-    const review=node('aside','fury-profile-review');review.id='fury-profile-review';review.setAttribute('aria-label','Profile change preview');
-    savePanel.append(create);profileLayout.append(list,review,savePanel);
+    savePanel.append(create);profileLayout.append(list,savePanel);
     profiles.querySelector('.page-actions').append(button('Save current setup',()=>{savePanel.open=true;create.scrollIntoView({block:'nearest'});$('#profile-create-name').focus();},'fury-gold-outline'));
     $('#profile-active-summary').classList.add('fury-removed');
 
@@ -82,23 +81,18 @@ function mount({ document, node, button, getState, openManager, validateNetwork 
     }
     fieldGrid.addEventListener('change',()=>updateCardPreview(getState()));
     selectCardMode('BEDWARS');
-    const recapStyle=$('#session-recap-style'),recapTabs=node('nav','fury-recap-tabs');recapStyle.after(recapTabs);recapStyle.hidden=true;
-    function syncRecapTabs(){recapTabs.querySelectorAll('button').forEach(b=>{const active=b.dataset.style===recapStyle.value;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});}
-    for(const option of recapStyle.options){const b=button(option.textContent,()=>{recapStyle.value=option.value;syncRecapTabs();recapStyle.dispatchEvent(new Event('change',{bubbles:true}));});b.dataset.style=option.value;recapTabs.append(b);}
-    recapStyle.addEventListener('change',syncRecapTabs);
 
     const overlay=$('[data-settings-subpage="overlay"]'),overlayModule=$('.overlay-concept-module'),chatModule=$('.chat-stats-module');
     overlay.append(overlayModule);
     const triggers=panel('Chat triggers');triggers.append($('.feature-trigger-editor'));overlay.append(triggers,chatModule,$('#queue-time-settings'));
     overlay.querySelectorAll(':scope > .settings-subgroup').forEach(el=>el.classList.add('fury-removed'));
-    $('.concept-module-hero h3').textContent='Use Overlay';
     const sources=$('.chat-stats-source-list'),sourcePanel=panel('Show stats for','Choose which lobby events trigger player stats.');sourcePanel.classList.add('fury-chat-sources');sourcePanel.append(sources);chatModule.append(sourcePanel);
 
-    const network=$('[data-settings-subpage="network"]'),route=$('.network-studio'),endpoints=$('.network-endpoints-module'),health=$('.network-health-row');
+    const network=$('[data-settings-subpage="network"]'),route=$('.network-studio'),endpoints=$('.network-endpoints-module');
     // Keep the monitor input in the hidden original form for internal use.
     network.querySelectorAll(':scope >.settings-subgroup').forEach(el=>el.classList.add('fury-removed'));
     const connections=node('div','fury-connections');network.append(connections);
-    for(const [key,title] of [['direct','MAIN CONNECTION'],['failover','PROXY CONNECTION']]){
+    for(const [key,title] of [['direct','MAIN CONNECTION'],['failover','PROXY CONNECTION'],['custom','CUSTOM SERVER']]){
         const old=$(`[data-network-status="${key}"]`).closest('.network-endpoint-card');
         const card=node('details','fury-connection-card settings-search-item');card.open=true;
         const header=node('summary','fury-connection-heading');
@@ -114,17 +108,12 @@ function mount({ document, node, button, getState, openManager, validateNetwork 
         const check=button('Check settings',validateNetwork,'primary');check.setAttribute('aria-label',`Check ${title.toLowerCase()} settings`);fields.append(check);
         const address=node('p','fury-connection-address');
         const portInput=fields.querySelector('input');
-        const syncAddress=()=>{address.textContent=`Minecraft address: localhost:${portInput.value}`;};
+        const syncAddress=()=>{address.textContent=portInput.value ? `Minecraft address: localhost:${portInput.value}` : 'Add a local port to enable this connection.';};
         portInput.addEventListener('input',syncAddress);
         const detail=old.querySelector('[data-network-detail]'),hostDetail=$(`[data-network-host-status="${key}"]`);
         for(const message of [detail,hostDetail]){message.hidden=true;message.setAttribute('role','status');}
         body.append(fields,address,detail,hostDetail);card.append(header,body);connections.append(card);syncAddress();
     }
-    const alerts=node('section','fury-connection-alerts settings-search-item');
-    const alertIcon=node('span','fury-connection-alert-icon','<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12h5l3-9 4 18 3-9h5"/></svg>');
-    const copy=node('div','','<h3>SLOWDOWN ALERTS</h3><p>Warn about lag and briefly pause extra features.</p>');
-    health.querySelector('input').setAttribute('aria-label','Slowdown alerts');
-    alerts.append(alertIcon,copy,health.querySelector('.feature-toggle'));connections.append(alerts);
     const networkFooter=node('div','fury-connection-footer');
     const actions=node('div','fury-connection-actions');
     $('#network-copy-config').textContent='Copy settings';$('#network-safe-defaults').textContent='Reset to defaults';
@@ -167,7 +156,7 @@ function mount({ document, node, button, getState, openManager, validateNetwork 
     }
     return { update(state) {
         document.dispatchEvent(new CustomEvent('settings-status-refresh'));
-        updateCardPreview(state);recapTabs.querySelectorAll('button').forEach(b=>{b.classList.toggle('active',b.dataset.style===recapStyle.value);b.setAttribute('aria-pressed',String(b.dataset.style===recapStyle.value));});
+        updateCardPreview(state);
         const selected=state.viewedAccount;account.querySelector('.fury-reminder-selected').textContent=selected?`Status for ${selected.name}`:'Choose an account';
         const dust=state.reminders?.enderDust,amount=Number(dust?.enderDust);$('#fury-dust-progress').style.width=`${dust?.enderDust==null?0:Math.min(100,amount/300*100)}%`;
         const bet=state.reminders?.gamblerGeorge;$('#fury-george-wins').textContent=bet?.known?`${bet.wins||0} / ${bet.requiredWins||2} wins`:'Not checked';$('#fury-george-progress').style.width=`${bet?.known?Math.min(100,(bet.wins||0)/(bet.requiredWins||2)*100):0}%`;

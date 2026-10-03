@@ -1,5 +1,6 @@
 'use strict';
 
+const { createUsage } = require('./chat_controller');
 
 const FURY_PAGES = Object.freeze([
     { key: 'home', label: 'Home' },
@@ -59,6 +60,7 @@ const FURY_HELP_TOPICS = Object.freeze({
         description: 'Pregame protection, nick resolution, and party checks.',
         entries: [
             { label: 'Auto Dodge', command: '/dodge', description: 'Leave risky BedWars pregames using your selected rules.', examples: ['/dodge delay 10', '/dodge include tagged on'] },
+            { label: 'Nick Reroller', command: '/nickroll', description: 'Roll until name filters match, then choose Use Name.', examples: ['/nickroll start', '/nickroll stop', '/nickroll status', '/nickroll words'] },
             { label: 'Denick', command: '/denick', description: 'Automatic and manual nickname resolution.', examples: ['/denick autoskin on', '/denick party'] },
             { label: 'Party overview', command: '/po status', description: 'Run local-only checks for current party members.', examples: ['/po', '/po status'] }
         ]
@@ -69,7 +71,7 @@ const FURY_HELP_TOPICS = Object.freeze({
         entries: [
             { label: 'Share', command: '/share', description: 'Broadcast selected scan findings to party chat.', examples: ['/share auto on', '/share include tagged,nicks'] },
             { label: 'Chat stats', command: '/chatstats status', description: 'Show local stats for mentions, DMs, and triggers.', examples: ['/chatstats only mention', '/chatstats source dm off'] },
-            { label: 'Use Overlay', command: '/overlay', description: 'Mentions, DMs, and party invites follow Use Overlay.', examples: ['/fury set socialadds on', '/fury set socialadds off'] },
+            { label: 'Launcher Overlay', command: '/overlay', description: 'Mentions, DMs, and party invites appear while the launcher Overlay tab is open.', examples: ['/ol clear all'] },
             { label: 'Chat triggers', command: '/chattrigger list', description: 'Maintain custom phrases that request stats.', examples: ['/chattrigger list', '/chattrigger add <phrase>'] },
             { label: 'Looking for', command: '/lf', description: 'Mode-specific party triggers for this lobby only.', examples: ['/lf threes fours', '/lf off fours', '/lf off'] }
         ]
@@ -81,7 +83,7 @@ const FURY_HELP_TOPICS = Object.freeze({
             { label: 'Sessions', command: '/session', description: 'Track local stat changes and browse saved sessions.', examples: ['/session start', '/session history'] },
             { label: 'Recaps', command: '/recap', description: 'Show the most recent game recap.', examples: ['/session recap on', '/recap'] },
             { label: 'Session setup', command: '/fury history', description: 'Set inactivity boundary, retention, layout, and goals.', examples: ['/fury set boundary 180', '/fury set goal wins 10'] },
-            { label: 'Reminders', command: '/reminder status', description: 'Ender Dust, daily NPC, and Gambler George alerts.', examples: ['/reminder threshold 250', '/reminder daily on', '/reminder george on'] }
+            { label: 'Reminders', command: '/reminder status', description: 'Ender Dust and Gambler George alerts.', examples: ['/reminder threshold 250', '/reminder george on'] }
         ]
     },
     system: {
@@ -101,8 +103,8 @@ const FURY_HELP_TOPICS = Object.freeze({
         entries: [
             { label: 'Accent', command: '/fury accent ', description: 'Set the in-game Fury prefix accent using #RRGGBB.', examples: ['/fury accent #a66bea'] },
             { label: 'Visual flags', command: '/fury play', description: 'Toggle event labels and scoreboard team colors.', examples: ['/fury set eventlabels on', '/fury set teamcolors off'] },
-            { label: 'Social master', command: '/fury social', description: 'Enable or pause all automatic social overlay additions.', examples: ['/fury set socialadds on'] },
-            { label: 'Session storage', command: '/fury history', description: 'Set boundary, retention, recap style, and goals.', examples: ['/fury set retention 100', '/fury set recapstyle detailed'] }
+            { label: 'Launcher Overlay', command: '/fury social', description: 'Automatic additions run while the launcher Overlay tab is open.', examples: ['/ol clear all'] },
+            { label: 'Session storage', command: '/fury history', description: 'Set boundary, retention, and goals.', examples: ['/fury set retention 100', '/fury set goal games 10'] }
         ]
     },
     tabstats: {
@@ -112,7 +114,7 @@ const FURY_HELP_TOPICS = Object.freeze({
         entries: [
             { label: 'Power', command: '/tabstats', description: 'Enable the feature or restore original player names.', examples: ['/tabstats on', '/tabstats off'] },
             { label: 'Game rules', command: '/tabstats', description: 'Set BedWars and SkyWars independently to on, off, or auto.', examples: ['/tabstats bw auto', '/tabstats sw off'] },
-            { label: 'Columns', command: '/tabstats', description: 'Toggle kill ratio, win ratio, and Urchin/Seraph tags.', examples: ['/tabstats col kr on', '/tabstats col wr off', '/tabstats tags on'] },
+            { label: 'Columns', command: '/tabstats', description: 'Toggle kill ratio, win ratio, and Urchin tags.', examples: ['/tabstats col kr on', '/tabstats col wr off', '/tabstats tags on'] },
             { label: 'Restore names', command: '/tabstats clear', description: 'Remove applied stat text without disabling your saved setup.', examples: ['/tabstats clear'] }
         ]
     },
@@ -124,7 +126,6 @@ const FURY_HELP_TOPICS = Object.freeze({
             { label: 'Power', command: '/nametags', description: 'Enable the master name-tag overlay.', examples: ['/nametags on', '/nametags off'] },
             { label: 'Audiences', command: '/nametags', description: 'Configure teammates, threats, and everyone else separately.', examples: ['/nametags teammates on', '/nametags threats off'] },
             { label: 'Fields', command: '/nametags', description: 'Choose primary and fallback prefix/suffix stats for each audience.', examples: ['/nametags threats prefix tag', '/nametags others suffixfallback fkdr'] },
-            { label: 'Data source', command: '/nametags', description: 'Prefer Urchin or Seraph when both provide tags.', examples: ['/nametags source urchin'] },
             { label: 'Maintenance', command: '/nametags refresh', description: 'Refresh data or restore original names immediately.', examples: ['/nametags refresh', '/nametags clear'] }
         ]
     },
@@ -196,12 +197,11 @@ const FURY_HELP_TOPICS = Object.freeze({
     reminders: {
         hidden: true,
         title: 'Reminders',
-        description: 'Track Ender Dust, daily rewards, and Gambler George claim readiness.',
+        description: 'Track Ender Dust and Gambler George claim readiness.',
         entries: [
             { label: 'Ender Dust', command: '/reminder', description: 'Toggle alerts and choose a target from 1 to 300.', examples: ['/reminder on', '/reminder threshold 250'] },
-            { label: 'Daily rewards', command: '/reminder', description: 'Toggle automatic alerts for ready NPC rewards.', examples: ['/reminder daily on'] },
             { label: 'Gambler George', command: '/reminder', description: 'Track the two-win bet and remind you to claim it.', examples: ['/reminder george on', '/reminder george claimed'] },
-            { label: 'Refresh', command: '/reminder check', description: 'Refresh dust or daily rewards now.', examples: ['/reminder check', '/reminder daily check'] },
+            { label: 'Refresh', command: '/reminder check', description: 'Refresh Ender Dust now.', examples: ['/reminder check'] },
             { label: 'Preview', command: '/reminder test', description: 'Preview fake alert states without changing settings.', examples: ['/reminder test full'] }
         ]
     },
@@ -261,12 +261,13 @@ function createFuryMenu(options = {}) {
     if (typeof sendChat !== 'function') throw new Error('createFuryMenu requires sendChat');
     function renderHelp(client, topic = '') {
         const selected = FURY_HELP_TOPICS[String(topic).toLowerCase()];
-        sendChat(client, '\u00a7dFURY \u00bb \u00a77Settings are in the launcher. Use /help for commands.');
+        const help = createUsage(message => sendChat(client, message), 'Command guide',
+            'Settings are in the launcher. Use /help for commands.');
         if (selected) {
-            sendChat(client, `\u00a7f${selected.title}`);
+            help.section(selected.title);
             selected.entries.forEach(entry => {
-                sendChat(client, `\u00a7b${entry.command.trim()} \u00a77- ${entry.description}`);
-                (entry.examples || []).forEach(example => sendChat(client, `\u00a77${example}`));
+                help.command(entry.command.trim(), entry.description);
+                (entry.examples || []).forEach(example => help.example(example));
             });
         }
     }

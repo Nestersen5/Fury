@@ -5,7 +5,9 @@ Run scripts from the repository root unless a script says otherwise.
 - `package_windows.js` and `package_macos.js` build platform packages. The
   `verify_packaged_*.js`, `verify_no_browser.js`, and `smoke_packaged_app.js`
   scripts check their payloads and runtime behavior.
-- `release_artifacts.js` records local package metadata and hashes.
+- `prepare_release.js`, `release_plan.js`, `release_artifacts.js`,
+  `publish_release.js`, and `stage_download_site.js` handle release preparation
+  and publication checks.
 - `verify_*.js` scripts exercise focused launcher, platform, update, and
   packaging contracts. `verify_additional_features.js` discovers permanent
   tests under `tests/` that the primary npm scripts do not run.

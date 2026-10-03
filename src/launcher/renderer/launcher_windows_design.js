@@ -42,6 +42,16 @@ function mount({ document, clipboard }) {
                 </div>
                 <p class="join-destination">Connects to <span id="server-preview-failover-host">hypixel.fast</span></p>
             </div>
+            <div class="join-route" data-join-route="custom" hidden>
+                <label for="join-custom-address">Custom server</label>
+                <p id="join-custom-help">Use the third connection configured in Connection settings.</p>
+                <div class="join-address-field">
+                    <input id="join-custom-address" type="text" readonly spellcheck="false"
+                        aria-describedby="join-custom-help" value="" placeholder="Loading address&hellip;">
+                    <button type="button" data-copy-route="custom" aria-label="Copy custom server address" disabled>Copy</button>
+                </div>
+                <p class="join-destination">Connects to <span id="server-preview-custom-host">mc.hypixel.net</span></p>
+            </div>
         </div>
         <div class="join-footer">
             <p>Keep Fury open while you play.</p>
@@ -49,9 +59,10 @@ function mount({ document, clipboard }) {
         </div>`;
 
     const status = guide.querySelector('.join-copy-status');
-    const routes = ['direct', 'failover'].map(name => {
+    const routes = ['direct', 'failover', 'custom'].map(name => {
         const input = guide.querySelector(`#join-${name}-address`);
         const button = guide.querySelector(`[data-copy-route="${name}"]`);
+        const row = input.closest('.join-route');
         let feedbackTimer;
         const resetFeedback = () => {
             clearTimeout(feedbackTimer);
@@ -67,7 +78,7 @@ function mount({ document, clipboard }) {
                 clipboard.writeText(input.value);
                 button.textContent = 'Copied';
                 button.classList.add('is-copied');
-                status.textContent = `${name === 'direct' ? 'Direct' : 'Proxy'} address copied.`;
+                status.textContent = `${name === 'direct' ? 'Direct' : name === 'failover' ? 'Proxy' : 'Custom server'} address copied.`;
                 feedbackTimer = setTimeout(resetFeedback, 1800);
             } catch {
                 input.focus();
@@ -75,19 +86,21 @@ function mount({ document, clipboard }) {
                 status.textContent = `Press ${process.platform === 'darwin' ? 'Cmd' : 'Ctrl'}+C to copy the selected address.`;
             }
         });
-        return { name, input, button, resetFeedback };
+        return { name, input, button, row, resetFeedback };
     });
 
     return {
         renderAddresses(values) {
             for (const route of routes) {
-                const address = `localhost:${values[`${route.name}Port`]}`;
+                const port = values[`${route.name}Port`];
+                if (route.name === 'custom') route.row.hidden = !port;
+                const address = port ? `localhost:${port}` : '';
                 if (route.input.value !== address) {
                     route.input.value = address;
                     route.resetFeedback();
                     status.textContent = '';
                 }
-                route.button.disabled = false;
+                route.button.disabled = !port;
             }
         }
     };

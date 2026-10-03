@@ -38,8 +38,7 @@ function createScanRunner(deps) {
         formatBedwarsPrestige,
         getInteractiveTags,
         setLastScanSummary,
-        setLastScanResults,
-        trackTags
+        setLastScanResults
     } = deps;
 
     function getScanCandidateNames(lobbyMap, gameRoster) {
@@ -247,23 +246,8 @@ function createScanRunner(deps) {
                         });
                     }
 
-                    if (typeof trackTags === 'function') {
-                        try {
-                            trackTags({
-                                name,
-                                lookupName: knownDenickedAs,
-                                gameMode: scanGameMode,
-                                team: scanGameMode === 'BEDWARS' ? (getPlayerTeam(lobbyMap, name) || inferTeamFromColor(lobbyMap, name) || '') : '',
-                                data
-                            });
-                        } catch (e) {
-                            console.log('Tag tracker error:', e.message);
-                        }
-                    }
-
-                    // Tags from both APIs
+                    // Urchin tags
                     const uTag = data.urchin?.tag || '';
-                    const sTag = data.seraph; // report_type
 
                     const lookupFailed = Boolean(data.lookupFailed);
                     // A nick the rest of the proxy already settled (tab stats,
@@ -274,7 +258,7 @@ function createScanRunner(deps) {
                     // nick into a plain row.
                     const alreadyDetectedNick = detectedNickedPlayers?.has(String(name).toLowerCase()) || false;
                     const isNicked = Boolean(knownDenickedAs) || alreadyDetectedNick || (!lookupFailed && data.isNicked);
-                    const tagThreat = state.threatConfig.countTags && (uTag || sTag);
+                    const tagThreat = state.threatConfig.countTags && uTag;
                     const nickedThreat = isNicked && !isLikelyBot(name);
                     if (nickedThreat) {
                         markDetectedNick(name, 'scan');
@@ -336,9 +320,7 @@ function createScanRunner(deps) {
                             gameMode: scanGameMode,
                             ...stats,
                             uTag: uTag,
-                            sTag: sTag?.report_type || '',
                             urchinRaw: data.urchin, // <--- Save full Urchin object
-                            seraphRaw: data.seraph, // <--- Save full Seraph object
                             lookupFailed,
                             lookupErrorMessage: data.lookupErrorMessage || '',
                             isNicked: isNicked,
@@ -444,7 +426,7 @@ function createScanRunner(deps) {
                 }
 
                 // ADD THE INTERACTIVE TAGS HERE
-                const tagComponents = getInteractiveTags(m.urchinRaw, m.seraphRaw, m.name);
+                const tagComponents = getInteractiveTags(m.urchinRaw, m.name);
                 playerLine.extra.push(...tagComponents);
 
                 // Add threat marker if applicable

@@ -18,50 +18,7 @@ const { submodeStats } = require('./submodeStats');
 const localTracking = require('./localTracking');
 const { deriveRatios } = require('./localStats');
 
-const MODE_DEFINITIONS = [
-    {
-        key: 'Bedwars',
-        mode: 'BEDWARS',
-        label: 'BedWars',
-        fields: {
-            wins: 'wins_bedwars',
-            losses: 'losses_bedwars',
-            kills: 'kills_bedwars',
-            deaths: 'deaths_bedwars',
-            finals: 'final_kills_bedwars',
-            finalDeaths: 'final_deaths_bedwars',
-            beds: 'beds_broken_bedwars',
-            bedsLost: 'beds_lost_bedwars',
-            games: 'games_played_bedwars',
-            experience: 'Experience'
-        }
-    },
-    {
-        key: 'SkyWars',
-        mode: 'SKYWARS',
-        label: 'SkyWars',
-        fields: {
-            wins: 'wins',
-            losses: 'losses',
-            kills: 'kills',
-            deaths: 'deaths',
-            assists: 'assists',
-            games: 'games'
-        }
-    },
-    {
-        key: 'Duels',
-        mode: 'DUELS',
-        label: 'Duels',
-        fields: {
-            wins: 'wins',
-            losses: 'losses',
-            kills: 'kills',
-            deaths: 'deaths',
-            games: 'games_played_duels'
-        }
-    }
-];
+const { MODE_DEFINITIONS } = require('./modeDefinitions');
 
 const MAX_LAUNCHER_SESSIONS = 250;
 const MAX_LAUNCHER_GAMES = 250;
@@ -156,7 +113,7 @@ function compactGame(record = {}, { encounterLookup = null, ownName = null } = {
         const ownTeam = record.metadata?.team || null;
         const derived = eventTotals(events, { ownName, ownTeam });
         const hasDerivedMovement = Object.values(derived).some(value => number(value) > 0);
-        const stats = apiStats || (definition && hasDerivedMovement ? {
+        const stats = apiStats || record.localModes?.[0] || (definition && hasDerivedMovement ? {
             mode: definition.mode,
             label: definition.label,
             ...derived,
@@ -201,7 +158,7 @@ function compactGame(record = {}, { encounterLookup = null, ownName = null } = {
                 ? opponents.map((name) => ({ name, encounter: encounterLookup(name) || null }))
                 : opponents.map(name => ({ name, encounter: null })),
             stats,
-            statsSource: apiStats ? 'api' : (stats ? 'events' : 'none'),
+            statsSource: apiStats ? 'api' : record.localModes?.length ? 'local' : (stats ? 'events' : 'none'),
             metadata: record.metadata && typeof record.metadata === 'object' ? {
                 serverId: record.metadata.serverId || null,
                 map: record.metadata.map || null,
@@ -252,7 +209,7 @@ function compactSession(entry = {}, now = Date.now(), options = {}) {
     const active = Boolean(entry.active ?? !session.endedAt);
     const endedAt = active ? 0 : number(session.endedAt);
     const local = session.trackingSource === 'local';
-    const modes = local ? localTracking.localModes(session.localTracking).filter(mode=>active||localTracking.FIELDS.some(key=>mode[key]>0)) : compactModes(entry.delta || {});
+    const modes = entry.delta?.local ? entry.delta.modes.filter(mode=>active||localTracking.FIELDS.some(key=>mode[key]>0)) : compactModes(entry.delta || {});
     const games = Array.isArray(session.games)
         ? session.games.slice(-MAX_LAUNCHER_GAMES).reverse().map(record => compactGameFrom(record, {
             ...options,
@@ -357,7 +314,7 @@ function buildLauncherSessionHistory(entries = [], {
     const calendarSessions = scopedEntries.map(({session,delta,active}) => ({
         id:session.id,uuid:session.uuid,name:session.name,startedAt:session.startedAt,
         endedAt:session.endedAt,lastSeen:session.lastSeen,active:Boolean(active ?? !session.endedAt),
-        modes:session.trackingSource==='local'?localTracking.localModes(session.localTracking).filter(mode=>!session.endedAt||localTracking.FIELDS.some(key=>mode[key]>0)):compactModes(delta),
+        modes:delta?.local?delta.modes.filter(mode=>!session.endedAt||localTracking.FIELDS.some(key=>mode[key]>0)):compactModes(delta),
         games:(session.games||[]).map(record=>{
             const game=compactGameFrom(record,{ownName:session.name,gameCache});
             return {id:game.id,at:game.at,from:number(record.delta?.from),mode:game.mode,stats:game.stats,statsSource:game.statsSource,verificationStatus:game.verificationStatus};

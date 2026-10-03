@@ -7,6 +7,7 @@ const { createMenuMonitor, simplifyNbt } = require('./menuMonitor');
 const { parseQuickBuy } = require('./quickBuyImport');
 const { quickBuyMessage } = require('./quickBuyMessages');
 const hotbar = require('./hotbarLayout');
+const { createUsage } = require('../../features/chat_controller');
 
 const SLOTS = Array.from({ length: 21 }, (_, i) => 10 + Math.floor(i / 7) * 9 + i % 7);
 const plain = value => String(value || '').replace(/§[0-9a-fk-or]/gi, '').trim();
@@ -577,8 +578,23 @@ function createQuickBuy({ sendUpstream, sendClient, sendChat, disconnect, canSta
             runArgs = [args[1]];
         }
         if (!(mode === 'quickbuy' ? ['save', 'load', 'set', 'clear', 'test', 'copy'] : ['save', 'load', 'copy']).includes(sub)) {
-            say(`§f/${mode} <player> §8· §f/${mode} save/load <preset> §8· §f/${mode} list`);
-            say(`Presets: §f${listPresets(`/${mode}`).join(', ') || 'none yet'}`);
+            const help = createUsage(sendChat, mode === 'hotbar' ? 'Hotbar' : mode === 'quickbuyandhotbar' ? 'Quick Buy + Hotbar' : 'Quick Buy',
+                'Copy player layouts or manage your saved presets.');
+            help.section('Layouts');
+            help.command(`/${mode} <player>`, 'Copy a player\'s layout.');
+            help.command(`/${mode} preview <player>`, 'Preview a player\'s layout.');
+            help.command(`/${mode} cancel`, 'Cancel the current operation.');
+            help.section('Presets');
+            help.command(`/${mode} save <preset>`, 'Save your current layout.');
+            help.command(`/${mode} load <preset>`, 'Apply a saved layout.');
+            help.command(`/${mode} list`, 'List saved presets.');
+            help.detail(`Presets: ${listPresets(`/${mode}`).join(', ') || 'none yet'}`);
+            if (mode === 'quickbuy') {
+                help.section('Slots');
+                help.command('/quickbuy set <1-21> <item>', 'Set an item in a Quick Buy slot.');
+                help.command('/quickbuy clear <1-21>', 'Clear a Quick Buy slot.');
+                help.command('/quickbuy test', 'Check the Quick Buy menu.');
+            }
             return;
         }
         operation = run(sub, runArgs).catch(error => {

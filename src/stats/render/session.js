@@ -14,6 +14,8 @@
 
 const { sendChat } = require('../../../features/minecraft_chat.js');
 const { formatInt, formatRatio } = require('../format.js');
+const { scoreboardRecapMessages } = require('../recapScoreboard.js');
+const { normalizeRecapFields } = require('../../session/settings.js');
 const {
     getWlrColor,
     getFkdrColor,
@@ -248,6 +250,19 @@ function createSessionRender({ helpers, deps } = {}) {
         return rows;
     }
 
+    function localRecapRows(recap) {
+        const stats = recap.delta.modes?.find(entry => entry.mode === recap.mode);
+        if (!stats) return null;
+        const value = (key, color = '§a') => Number.isFinite(stats[key]) ? count(stats[key], color) : '§8?';
+        const happened = key => Number.isFinite(stats[key]) ? didHappen(stats[key]) : '§8?';
+        if (recap.mode === 'BEDWARS') return [
+            [['Finals', value('finals')], ['Kills', value('kills')]],
+            [['Beds', value('beds')], ['Deaths', value('deaths', '§c')]],
+            [['Bed lost', happened('bedsLost')], ['Final killed', happened('finalDeaths')]]
+        ];
+        return [[['Kills', value('kills')], ['Deaths', value('deaths', '§c')]]];
+    }
+
     const RECAP_BLOCKS = [
         ['Bedwars', bedwarsRecapRows],
         ['SkyWars', skywarsRecapRows],
@@ -296,7 +311,14 @@ function createSessionRender({ helpers, deps } = {}) {
 
         if (delta.local) {
             sendChat(client, `§6[FURY] §f${name || 'Session'} §8· §7${formatShortDuration(delta.spanMs)} §8· §eLocal tracking`);
-            for (const mode of delta.modes || []) {
+            for (const overall of delta.modes || []) {
+                if (focus?.game && overall.mode !== String(focus.game).toUpperCase()) continue;
+                const mode = focus?.mode?.id && focus.mode.id !== 'overall'
+                    ? overall.submodes?.find(entry => entry.id === focus.mode.id) : overall;
+                if (!mode) {
+                    sendChat(client, `§6${overall.label} §8» §7No observed counters for this mode.`);
+                    continue;
+                }
                 const fields = [['wins','Wins'],['losses','Losses'],['games','Completed games'],['finals', 'Final kills'],['finalDeaths','Final deaths'],['kills','Kills'],['deaths','Deaths'], ['beds', 'Beds broken'], ['bedsLost', 'Beds lost'],['wlr','WLR'],['fkdr','FKDR'],['kdr','KDR'],['bblr','BBLR'],['winRate','Win rate'],['localStreak','Local streak']]
                     .filter(([key]) => Number.isFinite(mode[key]));
                 if(!fields.length)sendChat(client,`§6${mode.label} §8» §7No verified counters available`);
@@ -354,6 +376,11 @@ function createSessionRender({ helpers, deps } = {}) {
     // game that just finished, so one line answers "how is today going".
     function sessionFooter(sessionDelta, game) {
         if (!sessionDelta || !game) return null;
+        if (sessionDelta.local) {
+            const totals = sessionDelta.modes?.find(entry => MODE_LABELS[entry.mode] === GAME_LABELS[game]);
+            if (!Number.isFinite(totals?.wins) || !Number.isFinite(totals?.losses)) return null;
+            return `§7Session: §a${formatInt(totals.wins)}W§8/§c${formatInt(totals.losses)}L`;
+        }
         const stats = sessionDelta.stats?.[game];
         if (!hasMovement(stats)) return null;
 
@@ -374,6 +401,14 @@ function createSessionRender({ helpers, deps } = {}) {
     function sessionGoalValues(sessionDelta) {
         const values = { wins: 0, finals: 0, games: 0, minutes: Math.max(0, Math.round((Number(sessionDelta?.spanMs) || 0) / 60000)) };
         if (!sessionDelta) return values;
+        if (sessionDelta.local) {
+            for (const key of ['wins', 'finals', 'games']) {
+                const modes = (sessionDelta.modes || []).filter(mode => key !== 'finals' || mode.mode === 'BEDWARS');
+                if (modes.some(mode => !Number.isFinite(mode[key]))) delete values[key];
+                else values[key] = modes.reduce((sum, mode) => sum + mode[key], 0);
+            }
+            return values;
+        }
         if (hasMovement(sessionDelta.stats?.Bedwars)) {
             const stats = collectBedwarsStats(sessionDelta.stats.Bedwars, BEDWARS_MODE_DEFS[0], sessionDelta.root);
             values.wins += Number(stats.wins) || 0;
@@ -414,39 +449,45 @@ function createSessionRender({ helpers, deps } = {}) {
 
     function renderGameRecap(client, recap, options = {}) {
         if (!recap?.delta) return false;
-        if (recap.delta.local) return renderLocalSession(client, recap.delta, { name: 'Session totals' });
         const game = recap.game;
         const builder = RECAP_BLOCKS.find(([name]) => name === game)?.[1];
-        const rows = builder ? builder(recap.delta) : null;
+        const rows = recap.delta.local ? localRecapRows(recap) : builder ? builder(recap.delta) : null;
         if (!rows) return false;
 
-        const style = ['compact', 'detailed', 'custom'].includes(options.style) ? options.style : 'compact';
-        const fields = style === 'custom' ? new Set(Array.isArray(options.fields) ? options.fields : [])
-            : new Set(['result', 'duration', 'game_stats', 'session_totals', 'goals']);
-        const modeLabel = MODE_LABELS[String(recap.mode || '').toUpperCase()] || GAME_LABELS[game] || 'Game';
-        const result = recap.record?.result;
-        const badge = fields.has('result') ? (result === 'win' ? '§aVICTORY' : result === 'loss' ? '§cDEFEAT' : '§fGAME OVER') : '';
-        const duration = fields.has('duration') && recap.record?.durationMs ? ` §8· §7${formatShortDuration(recap.record.durationMs)}` : '';
-        sendChat(client, `§6[FURY] ${badge}${badge ? ' §8· ' : ''}§f${modeLabel}${duration}`);
-        if (fields.has('game_stats')) {
-            const pairs = rows.flat();
-            const prominent = game === 'Bedwars' ? ['Finals', 'Beds', 'Kills'] : game === 'SkyWars' ? ['Kills', 'Assists'] : ['Kills', 'Deaths'];
-            const line = prominent.map(label => pairs.find(pair => pair[0] === label)).filter(Boolean)
-                .map(([label, value]) => `§7${label}: ${value}`).join(' §8· ');
-            if (line) sendChat(client, line);
-            if (style === 'detailed') {
-                const extra = pairs.filter(([label]) => !prominent.includes(label)).map(([label,value]) => `§7${label}: ${value}`).join(' §8· ');
-                if (extra) sendChat(client, extra);
+        const pairs = rows.flat();
+        const definitions = [
+            ['finals', 'Finals', '§a'], ['beds', 'Beds', '§e'], ['kills', 'Kills', '§b'],
+            ['assists', 'Assists', '§e'], ['deaths', 'Deaths', '§c'], ['deaths', 'Died', '§c'],
+            ['final_deaths', 'Final killed', '§c'], ['beds_lost', 'Bed lost', '§c'],
+            ['rounds', 'Rounds', '§e'], ['stars', 'Stars', '§6']
+        ];
+        const stats = definitions.map(([field, label, color]) => {
+            const pair = pairs.find(([name]) => name === label);
+            return pair && { field, label, value: pair[1],
+                color: ['Died', 'Final killed', 'Bed lost'].includes(label) ? pair[1].slice(0, 2) : color };
+        }).filter(Boolean);
+        const fields = normalizeRecapFields(options.fields);
+        let session = null;
+        if (fields.some(field => field.startsWith('session_')) && recap.sessionDelta) {
+            if (recap.sessionDelta.local) {
+                session = recap.sessionDelta.modes?.find(entry => entry.mode === recap.mode) || null;
+            } else {
+                const stats = recap.sessionDelta.stats?.[game];
+                if (stats && !recap.sessionDelta.unmeasurable?.includes(game)) {
+                    session = game === 'Bedwars' ? collectBedwarsStats(stats, BEDWARS_MODE_DEFS[0], recap.sessionDelta.root)
+                        : game === 'SkyWars' ? collectSkyWarsStats(stats, SKYWARS_MODE_DEFS[0], recap.sessionDelta.root)
+                            : collectDuelsStats(stats, DUELS_MODE_DEFS[0]);
+                }
             }
         }
-        const footer = fields.has('session_totals') ? sessionFooter(recap.sessionDelta, game) : null;
-        if (footer) sendChat(client, footer.replace(/§a\+/g, '§a').replace(/§c\+/g, '§c').replace(/ §8\| /g, ' §8· '));
-        if (fields.has('goals')) {
-            const values = sessionGoalValues(recap.sessionDelta);
-            const goals = Object.entries(options.goals || {}).filter(([key,target]) => Number(target) > 0 && key in values)
-                .slice(0,4).map(([key,target]) => `§7${key}: ${values[key] >= target ? '§a' : '§e'}${formatInt(values[key])}§7/${formatInt(target)}${values[key] >= target ? ' §a✓' : ''}`);
-            if (goals.length) sendChat(client, `§7Goal ${goals.join(' §8· ')}`);
-        }
+        scoreboardRecapMessages({
+            game, result: recap.record?.result,
+            duration: recap.record?.durationMs ? formatShortDuration(recap.record.durationMs) : '',
+            variant: recap.record?.metadata?.variant,
+            map: recap.record?.metadata?.map,
+            stats, session, fields, gamesGoal: options.goals?.games,
+            games: recap.sessionDelta ? sessionGoalValues(recap.sessionDelta).games : undefined
+        }).forEach(message => sendChat(client, message));
         return true;
     }
 

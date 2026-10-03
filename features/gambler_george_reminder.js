@@ -101,22 +101,32 @@ function isGeorgeAcceptanceText(text = '') {
     const clean = cleanGeorgeText(text).toLowerCase();
     if (!clean) return false;
     const hasGeorgeContext = clean.includes('gambler george') || clean.includes('win the bet');
-    return hasGeorgeContext && (
+    if (!hasGeorgeContext) return false;
+    const georgeDialogue = clean.match(/^\[npc\]\s+gambler george:\s*(.*)$/)?.[1] || '';
+    return (
         /\b(?:quest|bet)\s+(?:accepted|started|active)\b/.test(clean)
         || /\b(?:accepted|started)\s+(?:the\s+)?(?:quest|bet)\b/.test(clean)
-        || /\b(?:go\s+)?win\s+(?:2|two)\s+bed\s*wars\s+(?:games|matches)\b/.test(clean)
+        // An offer can also say "win 2 Bed Wars matches". Only George's
+        // instruction after acceptance may start tracking from chat alone.
+        || /^(?:go\s+)?win\s+(?:2|two)\s+bed\s*wars\s+(?:games|matches)\b/.test(georgeDialogue)
+        || /^that's the spirit!(?:\s|$)/.test(georgeDialogue)
     );
 }
 
 function isGeorgeClaimText(text = '') {
     const clean = cleanGeorgeText(text).toLowerCase();
     if (!clean) return false;
+    // The ticket award can be a separate system line without George's name.
+    // Require the exact stake and reject player chat; callers also require a
+    // completed, claim-ready bet before this can clear anything.
+    if (/\+\s*200\s+slumber tickets\b/.test(clean)
+        && !/^[^:]{1,80}:\s/.test(clean)) return true;
     const hasGeorgeContext = clean.includes('gambler george') || clean.includes('win the bet');
+    const georgeDialogue = clean.match(/^\[npc\]\s+gambler george:\s*(.*)$/)?.[1] || '';
     return hasGeorgeContext && (
         /\b(?:reward|bet)\s+(?:claimed|collected|redeemed)\b/.test(clean)
         || /\b(?:claimed|collected|redeemed)\s+(?:the\s+)?(?:reward|bet)\b/.test(clean)
-        || /\b(?:won|completed|finished)\s+(?:the\s+)?bet\b/.test(clean)
-        || /\b(?:here(?:'s| is| are)|take)\b.*\b(?:tickets|reward|winnings)\b/.test(clean)
+        || /^(?:here|take)\b.*\b(?:tickets|reward|winnings|earnings)\b/.test(georgeDialogue)
     );
 }
 
@@ -162,8 +172,6 @@ function createGamblerGeorgeReminder(options = {}) {
         saveState = () => {},
         sendChat = () => {},
         playSound = () => {},
-        // Auto Gambler is what answers George's prompt in the first place, so
-        // with it off there is no bet for this tracker to be tracking.
         getAutoGamblerEnabled = () => true,
         logger = console,
         now = () => Date.now(),
@@ -202,9 +210,7 @@ function createGamblerGeorgeReminder(options = {}) {
             ...state,
             enabled: Boolean(getEnabled()),
             autoGamblerEnabled: autoGambler,
-            // Parked, not disabled: progress already banked is kept intact and
-            // resumes as soon as Auto Gambler is switched back on.
-            paused: !autoGambler,
+            paused: false,
             requiredWins: GAMBLER_GEORGE_REQUIRED_WINS,
             cooldownRemainingMs: remaining,
             onCooldown: remaining > 0
@@ -222,7 +228,7 @@ function createGamblerGeorgeReminder(options = {}) {
     }
 
     function announce(message, sound = null) {
-        if (!getEnabled() || !autoGamblerActive()) return;
+        if (!getEnabled()) return;
         sendChat(message);
         if (!sound) return;
         // Never let a sound write break the alert that matters.
@@ -233,8 +239,8 @@ function createGamblerGeorgeReminder(options = {}) {
         }
     }
 
-    // The enabled/Auto-Gambler check runs when the alert actually fires, so
-    // switching the reminder off inside the delay window still silences it.
+    // The enabled check runs when the alert actually fires, so switching the
+    // reminder off inside the delay window still silences it.
     function announceLater(message, sound = null, delayMs = GAMBLER_GEORGE_WIN_ALERT_DELAY_MS) {
         if (!(delayMs > 0)) {
             announce(message, sound);
@@ -266,11 +272,6 @@ function createGamblerGeorgeReminder(options = {}) {
     }
 
     function acceptQuest(source = 'detected', { restart = false, force = null } = {}) {
-        if (!autoGamblerActive()) {
-            logger.log?.(`[Gambler George Reminder] Ignored ${String(source || 'unknown').trim()} acceptance; `
-                + 'Auto Gambler is off.');
-            return snapshot();
-        }
         if (state.active && !restart) return snapshot();
         const normalizedSource = String(source || '').trim();
         const allowOverride = force === null
@@ -348,7 +349,6 @@ function createGamblerGeorgeReminder(options = {}) {
     }
 
     function recordWin(sessionKey = '') {
-        if (!autoGamblerActive()) return false;
         if (!state.active || state.claimReady) return false;
         const normalizedKey = String(sessionKey || '').trim();
         if (!normalizedKey || normalizedKey === state.lastResultSessionKey) return false;
@@ -373,7 +373,6 @@ function createGamblerGeorgeReminder(options = {}) {
     }
 
     function recordLoss(sessionKey = '') {
-        if (!autoGamblerActive()) return false;
         if (!state.active || state.claimReady) return false;
         const normalizedKey = String(sessionKey || '').trim();
         if (normalizedKey && normalizedKey === state.lastResultSessionKey) return false;
@@ -382,7 +381,6 @@ function createGamblerGeorgeReminder(options = {}) {
     }
 
     function observeGameResult(text = '', context = {}) {
-        if (!autoGamblerActive()) return false;
         if (!state.active || state.claimReady) return false;
         const victory = isVictoryText(text);
         const defeat = !victory && isDefeatText(text);
@@ -400,7 +398,6 @@ function createGamblerGeorgeReminder(options = {}) {
     }
 
     function observeCommand(command = '', source = 'manual_command') {
-        if (!autoGamblerActive()) return false;
         if (!isGeorgeAcceptanceCommand(command)) return false;
         // The explicit positive response is a fresh bet. Restarting here also
         // recovers safely if a previous loss happened while Fury was offline.
@@ -409,7 +406,6 @@ function createGamblerGeorgeReminder(options = {}) {
     }
 
     function observeChatLine(text = '', context = {}) {
-        if (!autoGamblerActive()) return false;
         if (isGeorgeClaimText(text)) {
             if (!state.claimReady) return false;
             clearQuest('claim_chat');
@@ -428,7 +424,7 @@ function createGamblerGeorgeReminder(options = {}) {
     }
 
     function onTransition(kind = 'transition', transitionKey = '') {
-        if (!getEnabled() || !autoGamblerActive()) return false;
+        if (!getEnabled()) return false;
         if (!state.active || !state.claimReady) return false;
         const key = String(transitionKey || '').trim();
         if (!key || key === lastReminderTransitionKey) return false;
@@ -441,7 +437,7 @@ function createGamblerGeorgeReminder(options = {}) {
     return {
         // Cheap enough for a packet hot path: lets callers skip parsing a
         // payload no bet could act on.
-        hasPendingResult: () => autoGamblerActive() && state.active && !state.claimReady,
+        hasPendingResult: () => state.active && !state.claimReady,
         acceptQuest,
         clearQuest,
         clearCooldown,

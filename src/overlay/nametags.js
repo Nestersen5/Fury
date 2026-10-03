@@ -277,8 +277,8 @@ function cleanNametagText(value = '') {
         .trim();
 }
 
-function pickNametagTag(row, compactTagName, priority = 'urchin') {
-    const chosen = pickNametagTagEntry(row, priority);
+function pickNametagTag(row, compactTagName) {
+    const chosen = pickNametagTagEntry(row);
     if (!chosen) return '';
     const compact = typeof compactTagName === 'function'
         ? compactTagName(chosen.value)
@@ -290,18 +290,12 @@ function realNametagTags(row) {
     const tags = Array.isArray(row?.tags) ? row.tags : [];
     return tags.filter(tag => {
         const value = String(tag?.value || '');
-        return value && !/^api\b/i.test(value);
+        return tag?.source === 'Urchin' && value && !/^api\b/i.test(value);
     });
 }
 
-function pickNametagTagEntry(row, priority = 'urchin') {
-    const realTags = realNametagTags(row);
-    const order = priority === 'seraph' ? ['Seraph', 'Urchin'] : ['Urchin', 'Seraph'];
-    for (const source of order) {
-        const found = realTags.find(tag => tag?.source === source);
-        if (found) return found;
-    }
-    return null;
+function pickNametagTagEntry(row) {
+    return realNametagTags(row)[0] || null;
 }
 
 // Tag glyphs remain part of the resource-pack asset map, but are intentionally
@@ -309,7 +303,6 @@ function pickNametagTagEntry(row, priority = 'urchin') {
 const NAMETAG_TAG_DISPLAY_MODES = Object.freeze(['acronyms', 'full']);
 const NAMETAG_TAG_SOURCE_COLORS = Object.freeze({
     urchin: '§d',
-    seraph: '§3'
 });
 const NAMETAG_TAG_DEFINITIONS = Object.freeze({
     blatant_cheater: Object.freeze({ icon: '\uE000\uE001', acronym: 'BC', label: 'Blatant Cheater', color: '§4' }),
@@ -395,7 +388,6 @@ function nametagIconForTag(value = '') {
 function nametagTagSourceColor(source = '', fallback = '') {
     const normalized = String(source || '').trim().toLowerCase();
     if (normalized === 'urchin' || normalized === 'u') return NAMETAG_TAG_SOURCE_COLORS.urchin;
-    if (normalized === 'seraph' || normalized === 's') return NAMETAG_TAG_SOURCE_COLORS.seraph;
     return fallback;
 }
 
@@ -424,14 +416,14 @@ function formatNametagTagValue(value, opts = {}) {
 }
 
 function formatNametagTag(row, opts = {}) {
-    const chosen = pickNametagTagEntry(row, opts.priority);
+    const chosen = pickNametagTagEntry(row);
     if (!chosen) return '';
     return formatNametagTagValue(chosen.value, { ...opts, source: chosen.source });
 }
 
 // Lowercased text of the highest-priority real tag, for `tagType` conditions.
-function nametagPrimaryTagType(row, priority = 'urchin') {
-    const chosen = pickNametagTagEntry(row, priority);
+function nametagPrimaryTagType(row) {
+    const chosen = pickNametagTagEntry(row);
     return chosen ? cleanNametagText(chosen.value).toLowerCase() : '';
 }
 
@@ -669,7 +661,6 @@ function buildNametagFields(row, opts = {}) {
     const {
         compactTagName,
         isLikelyBot,
-        priority = 'urchin',
         audience = null,
         isTeammate = false,
         starBracketsEnabled = true,
@@ -693,7 +684,7 @@ function buildNametagFields(row, opts = {}) {
 
     if (!audience) return { prefixExtra: '', suffix: '' };
 
-    const statOpts = { compactTagName, priority, isTeammate, guildTag: row.guildTag, starBracketsEnabled, tagDisplayMode };
+    const statOpts = { compactTagName, isTeammate, guildTag: row.guildTag, starBracketsEnabled, tagDisplayMode };
     // A prestige has to know its field before it can pick how many colour bands
     // to spend on.
     //

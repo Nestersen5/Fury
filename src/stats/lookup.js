@@ -67,7 +67,6 @@ function createStatsLookup({ getPlayerData, makeUrchinData, makePingData } = {})
                     requestStatus: 'not_checked',
                     error: 'No ping lookup was available.'
                 }),
-                seraph: null,
                 status: options.status || '§7Unknown',
                 isNicked: Boolean(options.isNicked),
                 lookupFailed: Boolean(options.lookupFailed),

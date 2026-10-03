@@ -52,3 +52,15 @@ assert.strictEqual(clickValue(edit), '/overlay threat fkdr ');
 assert.strictEqual(edit.underlined, false);
 
 console.log('Chat controller tests passed.');
+
+const usage = [];
+const guide = controller.createUsage(message => usage.push(message), 'Example', 'Description.');
+guide.section('Controls');
+guide.command('/example start', 'Start the feature.');
+guide.example('/example status');
+assert.strictEqual(usage[0].extra[0].color, 'gold');
+assert(usage[2].extra.every(part => part.color === 'gold' && part.bold));
+assert.deepStrictEqual(usage[3].extra.map(part => [part.text, part.color]), [
+    ['/example start', 'white'], [' - Start the feature.', 'gray']
+]);
+assert(!JSON.stringify(usage).match(/clickEvent|hoverEvent/), 'Static usage must not gain actions');

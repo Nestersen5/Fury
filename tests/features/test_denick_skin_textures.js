@@ -141,6 +141,27 @@ async function flushPromises() {
         assert.deepStrictEqual(sent, [], 'a failed lookup leaves the Hypixel nick skin untouched');
     }
 
+    {
+        const sent = [], pending = [];
+        let real = 'OldOwner';
+        const renamer = createDenickDisplayNames({
+            isEnabled: () => false,
+            resolveRealName: () => real,
+            isSkinReplacementEnabled: () => true,
+            resolveSkinProperties: () => new Promise(resolve => pending.push(resolve)),
+            resend: (packetName, payload) => sent.push({ packetName, payload })
+        });
+        renamer.rewritePlayerInfo({ action: 0, data: [{ uuid: 'correction-test', name: 'SavedNick', properties: [NICK_TEXTURE] }] }, 'add_player');
+        await flushPromises();
+        real = 'NewOwner'; renamer.refreshSavedMappings(); await flushPromises();
+        pending[0]([REAL_TEXTURE]); await flushPromises();
+        assert.equal(sent.length, 0, 'an old skin lookup cannot apply after correction');
+        pending[1]([REAL_TEXTURE]); await flushPromises();
+        assert.deepStrictEqual(sent.at(-1).payload.data[0].properties, [REAL_TEXTURE]);
+        real = null; renamer.refreshSavedMappings();
+        assert.deepStrictEqual(sent.at(-1).payload.data[0].properties, [NICK_TEXTURE], 'removal restores skins even with name replacement disabled');
+    }
+
     console.log('test_denick_skin_textures.js: all assertions passed');
 })().catch((error) => {
     console.error(error);

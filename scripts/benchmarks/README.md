@@ -131,3 +131,20 @@ implementing anything.
 Baselines, decisions and raw samples are written to the `--output` path under the
 ignored `output/` directory and are not tracked in this repository. Runs from
 different fixtures use different fixture hashes and are not comparable.
+
+**Saved nickname history**
+
+`node scripts/benchmarks/nicks_performance.js <baseline-directory>` compares
+synthetic 1,000/2,000-player histories against a saved working-tree baseline.
+The baseline needs `launcher.js`, `src/denick/history.js` and
+`src/denick/denick_history_index.js` at their original relative paths. Save
+these before editing; do not substitute Git HEAD for an already modified tree.
+
+The harness measures unchanged launcher reads, cold proxy loading and bursts
+of twenty detections. It uses the real JSON worker with private temporary
+files; batching submission time is reported separately from mutation time.
+Disk completion is awaited outside the timing samples. It does not measure
+Electron IPC, rendering, live packet latency or peak heap. Results are saved
+under `output/nicks-implementation/`. Use the installed Electron Node runtime
+as shown above when comparing with production. The extra conflict index uses
+memory proportional to saved nickname mappings; it is not an unbounded cache.

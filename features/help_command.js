@@ -41,7 +41,7 @@ const HELP_SECTIONS = [
                 label: '/session',
                 command: '/session',
                 description: 'Your local session deltas, overall or per mode.',
-                variations: ['/session', '/session start', '/session end', '/session bw solo', '/session history', '/session history 3', '/ses refresh'],
+                variations: ['/session', '/session start', '/session end', '/session bw solo', '/session history', '/session history 3', '/session debug on', '/session result win', '/ses refresh'],
                 startup: 'Session tracking and history'
             },
             {
@@ -58,10 +58,16 @@ const HELP_SECTIONS = [
             },
             {
                 label: '/reminder',
+                aliases: ['/reminders'],
                 command: '/reminder status',
-                description: 'Monitor Slumber dust, NPC rewards, and Gambler George claim progress.',
-                variations: ['/reminder on', '/reminder check', '/reminder test', '/reminder threshold 250', '/reminder daily', '/reminder daily on', '/reminder daily check', '/reminder george', '/reminder george on', '/reminder george claimed', '/reminder george cooldown'],
+                description: 'Monitor Slumber dust and Gambler George claim progress.',
+                variations: ['/reminder on', '/reminder check', '/reminder test', '/reminder threshold 250', '/reminder george', '/reminder george on', '/reminder george claimed', '/reminder george cooldown'],
                 startup: 'Slumber reminders'
+            },
+            {
+                label: '/recordcheat /rc', command: '/rc ',
+                description: 'Record labelled player clips and buffered moments.',
+                variations: ['/rc <player> <label> [replay]', '/rc clip <player> <label>', '/rc labels', '/rc buffer on|off [seconds]', '/rc mark [note]', '/rc stop [player]', '/rc status']
             }
         ]
     },
@@ -82,15 +88,16 @@ const HELP_SECTIONS = [
             },
             {
                 label: '/profile',
+                aliases: ['/profiles', '/preset', '/presets'],
                 command: '/profile',
                 description: 'Browse built-in playstyle setups or save and swap your own.',
                 variations: ['/profile list', '/profile competitive', '/profile save friends', '/profile diff competitive', '/profile bind friends bw']
             },
             {
-                label: '/urchin /seraph',
+                label: '/urchin',
                 command: '/urchin ',
                 description: 'External tag lookups.',
-                variations: ['/urchin <player>', '/seraph <player>']
+                variations: ['/urchin <player>']
             },
             {
                 label: '/partycheck',
@@ -104,6 +111,10 @@ const HELP_SECTIONS = [
                 description: 'Manually check every current party member locally; never broadcasts. Preview result styles with /po test.',
                 variations: ['/po', '/po status', '/po test', '/po test caution', '/po test report']
             },
+            { label: '/partyy', command: '/partyy status', description: 'Show the tracked party leader and members.', variations: ['/partyy status'] },
+            { label: '/tag', command: '/tag ', description: 'Review and build community tags for a player.', variations: ['/tag <player>', '/tag type <type>', '/tag text <reason>', '/tag apply'] },
+            { label: '/addtag', command: '/addtag ', description: 'Add a community tag with a reason and privacy options.', variations: ['/addtag <player> <tag_type> <reason> [hide_username=true] [overwrite=true]'] },
+            { label: '/removetag', command: '/removetag ', description: 'Remove a community tag from a player.', variations: ['/removetag <player> <tag_type>'] },
         ]
     },
     {
@@ -115,6 +126,13 @@ const HELP_SECTIONS = [
                 description: 'Analyze current game players.',
                 variations: ['/scan'],
                 startup: 'Current-game analysis'
+            },
+            {
+                label: '/anticheat',
+                aliases: ['/scafdetect', '/scaffolddetect'],
+                command: '/anticheat',
+                description: 'Private chat flags for Scaffold, Autoblock and Stasis in BedWars/SkyWars (Scaffold and Autoblock in replays too).',
+                variations: ['/anticheat on', '/anticheat off', '/anticheat status', '/scafdetect on']
             },
             {
                 label: '/share',
@@ -132,6 +150,7 @@ const HELP_SECTIONS = [
             },
             {
                 label: '/overlay',
+                aliases: ['/scanmode', '/scanconfig'],
                 command: '/overlay ',
                 description: 'Switch scan output and threat thresholds.',
                 variations: ['/overlay all', '/overlay threats', '/overlay off', '/overlay threat fkdr 2']
@@ -144,18 +163,21 @@ const HELP_SECTIONS = [
             },
             {
                 label: '/tabstats',
+                aliases: ['/tabliststats'],
                 command: '/tabstats ',
                 description: 'Core tab list stats inside active games.',
                 variations: ['/tabstats on', '/tabstats off', '/tabstats status']
             },
             {
                 label: '/nametags',
+                aliases: ['/nametag'],
                 command: '/nametags ',
                 description: 'Show nick/tag/threat tags above enemy heads (Bedwars).',
                 variations: ['/nametags on', '/nametags style acronyms|full', '/nametags status']
             },
             {
                 label: '/chatstats /chattrigger',
+                aliases: ['/lobbychatstats', '/chattriggers', '/ctriggers'],
                 command: '/chatstats ',
                 description: 'Lobby chat stat lines and social overlay triggers.',
                 variations: ['/chatstats only mention', '/chatstats source trigger off', '/chattrigger list']
@@ -174,6 +196,7 @@ const HELP_SECTIONS = [
             },
             {
                 label: '/dodge',
+                aliases: ['/autododge'],
                 command: '/dodge status',
                 description: 'Auto-leave a pregame Bedwars lobby for configured tagged, nicked, or stat-threat players.',
                 variations: ['/dodge on', '/dodge include nicks on', '/dodge threat fkdr 4', '/dodge cancel', '/cancel', '/c'],
@@ -184,25 +207,25 @@ const HELP_SECTIONS = [
                 command: '/autododgetest',
                 description: 'Inject a fake tagged pregame chat line to test auto-dodge timing.',
                 variations: ['/autododgetest', '/autododgetest FakePlayer', '/autododgetest FakePlayer anyone got party?']
-            }
+            },
+            { label: '/quickbuy /qb', command: '/quickbuy ', description: 'Copy, save, and load BedWars Quick Buy layouts.', variations: ['/quickbuy <player>', '/quickbuy save <preset>', '/quickbuy load <preset>', '/quickbuy list', '/quickbuy preview <player>', '/quickbuy cancel'] },
+            { label: '/hotbar /hb', command: '/hotbar ', description: 'Copy, save, and load BedWars hotbar layouts.', variations: ['/hotbar <player>', '/hotbar save <preset>', '/hotbar load <preset>', '/hotbar list', '/hotbar preview <player>', '/hotbar cancel'] },
+            { label: '/quickbuyandhotbar /qbahb', command: '/quickbuyandhotbar ', description: 'Copy or manage Quick Buy and hotbar layouts together.', variations: ['/quickbuyandhotbar <player>', '/quickbuyandhotbar save <preset>', '/quickbuyandhotbar load <preset>', '/quickbuyandhotbar list', '/quickbuyandhotbar preview <player>', '/quickbuyandhotbar cancel'] },
+            { label: '/cancel /c', command: '/cancel', description: 'Cancel a pending automatic dodge.', variations: ['/cancel', '/c', '/dodge cancel'] },
+            { label: '/a /t /threat /o', command: '/a', description: 'Scan shortcuts: all players, threats only, or off.', variations: ['/a', '/t', '/threat', '/o'] },
         ]
     },
     {
         title: 'Denicks & Settings',
         entries: [
+            { label: '/nickroll', command: '/nickroll', description: 'Roll until name filters match; manually accept the result.',
+                variations: ['/nickroll start', '/nickroll stop', '/nickroll status', '/nickroll words'] },
             {
                 label: '/denick',
                 command: '/denick ',
                 description: 'Manual, automatic party, stat, and exact-match denick lookup. Party choices appear after a BedWars game starts.',
                 variations: ['/denick party', '/denick party test', '/denick party confirm', '/denick party choose <#>', '/denick add <nick> <realIGN>', '/denick finals <#> beds <#>', '/denick finalkill <name> beddestroy <name>'],
                 startup: 'Nick mappings and party denick'
-            },
-            {
-                label: '/alias',
-                command: '/alias ',
-                description: 'Custom display names for people you know. Keyed on the real IGN, so one entry covers them nicked or not.',
-                variations: ['/alias add <realIGN> <name> [color]', '/alias remove <realIGN>', '/alias list', '/alias nametags on|off', '/alias chat on|off', '/alias tab on|off', '/alias showreal on|off'],
-                startup: 'Custom names for friends'
             },
             {
                 label: '/denickskin',
@@ -214,7 +237,7 @@ const HELP_SECTIONS = [
                 label: '/apikey',
                 command: '/apikey ',
                 description: 'Manage API keys and usage.',
-                variations: ['/apikey hypixel <key>', '/apikey view', '/apikey usage'],
+                variations: ['/apikey hypixel <key>', '/apikey view', '/apikey usage', '/apikey reminder', '/apikey snooze'],
                 startup: 'API key setup'
             },
             {
@@ -245,34 +268,30 @@ const HELP_SECTIONS = [
                     '/fury help settings',
                     '/fury accent #a66bea'
                 ]
-            }
+            },
+            { label: '/help', command: '/help', description: 'Browse all Fury commands by category.', variations: ['/help stats', '/help lookup', '/help overlay', '/help settings', '/help all'] },
         ]
     }
 ];
 
 function createHelpRow(entry) {
-    const row = { text: '', extra: [] };
-    row.extra.push({
-        text: entry.label.split(' ')[0],
-        color: 'aqua',
-        underlined: false,
+    const summary = entry.summary || HELP_SUMMARIES[entry.command.trim()] || entry.description;
+    const row = chat.line(chat.usageCommand(entry.label, summary, {
         clickEvent: { action: 'suggest_command', value: entry.command },
         hoverEvent: {
             action: 'show_text',
             value: [
-                `\u00a7d\u00a7l${entry.label}`,
+                `\u00a76\u00a7l${entry.label}`,
                 `\u00a77${entry.description}`,
                 '',
+                ...(entry.aliases?.length ? [`\u00a77Aliases: \u00a7f${entry.aliases.join(', ')}`] : []),
                 ...(entry.variations || []).map(item => `\u00a78- \u00a7f${item}`),
                 '',
-                `\u00a7aClick to suggest: \u00a7e${entry.command}`
+                `\u00a77Click to suggest: \u00a7f${entry.command}`
             ].join('\n')
         }
-    });
-    const summary = entry.summary || HELP_SUMMARIES[entry.command.trim()] || entry.description;
-    row.extra.push(chat.text(`  ${summary}`, 'gray', {
-        hoverEvent: chat.hover(entry.description)
     }));
+    row.extra[1].hoverEvent = chat.hover(entry.description);
     return row;
 }
 
@@ -284,13 +303,13 @@ const HELP_SUMMARIES = {
     '/session': 'Session tracking', '/recap': 'Last game recap', '/clip': 'Mark a replay moment',
     '/reminder status': 'Slumber reminders', '/info': 'Player status & tags',
     '/ping': 'Ping history', '/profile': 'Playstyle profiles',
-    '/urchin': 'Urchin / Seraph tags', '/partycheck status': 'Party split warnings',
+    '/urchin': 'Urchin tags', '/partycheck status': 'Party split warnings',
     '/po': 'Local party check', '/scan': 'Scan current players', '/share': 'Scan broadcasts',
     '/overlay': 'Visibility & threat rules', '/ol': 'Manual overlay players',
     '/tabstats': 'Tab list stats', '/nametags': 'Above-player stats',
     '/chatstats': 'Chat stats & triggers', '/autogambler status': 'Accept George quest',
     '/dodge status': 'Pregame auto dodge', '/autododgetest': 'Dodge timing preview',
-    '/denick': 'Resolve nicked players', '/alias': 'Custom friend names',
+    '/denick': 'Resolve nicked players',
     '/denickskin': 'Skin-owner lookup', '/apikey': 'API keys & usage',
     '/apikill': 'Pause API requests', '/proxyhealth status': 'Proxy lag guard',
     '/fury': 'Settings commands & guide'
@@ -306,19 +325,20 @@ function handleHelpCommand(client, sendChat, args = []) {
     const section = HELP_SECTIONS[category];
     const pages = Math.max(1, Math.ceil(section.entries.length / HELP_PAGE_SIZE));
     const page = Math.min(pages, Math.max(1, Number.parseInt(tokens[1], 10) || 1));
-    const panel = chat.clientPanel(client, sendChat);
+    const panel = chat.clientPanel(client, sendChat, { colors: { heading: 'gold', value: 'gold', action: 'gold' } });
     panel.title(all ? 'Help - all commands' : `Help  ${category + 1}/4`, section.title);
     panel.row(HELP_CATEGORIES.flatMap((name, index) => [
         ...(index ? [chat.text(' ')] : []),
         ...panel.pick(name[0].toUpperCase() + name.slice(1), !all && index === category,
-            `/help ${name}`, HELP_SECTIONS[index].title)
+            `/help ${name}`, HELP_SECTIONS[index].title, { unselectedColor: 'gray' })
     ]));
     if (all) {
         HELP_SECTIONS.forEach(group => {
-            panel.section(group.title);
+            panel.row(chat.usageSection(group.title));
             group.entries.forEach(entry => sendChat(client, createHelpRow(entry)));
         });
     } else {
+        panel.row(chat.usageSection(section.title));
         section.entries.slice((page - 1) * HELP_PAGE_SIZE, page * HELP_PAGE_SIZE)
             .forEach(entry => sendChat(client, createHelpRow(entry)));
         panel.row([

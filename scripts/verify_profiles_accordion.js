@@ -32,6 +32,12 @@ const target=require('./launcher_verification_target').verificationTarget('profi
    assert.strictEqual(await page.$$eval('.fury-review-row p',els=>els.length),0);
    assert(await page.$eval('main',e=>e.scrollWidth<=e.clientWidth+1));
    assert(await page.$eval('#fury-profile-review',e=>e.getBoundingClientRect().right<=innerWidth));
+   const featureRows = await page.$$eval('.fury-profile-feature-row', elements => elements.map(e => ({height:e.getBoundingClientRect().height, width:e.getBoundingClientRect().width, overflow:e.scrollWidth > e.clientWidth + 1})));
+   assert(featureRows.length === 3 && featureRows.every(row => row.height >= 20 && row.width > 120 && !row.overflow), 'Feature states should be readable and fit their column');
+   await click('.reviewing [data-profile-action="review"]');
+   assert.strictEqual(await page.$$eval('.fury-profile-expanded:not([hidden])', elements => elements.length), 0);
+   await page.keyboard.press('Space');
+   assert.strictEqual(await page.$$eval('.fury-profile-expanded:not([hidden])', elements => elements.length), 1);
    await page.screenshot({path:path.join(output,`profiles-${width}.png`)});
   }
   await click('.fury-profile-library-card.reviewing .fury-profile-more > summary');
@@ -40,9 +46,9 @@ const target=require('./launcher_verification_target').verificationTarget('profi
   await click('[data-page="profiles"] .page-actions .fury-gold-outline');
   assert(await page.$eval('#profile-create-name',e=>e===document.activeElement&&e.checkVisibility()));
   const name=await page.evaluate('profileReviewName');
-  await click('#fury-profile-review [data-profile-action="apply"]');
+  await click('.reviewing [data-profile-action="apply"]');
   await page.waitForFunction(name=>state.profiles.active===name,{},name);
-  assert.deepStrictEqual(errors,[]);console.log('PASS docked review, keyboard selection, selection retention, unique title-only feature rows, apply, duplicate/save controls and both sizes');
+  assert.deepStrictEqual(errors,[]);console.log('PASS inline review, keyboard selection, selection retention, unique title-only feature rows, apply, duplicate/save controls and both sizes');
  target.record();
  }finally{if(browser)await browser.disconnect();await stopChild(child);}
 })().catch(e=>{console.error(e);process.exitCode=1;});

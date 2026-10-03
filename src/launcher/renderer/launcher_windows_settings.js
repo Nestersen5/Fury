@@ -21,6 +21,7 @@ function mount({ document, icon, navigate, invoke }) {
     }
     for (const [id, category, iconName] of [
         ['auto-gambler-enabled', 'Queue automation', 'cardCheck'],
+        ['quick-maths-enabled', 'Quick Maths', 'cardCheck'],
         ['party-split-warnings-enabled', 'Party safety', 'users']
     ]) {
         const card = document.getElementById(id).closest('.feature-card');
@@ -168,7 +169,7 @@ function mount({ document, icon, navigate, invoke }) {
         ['Choose and arrange the information shown beside players in BedWars and SkyWars.', 'Choose and order Tab stats for BedWars and SkyWars.'],
         ["Choose what appears before and after each player's name. The preview updates instantly.", 'Choose what appears before and after names. Preview changes live.'],
         ['Wrap the BedWars level and star icon in dark gray brackets, for example: [385✫].', 'Show BedWars stars in gray brackets: [385✫].'],
-        ['Choose compact acronyms or full classification labels. Urchin renders pink; Seraph renders dark aqua. The preview uses Urchin.', 'Show tag acronyms or full names. Urchin is pink; Seraph is dark aqua.'],
+        ['Choose compact acronyms or full classification labels. Urchin renders pink. The preview uses Urchin.', 'Show tag acronyms or full names. Urchin is pink.'],
         ['Keys stay on this computer. Open a provider to paste, test, or replace its key; everything else remains tucked away.', 'Keys stay on this computer. Open a provider to add or test a key.'],
         ['See the active route, validate endpoints, and know exactly which changes require a restart.', 'Check the active route and edit connection settings.'],
         ['Warn when the proxy lags and temporarily pause expensive optional packet features.', 'Warn about proxy lag and pause optional packet features until it recovers.'],

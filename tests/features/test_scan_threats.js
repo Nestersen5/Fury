@@ -133,6 +133,12 @@ async function runScan({ profiles, detectedNicks = [], scanMode = 'threats', sca
 }
 
 (async () => {
+    for (const gameMode of ['BEDWARS', 'SKYWARS']) {
+        const retired = quietProfile(1);
+        retired.data.seraph = { tagged: true, report_type: 'Blacklisted' };
+        const output = await runScan({ gameMode, profiles: { samplename: retired, quietguy: quietProfile(1) } });
+        assert(!output.includes('samplename'), `${gameMode}: retired reports must not make a quiet player a threat`);
+    }
     // Legacy saved preferences must not restore the removed layout.
     for (const scanChatLayout of [undefined, 'old', 'new']) {
         for (const source of ['skin', 'stats', 'skin_manual', 'saved']) {

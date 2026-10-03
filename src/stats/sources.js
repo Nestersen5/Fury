@@ -1,8 +1,8 @@
 'use strict';
 
 // Raw per-service fetchers for the stats pipeline: Aurora ping
-// (with parsing + summarization), Hypixel status / guild, and Seraph
-// blacklist. The host (proxy.js) owns the caches, key store, dedupe
+// (with parsing + summarization) and Hypixel status / guild.
+// The host (proxy.js) owns the caches, key store, dedupe
 // instance, and key-availability checks; this module receives them
 // via createStatsSources and exposes pure data shapers next to the
 // fetchers that produce them.
@@ -153,7 +153,6 @@ function createStatsSources({
     hasHypixelApiKeyConfigured,
     getHypixelKey,
     getAuroraKey,
-    getSeraphKey,
     guildCache,
     auroraPingCache,
     auroraPingCacheDuration,
@@ -161,7 +160,7 @@ function createStatsSources({
 } = {}) {
     const required = {
         hypixelApiGet, hasHypixelApiKeyConfigured, getHypixelKey, getAuroraKey,
-        getSeraphKey, guildCache, auroraPingCache, auroraPingCacheDuration, auroraPingDeduper
+        guildCache, auroraPingCache, auroraPingCacheDuration, auroraPingDeduper
     };
     for (const [name, value] of Object.entries(required)) {
         if (value === undefined || value === null) {
@@ -257,26 +256,10 @@ function createStatsSources({
         });
     }
 
-    async function getSeraphRaw(uuid) {
-        const seraphKey = getSeraphKey();
-        if (!seraphKey || !uuid) return null;
-        try {
-            const response = await axios.get(`https://api.seraph.si/${uuid}/blacklist?key=${seraphKey}`, { timeout: 3000 });
-            const res = response.data;
-            if (res && res.success && res.data?.blacklist?.tagged) {
-                return res.data.blacklist;
-            }
-            return null;
-        } catch (e) {
-            return null;
-        }
-    }
-
     return {
         getHypixelGuildRaw,
         getHypixelStatusRaw,
         getAuroraPingRaw,
-        getSeraphRaw
     };
 }
 

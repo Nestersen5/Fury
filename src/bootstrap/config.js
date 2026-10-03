@@ -1,5 +1,7 @@
 'use strict';
 
+const { normalizeRecapFields } = require('../session/settings');
+
 // Bootstrap config loaders extracted from proxy.js. Owns parsing + defaults
 // for keys, scan thresholds, chat triggers, and feature flags from disk.
 //
@@ -22,7 +24,6 @@ function createConfigLoader(deps) {
         normalizeTabStatsModeSetting,
         normalizeShareDestination,
         normalizeNametagScope,
-        normalizeNametagSourcePriority,
         normalizeNametagTagDisplayMode,
         normalizeNametagStat,
         clampDodgeDelay,
@@ -107,16 +108,22 @@ function createConfigLoader(deps) {
 
         return {
             chatPrefixAccentHex: String(features.chatPrefixAccentHex || '#e5b35d'),
+            anticheatEnabled: bool('anticheatEnabled', true),
+            anticheatScaffoldEnabled: bool('anticheatScaffoldEnabled', true),
+            anticheatAutoblockEnabled: bool('anticheatAutoblockEnabled', false),
+            anticheatStasisEnabled: bool('anticheatStasisEnabled', false),
+            anticheatPossibleAlertsEnabled: bool('anticheatPossibleAlertsEnabled', true),
+            anticheatTeamAlertsEnabled: bool('anticheatTeamAlertsEnabled', false),
             accentBedwarsEventLabelsEnabled: bool('accentBedwarsEventLabelsEnabled', true),
             bedwarsSidebarTeamColorsEnabled: bool('bedwarsSidebarTeamColorsEnabled', true),
             tabStatsEnabled: Boolean(features.tabStatsEnabled),
             autoScanOnGameStart: true,
             autoGamblerEnabled,
+            quickMathsEnabled: bool('quickMathsEnabled', false),
             autoSkinDenickEnabled: bool('autoSkinDenickEnabled', true),
             autoStatsDenickEnabled: bool('autoStatsDenickEnabled', true),
             denickChatAnnouncementsEnabled: bool('denickChatAnnouncementsEnabled', true),
             denickPartyAnnounceEnabled: bool('denickPartyAnnounceEnabled', false),
-            socialOverlayAddsEnabled: bool('socialOverlayAddsEnabled', true),
             lobbyChatStatsEnabled: bool('lobbyChatStatsEnabled', true),
             lobbyChatStatsMentionEnabled: bool('lobbyChatStatsMentionEnabled', true),
             lobbyChatStatsDmEnabled: bool('lobbyChatStatsDmEnabled', true),
@@ -138,7 +145,6 @@ function createConfigLoader(deps) {
             enderDustReminderEnabled: bool('enderDustReminderEnabled', false),
             enderDustReminderThreshold: enderDustThreshold(features.enderDustReminderThreshold),
             enderDustReminderLastReading: features.enderDustReminderLastReading || null,
-            slumberDailyRewardsReminderEnabled: bool('slumberDailyRewardsReminderEnabled', false),
             gamblerGeorgeReminderEnabled: bool('gamblerGeorgeReminderEnabled', true),
             gamblerGeorgeReminderState: features.gamblerGeorgeReminderState || null,
             partyOverviewEnabled: true,
@@ -166,8 +172,8 @@ function createConfigLoader(deps) {
             replayDetailsEnabled: bool('replayDetailsEnabled', true),
             sessionBoundaryMinutes: 30,
             sessionRetention: 0,
-            sessionRecapStyle: features.sessionRecapStyle || 'detailed',
-            sessionRecapFields: Array.isArray(features.sessionRecapFields) ? features.sessionRecapFields.slice() : ['result', 'duration', 'game_stats', 'session_totals', 'goals'],
+            sessionRecapStyle: 'scoreboard',
+            sessionRecapFields: normalizeRecapFields(features.sessionRecapFields),
             sessionBedwarsFields: Array.isArray(features.sessionBedwarsFields) ? features.sessionBedwarsFields.slice() : ['wins', 'losses', 'finals', 'finalDeaths', 'beds', 'bedsLost', 'kills', 'deaths', 'wlr', 'fkdr', 'kdr', 'bblr', 'games', 'stars'],
             sessionSkywarsFields: Array.isArray(features.sessionSkywarsFields) ? features.sessionSkywarsFields.slice() : ['wins', 'losses', 'kills', 'deaths', 'wlr', 'kdr', 'games', 'assists'],
             sessionDuelsFields: Array.isArray(features.sessionDuelsFields) ? features.sessionDuelsFields.slice() : ['wins', 'losses', 'kills', 'deaths', 'wlr', 'kdr'],
@@ -205,9 +211,6 @@ function createConfigLoader(deps) {
             nametagScope: typeof normalizeNametagScope === 'function'
                 ? normalizeNametagScope(features.nametagScope, 'enemies')
                 : 'enemies',
-            nametagSourcePriority: typeof normalizeNametagSourcePriority === 'function'
-                ? normalizeNametagSourcePriority(features.nametagSourcePriority, 'urchin')
-                : 'urchin',
             nametagTeammatesEnabled: bool('nametagTeammatesEnabled', false),
             nametagTeammatesPrefix: nametagStat(features.nametagTeammatesPrefix, 'none'),
             nametagTeammatesPrefixFallback: nametagStat(features.nametagTeammatesPrefixFallback, 'none'),

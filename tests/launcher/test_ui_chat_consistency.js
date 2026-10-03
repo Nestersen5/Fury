@@ -16,7 +16,7 @@ function verify(label,input,expectedPrefix){
 const metadata={bold:true,italic:true,underlined:true,strikethrough:false,obfuscated:false,
  hoverEvent:{action:'show_text',value:{text:'Keep §cformatting',extra:[{text:' detail',color:'gold'}]}},
  clickEvent:{action:'suggest_command',value:'/help'},insertion:'Keep this'};
-for(const prefix of ['Fury »','FURY »','[Fury]','[FURY]','[Alias]','[Clip]','Gambler George »','Queue time »','Lobby »','Quick Buy »','Quick Buy + Hotbar »','Hotbar »','Preview »','Layout »','Urchin »','Seraph »','Tags »']){
+for(const prefix of ['Fury »','FURY »','[Fury]','[FURY]','[Alias]','[Clip]','Gambler George »','Queue time »','Lobby »','Quick Buy »','Quick Buy + Hotbar »','Hotbar »','Preview »','Layout »','Urchin »','Tags »']){
  verify(prefix,{text:'  '+prefix+' body stays red',color:'red',...metadata},true);
 }
 for(const prefix of ['[MVP+]','[ADMIN]','[Server]','[System]','[Menu]','Book Trace »','[Team debug]','[ClickInfo]','Dodge Test »','[fury]','FURY player says'])verify(prefix,{text:prefix+' body',color:'gold',...metadata},false);

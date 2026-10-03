@@ -6,6 +6,7 @@ const { createSessionStore } = require('../../src/session/sessionStore');
 const { createSessionTracker } = require('../../src/session/sessionTracker');
 const { buildLauncherSessionHistory } = require('../../src/session/launcherSessionHistory');
 const { stats: cardStats } = require('../../src/launcher/renderer/launcher_session_card');
+const { createKillMessages } = require('../../src/cosmetics/killMessages');
 
 const start = { mode: 'BEDWARS', sessionKey: 'game-1', key: 'game-1', ownName: 'Tester', ownTeam: 'Aqua',
     observedFromStart: true, standardBedwars: true, identityKnown: true, startedAt: 1000 };
@@ -50,6 +51,21 @@ assert.deepStrictEqual(require('../../src/session/localStats').normalizeLocal({ 
 (async () => {
     const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'fury-local-sessions-'));
     const sessionFile = path.join(folder, 'sessions.json');
+    const killMessages = createKillMessages({
+        sendChat() {}, stripAnsi: value => String(value).replace(/\u00a7[0-9a-fk-or]/gi, ''),
+        killMessagePatternsFile: path.join(folder, 'kill-message-patterns.json'),
+        getDenickKillMessageNames: () => [], denickCosmeticApiValue: () => null
+    });
+    const cosmeticGame = createGame(start);
+    const cosmeticContext = { at: 2000, detectKnownKillMessageForStats: killMessages.detectKnownKillMessageForStats };
+    observe(cosmeticGame, 'Rival was too shy to meet Tester.', cosmeticContext);
+    observe(cosmeticGame, 'Rival was too shy to meet Tester.', { ...cosmeticContext, at: 2001 });
+    observe(cosmeticGame, 'Enemy howled into the void for NickName. FINAL KILL!',
+        { ...cosmeticContext, at: 3000, ownNames: ['NickName'] });
+    observe(cosmeticGame, "Other was Tester's final #4.", { ...cosmeticContext, at: 3500 });
+    observe(cosmeticGame, 'Tester was yelled at by Rival.', { ...cosmeticContext, at: 4000 });
+    assert.deepStrictEqual([cosmeticGame.counts.kills.value, cosmeticGame.counts.finals.value,
+        cosmeticGame.counts.deaths.value], [1, 2, 1], 'catalog messages count own regular kills, nicked finals and deaths once');
     let stamp = 1000000, apiAvailable = false, calls = 0;
     const account = { uuid: 'a'.repeat(32), name: 'Tester' };
     const timers = new Map(); let timerId = 0;

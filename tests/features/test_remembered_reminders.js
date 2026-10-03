@@ -35,16 +35,16 @@ async function run() {
         assert(reminders.getStatus().enderDust.error.includes('Connect Minecraft once'));
         store.remember(alice, 'Alice');
         await reminders.refresh();
-        assert.strictEqual(calls, 1, 'one player request refreshes both reminders with alerts disabled');
+        assert.strictEqual(calls, 1, 'one player request refreshes dust with alerts disabled');
         assert.strictEqual(reminders.getStatus().enderDust.enderDust, 270);
-        assert.strictEqual(reminders.getStatus().slumberDailyRewards.readyCount, 0);
+        assert.strictEqual(reminders.getStatus().gamblerGeorge.paused, false,
+            'the launcher does not mark George tracking paused when Auto Gambler is off');
         await reminders.refresh();
         assert.strictEqual(calls, 1, 'background polling respects the five-minute interval');
 
         const restartedStore = createReminderAccountStore(directory, () => now);
         assert.strictEqual(restartedStore.selected().uuid, alice, 'last account survives restart');
         now += 24 * 60 * 60 * 1000;
-        assert.strictEqual(reminders.getStatus().slumberDailyRewards.readyCount, 1, 'saved daily rewards reset while disconnected');
         settings.features.apiKillSwitchEnabled = true;
         await reminders.refresh({ force: true });
         assert.strictEqual(calls, 1, 'manual refresh respects the API kill switch');
@@ -57,7 +57,7 @@ async function run() {
         fail = true;
         await reminders.refresh();
         assert.strictEqual(reminders.getStatus().enderDust.enderDust, 270, 'failed refresh retains readings');
-        assert(reminders.getStatus().slumberDailyRewards.error.includes('offline'));
+        assert(reminders.getStatus().enderDust.error.includes('offline'));
         await reminders.refresh();
         assert.strictEqual(calls, 2, 'failure retries are paced too');
         fail = false;

@@ -7016,9 +7016,6 @@ aside.app-rail .nav-tab[data-page-tab="console"].active::before {
 [data-api-card="aurora"] .api-key-input::before {
     content: "ⓘ  Aurora access is provider-managed. Ask the Aurora service operator for a key, then paste it here.";
 }
-[data-api-card="seraph"] .api-key-input::before {
-    content: "ⓘ  Seraph access is provider-managed. Ask the Seraph service operator for a key, then paste it here.";
-}
 
 .session-opponent-name {
     display: inline-flex;
@@ -9409,37 +9406,6 @@ aside.app-rail .nav-tab.active::before {
 .reminder-card-head p { margin: 1px 0 0; color: var(--muted); font-size: 12px; line-height: 1.35; }
 .reminder-card-head .feature-toggle { flex: 0 0 auto; }
 
-.reminder-daily-card .reminder-card-head { flex-wrap: wrap; }
-.reminder-daily-card .reminder-card-head > div:first-child { flex: 1 1 280px; }
-.reminder-daily-actions { display: flex; align-items: center; gap: 20px; margin-left: auto; }
-.reminder-daily-filter {
-    display: inline-flex;
-    align-items: center;
-    gap: 9px;
-    padding: 10px 12px;
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    color: var(--text);
-    background: var(--panel);
-    font-size: 13px;
-    font-weight: 600;
-    white-space: nowrap;
-    cursor: pointer;
-}
-.reminder-daily-filter:has(input:checked) { border-color: var(--accent-border); background: var(--accent-soft); }
-.reminder-daily-filter:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 3px; }
-.reminders-page .reminder-daily-filter input[type="checkbox"] {
-    appearance: auto;
-    flex: 0 0 16px;
-    width: 16px;
-    height: 16px;
-    min-height: 0;
-    margin: 0;
-    padding: 0;
-    accent-color: var(--accent);
-    cursor: pointer;
-}
-
 .reminder-card-body {
     display: grid;
     grid-template-columns: minmax(190px, .8fr) minmax(160px, .68fr) minmax(0, 1.5fr);
@@ -9501,7 +9467,6 @@ aside.app-rail .nav-tab.active::before {
 }
 
 .reminder-repeat-limit strong { color: var(--text); font-size: 11px; white-space: nowrap; }
-.reminder-daily-card .reminder-card-body { display: block; padding: 8px 22px 9px; }
 .reminder-daily-status {
     display: flex;
     min-height: 22px;
@@ -9512,57 +9477,10 @@ aside.app-rail .nav-tab.active::before {
     line-height: 1.4;
 }
 
-.slumber-daily-reward-list {
-    display: grid;
-    gap: 8px;
-    margin-top: 12px;
-}
-
-.slumber-daily-reward-list:empty { display: none; }
-
-.slumber-daily-reward-row {
-    display: grid;
-    grid-template-columns: minmax(180px, .8fr) minmax(240px, 1.2fr);
-    gap: 10px;
-    align-items: center;
-    padding: 10px 12px;
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    background: var(--panel-2);
-    color: var(--muted);
-    font-size: 12px;
-}
-
-.slumber-daily-reward-row strong {
-    color: var(--text-strong);
-    font-size: 13px;
-}
-
-.slumber-daily-reward-row span {
-    min-width: 0;
-}
-
-.slumber-daily-reward-row b {
-    color: var(--text);
-    font-weight: 720;
-}
-
-.slumber-daily-reward-row .good-text b {
-    color: var(--good);
-}
-
-.slumber-daily-reward-row .bad-text b {
-    color: var(--bad);
-}
-
 @media (max-width: 860px) {
     .reminder-card-body { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .reminder-actions { grid-column: 1 / -1; }
 
-    .slumber-daily-reward-row {
-        grid-template-columns: 1fr;
-        gap: 4px;
-    }
 }
 
 @media (max-width: 560px) {
@@ -13205,33 +13123,10 @@ header.app-topbar #app-restart.header-icon-button {
     font-size: 14px;
 }
 
-.reminders-page .reminder-daily-card .reminder-card-body {
-    padding: 24px 30px 28px;
-}
-
 .reminders-page .reminder-daily-status {
     min-height: 48px;
     font-size: 16px;
     line-height: 1.5;
-}
-
-.reminders-page .slumber-daily-reward-list {
-    gap: 14px;
-    margin-top: 18px;
-}
-
-.reminders-page .slumber-daily-reward-row {
-    grid-template-columns: minmax(250px, .82fr) minmax(0, 1.18fr);
-    gap: 18px;
-    min-height: 82px;
-    padding: 18px 20px;
-    border-radius: 16px;
-    font-size: 15px;
-    line-height: 1.5;
-}
-
-.reminders-page .slumber-daily-reward-row strong {
-    font-size: 17px;
 }
 
 @media (max-width: 760px) {
@@ -13240,14 +13135,12 @@ header.app-topbar #app-restart.header-icon-button {
     }
 
     .reminders-page .reminder-card-head,
-    .reminders-page .reminder-card-body,
-    .reminders-page .reminder-daily-card .reminder-card-body {
+    .reminders-page .reminder-card-body {
         padding-inline: 20px;
     }
 
     .reminders-page .reminder-card-body,
-    .reminders-page .reminder-actions,
-    .reminders-page .slumber-daily-reward-row {
+    .reminders-page .reminder-actions {
         grid-template-columns: 1fr;
     }
 

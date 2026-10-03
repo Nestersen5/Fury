@@ -66,6 +66,12 @@ function createStore({ now, getMaxSessions = null } = {}) {
 }
 
 (async () => {
+    assert.equal(normalizeSessionFeatureSettings({}).sessionRecapStyle, 'scoreboard');
+    assert.equal(normalizeSessionFeatureSettings({ sessionRecapStyle: 'scoreboard' }).sessionRecapStyle, 'scoreboard');
+    for (const style of ['compact', 'detailed', 'custom', 'invalid']) {
+        assert.equal(normalizeSessionFeatureSettings({ sessionRecapStyle: style }).sessionRecapStyle, 'scoreboard',
+            'Saved legacy layouts migrate to scoreboard');
+    }
     {
         const normalized = normalizeSessionFeatureSettings({
             sessionBoundaryMinutes: 45,
@@ -79,7 +85,7 @@ function createStore({ now, getMaxSessions = null } = {}) {
         assert.strictEqual(normalized.sessionBoundaryMinutes, SESSION_DEFAULTS.sessionBoundaryMinutes);
         assert.strictEqual(normalized.sessionRetention, 0, 'legacy retention choices migrate to unlimited');
         assert.strictEqual(normalizeSessionFeatureSettings({sessionBoundaryMinutes:180}).sessionBoundaryMinutes, 30, 'legacy inactivity choices migrate to 30 minutes');
-        assert.strictEqual(normalized.sessionRecapStyle, 'custom');
+        assert.strictEqual(normalized.sessionRecapStyle, 'scoreboard');
         assert.deepStrictEqual(normalized.sessionRecapFields, ['result', 'goals']);
         assert.deepStrictEqual(normalized.sessionBedwarsFields, ['wins', 'fkdr']);
         assert.strictEqual(normalized.sessionGoalWins, 0);

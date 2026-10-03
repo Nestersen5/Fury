@@ -4,8 +4,10 @@ const SESSION_BOUNDARY_MINUTES = [30, 60, 180, 360];
 // 0 means unlimited local history. Keeping the sentinel numeric lets the
 // launcher persist the choice without introducing a second string schema.
 const SESSION_RETENTION_CHOICES = [0, 50, 100, 250, 1000];
-const SESSION_RECAP_STYLES = ['compact', 'detailed', 'custom'];
-const SESSION_RECAP_FIELDS = ['result', 'duration', 'game_stats', 'session_totals', 'goals'];
+const SESSION_RECAP_STYLES = ['scoreboard'];
+const SESSION_RECAP_FIELDS = ['header', 'result', 'duration', 'map', 'mode', 'finals', 'beds', 'kills',
+    'deaths', 'final_deaths', 'beds_lost', 'assists', 'rounds', 'stars',
+    'session_wins', 'session_losses', 'session_ratio', 'session_games', 'goals'];
 // Explicit off preserves charts for older saved field lists without this option.
 const SESSION_CHART_FIELDS = ['gamesByMode', 'hideGamesByMode'];
 const SESSION_TRACKED_FIELDS = {
@@ -17,8 +19,9 @@ const SESSION_TRACKED_FIELDS = {
 const SESSION_DEFAULTS = {
     sessionBoundaryMinutes: 30,
     sessionRetention: 0,
-    sessionRecapStyle: 'compact',
-    sessionRecapFields: SESSION_RECAP_FIELDS.slice(),
+    sessionRecapStyle: 'scoreboard',
+    sessionRecapFields: ['header', 'result', 'duration', 'map', 'mode', 'finals', 'beds', 'kills',
+        'deaths', 'assists', 'session_wins', 'session_losses', 'session_ratio', 'goals'],
     sessionBedwarsFields: ['wins', 'losses', 'finals', 'finalDeaths', 'beds', 'bedsLost', 'kills', 'deaths', 'wlr', 'fkdr', 'kdr', 'bblr', 'games', 'stars'],
     sessionSkywarsFields: ['wins', 'losses', 'kills', 'deaths', 'wlr', 'kdr', 'games', 'assists'],
     sessionDuelsFields: ['wins', 'losses', 'kills', 'deaths', 'wlr', 'kdr'],
@@ -46,6 +49,20 @@ function normalizeGoal(value, max = 100000) {
     return Number.isFinite(parsed) ? Math.min(max, Math.max(0, parsed)) : 0;
 }
 
+function normalizeRecapFields(value) {
+    if (!Array.isArray(value)) return SESSION_DEFAULTS.sessionRecapFields.slice();
+    // Older launchers always displayed the game rows, regardless of these
+    // aggregate toggles. Migrate that appearance once to individual fields.
+    const legacy = value.includes('game_stats') || value.includes('session_totals');
+    const fields = legacy ? ['header', 'result', 'duration', 'map', 'mode', 'finals', 'beds', 'kills', 'deaths', 'assists'] : [];
+    for (const field of value) {
+        if (field === 'session_totals') fields.push('session_wins', 'session_losses', 'session_ratio');
+        else if (SESSION_RECAP_FIELDS.includes(field)) fields.push(field);
+    }
+    // An explicitly empty selection means no recap content, not defaults.
+    return [...new Set(fields)];
+}
+
 function normalizeSessionFeatureSettings(source = {}) {
     const style = SESSION_RECAP_STYLES.includes(String(source.sessionRecapStyle || '').toLowerCase())
         ? String(source.sessionRecapStyle).toLowerCase()
@@ -55,11 +72,7 @@ function normalizeSessionFeatureSettings(source = {}) {
         sessionBoundaryMinutes: SESSION_DEFAULTS.sessionBoundaryMinutes,
         sessionRetention: SESSION_DEFAULTS.sessionRetention,
         sessionRecapStyle: style,
-        sessionRecapFields: normalizeFieldList(
-            source.sessionRecapFields,
-            SESSION_RECAP_FIELDS,
-            SESSION_DEFAULTS.sessionRecapFields
-        ),
+        sessionRecapFields: normalizeRecapFields(source.sessionRecapFields),
         sessionBedwarsFields: normalizeFieldList(
             source.sessionBedwarsFields,
             SESSION_TRACKED_FIELDS.BEDWARS,
@@ -102,6 +115,7 @@ module.exports = {
     normalizeChoiceNumber,
     normalizeFieldList,
     normalizeGoal,
+    normalizeRecapFields,
     normalizeSessionFeatureSettings,
     sessionGoalsFromSettings
 };
