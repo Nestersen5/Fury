@@ -16,6 +16,7 @@ const { sendChat } = require('../../../features/minecraft_chat.js');
 const { formatInt, formatRatio } = require('../format.js');
 const { scoreboardRecapMessages } = require('../recapScoreboard.js');
 const { normalizeRecapFields } = require('../../session/settings.js');
+const { gameModes } = require('../../session/observedStats.js');
 const {
     getWlrColor,
     getFkdrColor,
@@ -447,6 +448,47 @@ function createSessionRender({ helpers, deps } = {}) {
         return true;
     }
 
+    function averageGameTime(sessionDelta, mode) {
+        const durations = (sessionDelta?.session?.games || [])
+            .filter(game => game?.mode === mode && !game.metadata?.privateGame
+                && Number.isFinite(game.durationMs) && game.durationMs >= 1000)
+            .map(game => game.durationMs);
+        if (!durations.length) return '';
+        return formatShortDuration(durations.reduce((sum, duration) => sum + duration, 0) / durations.length);
+    }
+
+    function knownSessionRecapTotals(sessionDelta, mode) {
+        let games = 0;
+        let wins = 0;
+        let losses = 0;
+        let finals = 0;
+        let finalDeaths = 0;
+        for (const game of sessionDelta?.session?.games || []) {
+            if (game?.mode !== mode || game.metadata?.privateGame || !(game.durationMs >= 1000)) continue;
+            games++;
+            const stats = gameModes(game)?.find(entry => entry.mode === mode);
+            if (game.result === 'win') wins++;
+            else if (game.result === 'loss') losses++;
+            else {
+                wins += Number.isFinite(stats?.wins) ? stats.wins : 0;
+                losses += Number.isFinite(stats?.losses) ? stats.losses : 0;
+            }
+            // FKDR needs both counters from a match. If either is unknown,
+            // treat that match as zero finals and zero final deaths while
+            // retaining its known game result and played count above.
+            if (Number.isFinite(stats?.finals) && Number.isFinite(stats?.finalDeaths)) {
+                finals += stats.finals;
+                finalDeaths += stats.finalDeaths;
+            }
+        }
+        return games ? {
+            games,
+            wins,
+            losses,
+            fkdr: finals / Math.max(finalDeaths, 1)
+        } : null;
+    }
+
     function renderGameRecap(client, recap, options = {}) {
         if (!recap?.delta) return false;
         const game = recap.game;
@@ -478,9 +520,24 @@ function createSessionRender({ helpers, deps } = {}) {
                 }
             }
         }
+        if (fields.some(field => ['session_wins', 'session_losses', 'session_games', 'session_ratio'].includes(field))) {
+            const observed = knownSessionRecapTotals(recap.sessionDelta, recap.mode);
+            if (observed) {
+                session = { ...(session || {}) };
+                if (fields.includes('session_wins') && !Number.isFinite(session.wins)) session.wins = observed.wins;
+                if (fields.includes('session_losses') && !Number.isFinite(session.losses)) session.losses = observed.losses;
+                if (fields.includes('session_games')) {
+                    session.games = Math.max(Number.isFinite(session.games) ? session.games : 0, observed.games);
+                }
+                if (fields.includes('session_ratio') && game === 'Bedwars' && !Number.isFinite(session.fkdr)) {
+                    session.fkdr = observed.fkdr;
+                }
+            }
+        }
         scoreboardRecapMessages({
             game, result: recap.record?.result,
             duration: recap.record?.durationMs ? formatShortDuration(recap.record.durationMs) : '',
+            averageGameTime: averageGameTime(recap.sessionDelta, recap.mode),
             variant: recap.record?.metadata?.variant,
             map: recap.record?.metadata?.map,
             stats, session, fields, gamesGoal: options.goals?.games,

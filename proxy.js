@@ -6025,6 +6025,8 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 });
             }
             if (variations.length) {
+                // Give a quiet, local cue before the clickable choices appear.
+                playSelfSound({ name: 'note.pling', volume: 0.65, pitch: 90 });
                 // One variation means the roster left exactly one way to
                 // assign the nicks - forced, but only as sound as the roster
                 // it was derived from, so say that rather than letting a lone
@@ -11434,6 +11436,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             getPregameSessionId: () => bedwarsPregameSessionId,
             isEnabled: () => autoDodgeEnabled,
             isPartyMember: (name) => partyTracker.isTrackedMember(name),
+            isPartyRosterUsable: () => !partyTracker.isInParty() || partyTracker.hasUsableState(),
             getDelaySeconds: () => autoDodgeDelaySeconds,
             getDodgeSettings: () => ({
                 taggedPlayers: autoDodgeTaggedPlayers,

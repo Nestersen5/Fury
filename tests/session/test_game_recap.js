@@ -352,6 +352,45 @@ function makeRecap(overrides = {}) {
 }
 
 {
+    const recap = makeRecap({ sessionDelta: {
+        local: true,
+        modes: [{ mode: 'BEDWARS', wins: 3, losses: 1 }],
+        session: { games: [
+            { mode: 'BEDWARS', durationMs: 120000,
+                localModes: [{ mode: 'BEDWARS', finals: 4, finalDeaths: 2 }] },
+            { mode: 'BEDWARS', durationMs: 90000,
+                localModes: [{ mode: 'BEDWARS', finalDeaths: 1, unavailable: ['finals'] }] },
+            { mode: 'BEDWARS', durationMs: 90000, metadata: { privateGame: true },
+                localModes: [{ mode: 'BEDWARS', finals: 100, finalDeaths: 1 }] },
+            { mode: 'DUELS', durationMs: 90000,
+                localModes: [{ mode: 'DUELS', finals: 100, finalDeaths: 1 }] }
+        ] }
+    } });
+    const client = fakeClient();
+    renderGameRecap(client, recap);
+    assert.ok(client.text().includes('FKDR 2.00'),
+        'session FKDR uses games with both counters known and excludes unknown, private, and other-mode games');
+    assert.ok(client.text().includes('AVG TIME 1m 45s'),
+        'average game time still includes games with known duration even when their stats are incomplete');
+}
+
+{
+    const recap = makeRecap({ sessionDelta: {
+        local: true,
+        modes: [{ mode: 'BEDWARS', wins: 1, losses: 0 }],
+        session: { games: [{ mode: 'BEDWARS', durationMs: 120000,
+            result: 'win', localModes: [{ mode: 'BEDWARS', unavailable: ['finals', 'finalDeaths'] }] }] }
+    } });
+    const client = fakeClient();
+    renderGameRecapActual(client, recap, {
+        style: 'scoreboard', fields: ['session_wins', 'session_losses', 'session_games', 'session_ratio']
+    });
+    assert.ok(client.text().includes('FKDR 0.00'), 'an incomplete match contributes zero to FKDR instead of hiding the total');
+    assert.ok(client.text().includes('SESSION 1W / 0L'), 'a known result remains counted when game stats are incomplete');
+    assert.ok(client.text().includes('PLAYED 1'), 'a game with unknown stats still contributes to games played');
+}
+
+{
     // A single game is not a session: no ratios, no win/loss rows, no
     // "Games: +1", and no signed deltas on the per-game counts.
     const client = fakeClient();
