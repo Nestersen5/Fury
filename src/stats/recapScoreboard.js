@@ -16,7 +16,7 @@ const CHAT_WIDTH = 320;
 
 // Shared by real Minecraft chat and the launcher's preview. Widths use Fury's
 // existing Minecraft glyph metrics; no HTML-specific layout enters chat.
-function scoreboardRecapLines({ game, result, duration = '', variant = '', map = '', stats = [], gamesGoal = 0, games, session = null, fields } = {}) {
+function scoreboardRecapLines({ game, result, duration = '', averageGameTime = '', variant = '', map = '', stats = [], gamesGoal = 0, games, session = null, fields } = {}) {
     const selected = new Set(normalizeRecapFields(fields));
     const title = { Bedwars: 'BED WARS', SkyWars: 'SKYWARS', Duels: 'DUELS' }[game] || 'GAME';
     const badge = result === 'win' ? '§aVICTORY' : result === 'loss' ? '§cDEFEAT' : '§fGAME OVER';
@@ -62,6 +62,7 @@ function scoreboardRecapLines({ game, result, duration = '', variant = '', map =
             summary.push(`§7FKDR §f${Number.isFinite(session.fkdr) ? formatRatio(session.fkdr) : '?'}`);
         }
         if (selected.has('session_games')) summary.push(`§7PLAYED §f${count(session.games)}`);
+        if (averageGameTime) summary.push(`§7AVG TIME §f${averageGameTime}`);
     }
     const hasSession = summary.length > 0;
     if (hasSession) summary[0] = '§7SESSION ' + summary[0];

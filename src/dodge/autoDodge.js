@@ -37,6 +37,7 @@ function createAutoDodger(deps) {
         applyConfig,
         compactTagName,
         isPartyMember = () => false,
+        isPartyRosterUsable = () => true,
         // Injectable clock so tests can pin the countdown math; live use
         // always runs on Date.now.
         now = Date.now
@@ -218,6 +219,10 @@ function createAutoDodger(deps) {
     function maybeSchedule(name, profile, options = {}) {
         if (!isEnabled() || !isPregameActive() || isGameActive()) return;
         if (pendingDodge) return; // first matching player wins; later triggers are ignored
+        // A partial roster after joining or a leader change is not evidence
+        // that a missing name is an opponent. Wait for /p list to confirm it
+        // before acting on a party member's tag or stats.
+        if (!isPartyRosterUsable()) return;
         if (isPartyMember(name)) return; // never dodge over your own party member
         const knownDenick = options.knownDenick || null;
         const realName = String(knownDenick?.realName || knownDenick?.realIGN || '').trim();

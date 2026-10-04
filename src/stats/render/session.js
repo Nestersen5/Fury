@@ -16,6 +16,7 @@ const { sendChat } = require('../../../features/minecraft_chat.js');
 const { formatInt, formatRatio } = require('../format.js');
 const { scoreboardRecapMessages } = require('../recapScoreboard.js');
 const { normalizeRecapFields } = require('../../session/settings.js');
+const { gameModes } = require('../../session/observedStats.js');
 const {
     getWlrColor,
     getFkdrColor,
@@ -447,6 +448,31 @@ function createSessionRender({ helpers, deps } = {}) {
         return true;
     }
 
+    function averageGameTime(sessionDelta, mode) {
+        const durations = (sessionDelta?.session?.games || [])
+            .filter(game => game?.mode === mode && !game.metadata?.privateGame
+                && Number.isFinite(game.durationMs) && game.durationMs >= 1000)
+            .map(game => game.durationMs);
+        if (!durations.length) return '';
+        return formatShortDuration(durations.reduce((sum, duration) => sum + duration, 0) / durations.length);
+    }
+
+    function knownSessionFkdr(sessionDelta, mode) {
+        if (mode !== 'BEDWARS') return null;
+        let finals = 0;
+        let finalDeaths = 0;
+        let knownGames = 0;
+        for (const game of sessionDelta?.session?.games || []) {
+            if (game?.mode !== mode || game.metadata?.privateGame || !(game.durationMs >= 1000)) continue;
+            const stats = gameModes(game)?.find(entry => entry.mode === mode);
+            if (!Number.isFinite(stats?.finals) || !Number.isFinite(stats?.finalDeaths)) continue;
+            finals += stats.finals;
+            finalDeaths += stats.finalDeaths;
+            knownGames++;
+        }
+        return knownGames ? finals / Math.max(finalDeaths, 1) : null;
+    }
+
     function renderGameRecap(client, recap, options = {}) {
         if (!recap?.delta) return false;
         const game = recap.game;
@@ -478,9 +504,14 @@ function createSessionRender({ helpers, deps } = {}) {
                 }
             }
         }
+        if (fields.includes('session_ratio') && session && game === 'Bedwars' && !Number.isFinite(session.fkdr)) {
+            const partialFkdr = knownSessionFkdr(recap.sessionDelta, recap.mode);
+            if (Number.isFinite(partialFkdr)) session = { ...session, fkdr: partialFkdr };
+        }
         scoreboardRecapMessages({
             game, result: recap.record?.result,
             duration: recap.record?.durationMs ? formatShortDuration(recap.record.durationMs) : '',
+            averageGameTime: averageGameTime(recap.sessionDelta, recap.mode),
             variant: recap.record?.metadata?.variant,
             map: recap.record?.metadata?.map,
             stats, session, fields, gamesGoal: options.goals?.games,
