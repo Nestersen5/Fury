@@ -457,20 +457,36 @@ function createSessionRender({ helpers, deps } = {}) {
         return formatShortDuration(durations.reduce((sum, duration) => sum + duration, 0) / durations.length);
     }
 
-    function knownSessionFkdr(sessionDelta, mode) {
-        if (mode !== 'BEDWARS') return null;
+    function knownSessionRecapTotals(sessionDelta, mode) {
+        let games = 0;
+        let wins = 0;
+        let losses = 0;
         let finals = 0;
         let finalDeaths = 0;
-        let knownGames = 0;
         for (const game of sessionDelta?.session?.games || []) {
             if (game?.mode !== mode || game.metadata?.privateGame || !(game.durationMs >= 1000)) continue;
+            games++;
             const stats = gameModes(game)?.find(entry => entry.mode === mode);
-            if (!Number.isFinite(stats?.finals) || !Number.isFinite(stats?.finalDeaths)) continue;
-            finals += stats.finals;
-            finalDeaths += stats.finalDeaths;
-            knownGames++;
+            if (game.result === 'win') wins++;
+            else if (game.result === 'loss') losses++;
+            else {
+                wins += Number.isFinite(stats?.wins) ? stats.wins : 0;
+                losses += Number.isFinite(stats?.losses) ? stats.losses : 0;
+            }
+            // FKDR needs both counters from a match. If either is unknown,
+            // treat that match as zero finals and zero final deaths while
+            // retaining its known game result and played count above.
+            if (Number.isFinite(stats?.finals) && Number.isFinite(stats?.finalDeaths)) {
+                finals += stats.finals;
+                finalDeaths += stats.finalDeaths;
+            }
         }
-        return knownGames ? finals / Math.max(finalDeaths, 1) : null;
+        return games ? {
+            games,
+            wins,
+            losses,
+            fkdr: finals / Math.max(finalDeaths, 1)
+        } : null;
     }
 
     function renderGameRecap(client, recap, options = {}) {
@@ -504,9 +520,19 @@ function createSessionRender({ helpers, deps } = {}) {
                 }
             }
         }
-        if (fields.includes('session_ratio') && session && game === 'Bedwars' && !Number.isFinite(session.fkdr)) {
-            const partialFkdr = knownSessionFkdr(recap.sessionDelta, recap.mode);
-            if (Number.isFinite(partialFkdr)) session = { ...session, fkdr: partialFkdr };
+        if (fields.some(field => ['session_wins', 'session_losses', 'session_games', 'session_ratio'].includes(field))) {
+            const observed = knownSessionRecapTotals(recap.sessionDelta, recap.mode);
+            if (observed) {
+                session = { ...(session || {}) };
+                if (fields.includes('session_wins') && !Number.isFinite(session.wins)) session.wins = observed.wins;
+                if (fields.includes('session_losses') && !Number.isFinite(session.losses)) session.losses = observed.losses;
+                if (fields.includes('session_games')) {
+                    session.games = Math.max(Number.isFinite(session.games) ? session.games : 0, observed.games);
+                }
+                if (fields.includes('session_ratio') && game === 'Bedwars' && !Number.isFinite(session.fkdr)) {
+                    session.fkdr = observed.fkdr;
+                }
+            }
         }
         scoreboardRecapMessages({
             game, result: recap.record?.result,
