@@ -382,7 +382,9 @@ function makeRecap(overrides = {}) {
             result: 'win', localModes: [{ mode: 'BEDWARS', unavailable: ['finals', 'finalDeaths'] }] }] }
     } });
     const client = fakeClient();
-    renderGameRecap(client, recap, { fields: ['session_wins', 'session_losses', 'session_games', 'session_ratio'] });
+    renderGameRecapActual(client, recap, {
+        style: 'scoreboard', fields: ['session_wins', 'session_losses', 'session_games', 'session_ratio']
+    });
     assert.ok(client.text().includes('FKDR 0.00'), 'an incomplete match contributes zero to FKDR instead of hiding the total');
     assert.ok(client.text().includes('SESSION 1W / 0L'), 'a known result remains counted when game stats are incomplete');
     assert.ok(client.text().includes('PLAYED 1'), 'a game with unknown stats still contributes to games played');
