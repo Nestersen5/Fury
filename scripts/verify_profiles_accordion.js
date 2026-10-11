@@ -21,17 +21,24 @@ const target=require('./launcher_verification_target').verificationTarget('profi
   for(const [width,height] of [[1440,900],[1024,680]]){
    await page.setViewport({width,height});await page.evaluate("activatePage('profiles')");
    await page.waitForSelector('[data-profile-card]');
+   const expanded = await page.$('.reviewing [data-profile-action="review"]');
+   if (expanded) {
+    await click('.reviewing [data-profile-action="review"]');
+    await page.waitForFunction(() => !document.querySelector('.reviewing'));
+   }
    const before=await page.evaluate('state.profiles.active');
    await click('[data-profile-card]:nth-child(2) [data-profile-action="review"]');
    assert.strictEqual(await page.evaluate('state.profiles.active'),before);
    const selected=await page.evaluate('profileReviewName');
    await page.evaluate('renderProfiles(state.profiles)');assert.strictEqual(await page.evaluate('profileReviewName'),selected);
+   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(resolve)));
    await page.focus('[data-profile-card]:first-child [data-profile-action="review"]');await page.keyboard.press('Enter');
+   await page.waitForSelector('.reviewing .fury-profile-expanded');
    const rows=await page.$$eval('.fury-review-row',els=>els.map(e=>e.querySelector('strong').textContent));
    assert(rows.length<=8);assert.strictEqual(new Set(rows).size,rows.length);
    assert.strictEqual(await page.$$eval('.fury-review-row p',els=>els.length),0);
    assert(await page.$eval('main',e=>e.scrollWidth<=e.clientWidth+1));
-   assert(await page.$eval('#fury-profile-review',e=>e.getBoundingClientRect().right<=innerWidth));
+   assert(await page.$eval('.reviewing .fury-profile-expanded',e=>e.getBoundingClientRect().right<=innerWidth));
    const featureRows = await page.$$eval('.fury-profile-feature-row', elements => elements.map(e => ({height:e.getBoundingClientRect().height, width:e.getBoundingClientRect().width, overflow:e.scrollWidth > e.clientWidth + 1})));
    assert(featureRows.length === 3 && featureRows.every(row => row.height >= 20 && row.width > 120 && !row.overflow), 'Feature states should be readable and fit their column');
    await click('.reviewing [data-profile-action="review"]');
