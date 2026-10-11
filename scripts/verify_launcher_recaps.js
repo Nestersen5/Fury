@@ -11,7 +11,11 @@ module.exports = async function verify({ page, output, profile }) {
     const ready = text => page.waitForFunction(expected => {
         const canvas = document.querySelector('#session-recap-preview canvas');
         return canvas && canvas.getAttribute('aria-label').includes(expected);
-    }, {}, text);
+    }, {}, text).catch(async error => {
+        const actual = await page.$eval('#session-recap-preview', element =>
+            element.querySelector('canvas')?.getAttribute('aria-label') || element.textContent);
+        throw new Error(`Recap preview missing ${JSON.stringify(text)}: ${actual}`, { cause: error });
+    });
     const saved = () => page.waitForFunction('!featureSaveTimer && !featureSaveInFlight');
     const read = () => JSON.parse(fs.readFileSync(path.join(profile, 'features_config.json'), 'utf8'));
     const capture = async name => {
@@ -22,11 +26,18 @@ module.exports = async function verify({ page, output, profile }) {
     };
     await ready('SESSION 6W / 2L');
     await ready('Solos   Map: Airshow');
-    assert(await page.$$eval('#session-recap-fields input', inputs => inputs.every(input => input.closest('label').checkVisibility())));
-    assert.deepEqual(await page.$$eval('#session-recap-fields input', inputs => inputs.map(input => input.value)),
+    assert(await page.$$eval('#session-recap-fields input[value]', inputs => inputs.every(input => input.closest('label').checkVisibility())));
+    assert.deepEqual(await page.$$eval('#session-recap-fields input[value]', inputs => inputs.map(input => input.value)),
         require('../src/session/settings').SESSION_RECAP_FIELDS);
     assert.equal(await page.$eval('#session-recap-fields input[value="session_ratio"]',
         input => input.closest('label').textContent.trim()), 'Session FKDR');
+    await ready('AVG TIME 9m 42s');
+    await page.focus('#session-average-game-time');
+    await page.keyboard.press('Space');
+    await saved();
+    assert.equal(read().sessionAverageGameTimeEnabled, false);
+    await page.waitForFunction(() => !document.querySelector('#session-recap-preview canvas')
+        ?.getAttribute('aria-label').includes('AVG TIME'));
     await page.$eval('#session-goal-games', input => {
         input.value = '10';
         input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -58,7 +69,7 @@ module.exports = async function verify({ page, output, profile }) {
         return { width: canvas.width, height: canvas.height, mismatches,
             cssWidth: canvas.getBoundingClientRect().width, smoothing: canvas.getContext('2d').imageSmoothingEnabled };
     });
-    assert.deepEqual(geometry, { width: 648, height: 98, mismatches: [], cssWidth: 648, smoothing: false });
+    assert.deepEqual(geometry, { width: 648, height: 116, mismatches: [], cssWidth: 648, smoothing: false });
     await capture('recap-session-and-goal');
 
     const toggle = async value => {
@@ -89,8 +100,8 @@ module.exports = async function verify({ page, output, profile }) {
         return canvas && !canvas.getAttribute('aria-label').includes(expected);
     }, {}, text);
     for (const [field, text] of [['header', 'RECAP'], ['result', 'VICTORY'], ['duration', '11m 06s'],
-        ['map', 'Map: Airshow'], ['mode', 'Solos'], ['finals', 'FINALS'], ['beds', 'BEDS'],
-        ['kills', 'KILLS'], ['deaths', 'DEATHS'], ['session_wins', '6W'], ['session_losses', '2L'],
+        ['map', 'Map: Airshow'], ['mode', 'Solos'], ['finals', 'Finals'], ['beds', 'Beds'],
+        ['kills', 'Kills'], ['deaths', 'Deaths'], ['session_wins', '6W'], ['session_losses', '2L'],
         ['session_ratio', 'FKDR']]) {
         await toggle(field);
         await absent(text);
@@ -105,6 +116,14 @@ module.exports = async function verify({ page, output, profile }) {
         await toggle(field);
         await ready(text);
     }
+    for (const [field, text] of [['session_finals', 'Finals: 26'], ['session_beds', 'Beds: 10'],
+        ['session_avg_finals', 'Avg. finals: 3.25'], ['session_avg_beds', 'Avg. beds: 1.25']]) {
+        await toggle(field);
+        await ready(text);
+        assert(read().sessionRecapFields.includes(field));
+        await toggle(field);
+        await absent(text);
+    }
     await capture('recap-all-bedwars-fields');
     await (await page.$('.session-recap-designer')).screenshot({ path: path.join(output, 'recap-settings.png') });
     const selected = read().sessionRecapFields;
@@ -113,7 +132,7 @@ module.exports = async function verify({ page, output, profile }) {
     assert.deepEqual(read().sessionRecapFields, []);
     await page.evaluate('refresh()');
     await page.waitForFunction('!refreshInFlight');
-    assert.equal(await page.$$eval('#session-recap-fields input:checked', inputs => inputs.length), 0);
+    assert.equal(await page.$$eval('#session-recap-fields input[value]:checked', inputs => inputs.length), 0);
     assert(await page.$eval('#session-recap-preview', el => el.textContent.includes('Select information')));
     for (const field of require('../src/session/settings').SESSION_DEFAULTS.sessionRecapFields) await toggle(field);
     await ready('GAMES 8/10');
@@ -134,5 +153,10 @@ module.exports = async function verify({ page, output, profile }) {
             && ['auto', 'scroll'].includes(getComputedStyle(el).overflowX);
     }), 'Narrow layouts scroll the exact pixel preview instead of stretching glyphs');
     await capture('recap-minimum-width');
+    await page.focus('#session-average-game-time');
+    await page.keyboard.press('Space');
+    await saved();
+    assert.equal(read().sessionAverageGameTimeEnabled, true);
+    await ready('AVG TIME 9m 42s');
     console.log('PASS Recap bitmap widths, all field toggles, empty selection, keyboard input, persistence, refresh, disabled state and narrow layout');
 };
