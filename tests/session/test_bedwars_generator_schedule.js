@@ -64,19 +64,19 @@ const footer = JSON.stringify({ text: '', extra: [
 ] });
 const rendered = appendGeneratorRowToFooter(footer, getBedwarsGeneratorStats(345000));
 assert.strictEqual(componentText(rendered),
-    'Kills: 0  Beds Broken: 0\n\nEmeralds (1): 5  Diamonds (2): 12\nSTORE.HYPIXEL.NET');
+    'Kills: 0  Beds Broken: 0\n\nEmeralds (5): 12  Diamonds (12): 16\nSTORE.HYPIXEL.NET');
 assert.deepStrictEqual(JSON.parse(rendered).extra.slice(2, 13), [
     { text: 'Emeralds (', color: 'green' },
-    { text: '1', color: 'white' },
+    { text: '5', color: 'white' },
     { text: ')', color: 'green' },
     { text: ': ', color: 'green' },
-    { text: '5', color: 'gray' },
+    { text: '12', color: 'gray' },
     { text: '  ', color: 'white' },
     { text: 'Diamonds (', color: 'aqua' },
-    { text: '2', color: 'white' },
+    { text: '12', color: 'white' },
     { text: ')', color: 'aqua' },
     { text: ': ', color: 'aqua' },
-    { text: '12', color: 'gray' }
+    { text: '16', color: 'gray' }
 ]);
 assert.deepStrictEqual(JSON.parse(rendered).extra.at(-1), JSON.parse(footer).extra.at(-1));
 assert.strictEqual(appendGeneratorRowToFooter('Lobby footer', {}), 'Lobby footer');
@@ -118,9 +118,15 @@ assert.strictEqual(writes.length, 1, 'unchanged footer is not sent twice');
 assert.strictEqual(timers.size, 1, 'only one refresh timer');
 const tick = [...timers.values()][0].callback;
 timers.clear();
+stamp += 1000;
+tick();
+assert(componentText(writes.at(-1).packet.footer).includes('Emeralds (5): 11  Diamonds (12): 15'),
+    'the countdown updates each second while bracketed production counts stay unchanged');
+assert.strictEqual(timers.size, 1);
+timers.clear();
 stamp = 100000 + 361000; // Delayed callback crosses the upgrade without drift.
 tick();
-assert(componentText(writes.at(-1).packet.footer).includes('Diamonds (2): 13'));
+assert(componentText(writes.at(-1).packet.footer).includes('Diamonds (13): 23'));
 assert.strictEqual(timers.size, 1);
 context.enabled = false;
 context.refreshBedwarsGeneratorFooter();
@@ -149,7 +155,7 @@ assert.strictEqual(timers.size, 0, 'no polling when the footer has no insertion 
 context.originalTabFooterPacket = { header: 'Header', footer };
 context.sidebarLines = ['Diamond II in 0:02'];
 context.syncBedwarsGeneratorClock();
-assert(componentText(writes.at(-1).packet.footer).includes('Diamonds (2): 12'));
+assert(componentText(writes.at(-1).packet.footer).includes('Diamonds (12): 3'));
 assert.strictEqual(timers.size, 0, 'scoreboard mode has no competing local countdown');
 const beforeClockTick = writes.length;
 stamp += 2300;
@@ -158,26 +164,26 @@ context.refreshBedwarsGeneratorFooter();
 assert.strictEqual(writes.length, beforeClockTick, 'wall time cannot advance the displayed scoreboard clock');
 context.sidebarLines = ['Diamond II in 0:01'];
 context.syncBedwarsGeneratorClock();
-assert.strictEqual(writes.length, beforeClockTick, 'unchanged resource totals do not resend the footer on a scoreboard tick');
-assert(componentText(writes.at(-1).packet.footer).includes('Diamonds (2): 12'));
+assert.strictEqual(writes.length, beforeClockTick + 1, 'a changed countdown resends the footer even when resource totals stay unchanged');
+assert(componentText(writes.at(-1).packet.footer).includes('Diamonds (12): 2'));
 context.sidebarLines = ['Emerald II in 6:00'];
 context.syncBedwarsGeneratorClock();
-assert(componentText(writes.at(-1).packet.footer).includes('Diamonds (2): 12'));
+assert(componentText(writes.at(-1).packet.footer).includes('Diamonds (12): 1'));
 context.sidebarLines = ['Emerald II in 5:59'];
 context.syncBedwarsGeneratorClock();
-assert(componentText(writes.at(-1).packet.footer).includes('Diamonds (2): 13'));
+assert(componentText(writes.at(-1).packet.footer).includes('Diamonds (13): 23'));
 assert.strictEqual(timers.size, 0);
 context.sidebarLines = ['Emerald II in 0:01'];
 context.syncBedwarsGeneratorClock();
-assert(componentText(writes.at(-1).packet.footer).includes('Emeralds (1): 11'));
+assert(componentText(writes.at(-1).packet.footer).includes('Emeralds (11): 1'));
 context.sidebarLines = ['Diamond III in 6:00'];
 context.syncBedwarsGeneratorClock();
-assert(componentText(writes.at(-1).packet.footer).includes('Emeralds (1): 12'));
+assert(componentText(writes.at(-1).packet.footer).includes('Emeralds (12): 50'));
 context.sidebarLines = [];
 context.syncBedwarsGeneratorClock();
 assert.strictEqual(context.generatorSidebarElapsedMs, null);
 assert.strictEqual(timers.size, 1, 'missing scoreboard clock restores the fallback timer');
-assert(componentText(writes.at(-1).packet.footer).includes('Emeralds (1): 12'),
+assert(componentText(writes.at(-1).packet.footer).includes('Emeralds (12): 50'),
     'fallback continues from the last synchronized clock instead of jumping to local start time');
 context.sidebarLines = ['Diamond II in 0:01'];
 context.activeSessionGameMetadata = { privateGame: true };
@@ -193,7 +199,7 @@ context.bedwarsTabSettings = normalizeBedwarsTabSettings({
 });
 context.isTabStatsActiveInGame = () => false;
 context.refreshBedwarsGeneratorFooter();
-assert(!componentText(writes.at(-1).packet.footer).includes('Diamonds (2):'));
+assert(!componentText(writes.at(-1).packet.footer).includes('Diamonds ('));
 assert(componentText(writes.at(-1).packet.footer).includes('Diamond II: 2:41  |  Game End: 46:41'));
 assert.strictEqual(timers.size, 0);
 context.bedwarsTabSettings = normalizeBedwarsTabSettings({ tabResourcesEnabled: false, tabPhasesEnabled: false });
@@ -205,7 +211,7 @@ context.refreshBedwarsGeneratorFooter();
 assert.strictEqual(writes.at(-1).packet.footer, footer, 'outside a match settings do not fabricate a game clock');
 context.gameActive = true;
 context.refreshBedwarsGeneratorFooter();
-assert(componentText(writes.at(-1).packet.footer).includes('Emeralds (1):'));
-assert(!componentText(writes.at(-1).packet.footer).includes('Diamonds (2):'));
+assert(componentText(writes.at(-1).packet.footer).includes('Emeralds (3): 28'));
+assert(!componentText(writes.at(-1).packet.footer).includes('Diamonds ('));
 
 console.log('BedWars generator schedule and footer refresh tests passed.');

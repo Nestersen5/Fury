@@ -119,15 +119,15 @@ function buildBedwarsTabRows(stats, elapsedMs, settings = {}) {
     const config = normalizeBedwarsTabSettings(settings);
     const output = [];
     if (config.tabResourcesEnabled) {
-        for (const [type, generator] of [['emerald', 1], ['diamond', 2]]) {
+        for (const type of ['emerald', 'diamond']) {
             if (!config.tabResourceTypes.includes(type)) continue;
             if (output.length) output.push({ text: '  ', color: 'white' });
             output.push(
                 { text: `${type === 'diamond' ? 'Diamonds' : 'Emeralds'} (`, color: type === 'diamond' ? 'aqua' : 'green' },
-                { text: String(generator), color: 'white' },
+                { text: String(Math.max(0, Number(stats?.[`${type}s`]) || 0)), color: 'white' },
                 { text: ')', color: type === 'diamond' ? 'aqua' : 'green' },
                 { text: ': ', color: type === 'diamond' ? 'aqua' : 'green' },
-                { text: String(Math.max(0, Number(stats?.[`${type}s`]) || 0)), color: 'gray' }
+                { text: String(Math.max(0, Number(stats?.[`${type}Seconds`]) || 0)), color: 'gray' }
             );
         }
     }

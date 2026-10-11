@@ -19,12 +19,12 @@ const stats = getBedwarsGeneratorStats(elapsedMs);
 const show = settings => componentText(appendGeneratorRowToFooter(footer, stats, { settings, elapsedMs }));
 const phaseOnly = { tabResourcesEnabled: false, tabPhasesEnabled: true };
 assert.strictEqual(show({ tabResourcesEnabled: false, tabPhasesEnabled: false }), componentText(footer));
-assert.strictEqual(show({ tabResourceTypes: ['diamond'] }), 'Kills: 0 Final Kills: 0 Beds Broken: 0\n\nDiamonds (2): 7\nStore');
-assert.strictEqual(show({ tabResourceTypes: ['emerald'] }), 'Kills: 0 Final Kills: 0 Beds Broken: 0\n\nEmeralds (1): 3\nStore');
+assert.strictEqual(show({ tabResourceTypes: ['diamond'] }), 'Kills: 0 Final Kills: 0 Beds Broken: 0\n\nDiamonds (7): 14\nStore');
+assert.strictEqual(show({ tabResourceTypes: ['emerald'] }), 'Kills: 0 Final Kills: 0 Beds Broken: 0\n\nEmeralds (3): 28\nStore');
 assert.strictEqual(show({ ...phaseOnly, tabPhaseTypes: ['gameend', 'diamond2', 'emerald3', 'diamond2', 'invalid'] }),
     'Kills: 0 Final Kills: 0 Beds Broken: 0\n\nDiamond II: 2:41  |  Emerald III: 20:41\nGame End: 46:41\nStore');
 const all = show({ tabPhasesEnabled: true });
-assert(all.includes('Emeralds (1): 3  Diamonds (2): 7\n\nDiamond II: 2:41'));
+assert(all.includes('Emeralds (3): 28  Diamonds (7): 14\n\nDiamond II: 2:41'));
 assert(all.includes('Diamond II: 2:41  |  Emerald II: 8:41\nDiamond III: 14:41  |  Emerald III: 20:41'));
 assert(all.includes('Bed Gone: 26:41  |  Sudden Death: 36:41\nDragons: 41:41  |  Game End: 46:41'));
 assert(!show({ tabResourcesEnabled: false, tabPhaseTypes: [] }).includes('\n\n'));
@@ -33,7 +33,7 @@ for (const phase of BEDWARS_TAB_PHASES) {
     assert.strictEqual(past, footer, 'completed phase disappears without empty rows');
 }
 const noNewline = componentText(appendGeneratorRowToFooter('Beds Broken: 0', stats, { settings: { tabResourceTypes: ['emerald'] } }));
-assert.strictEqual(noNewline, 'Beds Broken: 0\n\nEmeralds (1): 3');
+assert.strictEqual(noNewline, 'Beds Broken: 0\n\nEmeralds (3): 28');
 
 // Round-trip through the real feature whitelist using isolated runtime data.
 const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'fury-bedwars-tab-'));
