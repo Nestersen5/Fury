@@ -105,7 +105,7 @@ async function lifecycle(apiAvailable) {
     const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'fury-auto-recap-'));
     let stamp = 100000, wins = 10, losses = 5, kills = 20, playing = false;
     let releaseFetch = null, holdFetch = false;
-    const notifications = [], callbacks = [];
+    const notifications = [], callbacks = [], verifications = [];
     const allow = createAutomaticRecapGuard({ now: () => stamp });
     const owner = { uuid: 'a'.repeat(32), name: 'Tester' };
     const store = createSessionStore({ sessionFile: path.join(folder, 'sessions.json'),
@@ -118,7 +118,8 @@ async function lifecycle(apiAvailable) {
             return { uuid: owner.uuid, displayname: owner.name,
                 stats: { Bedwars: { wins_bedwars: wins, losses_bedwars: losses, kills_bedwars: kills } } };
         },
-        onGameRecap: value => { callbacks.push(value); if (allow(value, { playing })) notifications.push(value); }
+        onGameRecap: value => { callbacks.push(value); if (allow(value, { playing })) notifications.push(value); },
+        onGameVerified: value => verifications.push(value)
     });
     const start = { mode: 'BEDWARS', sessionKey: 'one', ownTeam: 'Aqua',
         ownName: 'Tester', observedFromStart: true, standardBedwars: true, identityKnown: true };
@@ -134,18 +135,20 @@ async function lifecycle(apiAvailable) {
         tracker.observeLocalResult('[MVP+] Rival: VICTORY!');
         stamp += 60000;
         if (apiAvailable) {
-            await tracker.onGameEnd({ mode: 'BEDWARS', durationMs: 60001, sessionKey: 'one' });
-            assert.equal(notifications.length, 0, 'Unpublished results wait silently');
+            tracker.observeLocalResult('VICTORY!');
+            await tracker.onGameEnd({ mode: 'BEDWARS', durationMs: 60001, sessionKey: 'one', immediate: true, events: [{ type: 'victory' }] });
+            assert.equal(notifications.length, 1, 'An observed result prints before API publication');
             wins++; kills++;
             holdFetch = true;
             const a = tracker.processPendingVerifications({ force: true });
             const b = tracker.processPendingVerifications({ force: true });
             releaseFetch(); holdFetch = false;
             await Promise.all([a, b]);
-            assert.equal(callbacks.length, 1, 'Concurrent verification consumes a record once');
+            assert.equal(verifications.length, 1, 'Concurrent verification consumes a record once');
+            assert.equal(callbacks.length, 1, 'API reconciliation never reprints the observed recap');
         } else {
             tracker.observeLocalResult('VICTORY!');
-            await tracker.onGameEnd({ mode: 'BEDWARS', durationMs: 60001, sessionKey: 'one' });
+            await tracker.onGameEnd({ mode: 'BEDWARS', durationMs: 60001, sessionKey: 'one', immediate: true, events: [{ type: 'victory' }] });
         }
         assert.equal(notifications.length, 1, 'Exactly one recap for the real game');
         await tracker.onGameEnd({ mode: 'BEDWARS', durationMs: 60001, sessionKey: 'one' });
@@ -155,7 +158,7 @@ async function lifecycle(apiAvailable) {
         tracker.observeLocalChat('Other was killed by Tester.', start);
         stamp += 60000;
         if (apiAvailable) {
-            await tracker.onGameEnd({ mode: 'BEDWARS', durationMs: 60000, sessionKey: 'two' });
+            await tracker.onGameEnd({ mode: 'BEDWARS', durationMs: 60000, sessionKey: 'two', immediate: true });
             playing = true;
             await tracker.onGameStart({ ...start, sessionKey: 'three' });
             wins++;
@@ -164,7 +167,7 @@ async function lifecycle(apiAvailable) {
             assert.equal(store.getLastGame(owner.uuid).verificationStatus, 'pending', 'A window overlapping a live match cannot be attributed to the previous game');
         } else {
             tracker.observeLocalResult('VICTORY!');
-            await tracker.onGameEnd({ mode: 'BEDWARS', durationMs: 60000, sessionKey: 'two' });
+            await tracker.onGameEnd({ mode: 'BEDWARS', durationMs: 60000, sessionKey: 'two', immediate: true, events: [{ type: 'victory' }] });
             assert.equal(notifications.length, 2);
             assert.equal(notifications[1].delta.modes[0].kills, 1, 'Local recap contains only this game');
             assert.equal(notifications[1].sessionDelta.modes[0].kills, 2, 'Session total remains separate');
