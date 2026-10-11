@@ -8,6 +8,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const mc = require('minecraft-protocol');
+const { compactPacket, createPacketView } = require('../../src/diagnostics/teamDebug');
 const { unusedPorts, cleanEnvironment, startChild, stopChild, assertRunning, eventually, getJson } = require('../../scripts/smoke_packaged_app');
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -35,6 +36,7 @@ require(${JSON.stringify(path.join(root, 'src/stats/fetch.js'))}).createStatsFet
     env.FURY_ENABLE_DIAGNOSTICS = '0';
     const upstream = mc.createServer({ host: '127.0.0.1', port: upstreamPort, 'online-mode': false, version: '1.8.9', keepAlive: false });
     const receivedCommands = [], downstreamPackets = [], messages = [], errors = [], tabUpdates = new Map();
+    const clientView = createPacketView();
     let upstreamClient, player, child;
     const uuid = '11111111-1111-1111-1111-111111111111';
     upstream.on('error', error => errors.push(error.message));
@@ -50,7 +52,9 @@ require(${JSON.stringify(path.join(root, 'src/stats/fetch.js'))}).createStatsFet
             { uuid: '22222222-2222-2222-2222-222222222222', name: 'WhitePlayer' },
             { uuid: '33333333-3333-3333-3333-333333333333', name: 'GreenPlayer' },
             { uuid: '44444444-4444-4444-4444-444444444444', name: 'RedPlayer' },
-            { uuid: '55555555-5555-5555-5555-555555555555', name: 'YellowPlayer' }
+            { uuid: '55555555-5555-5555-5555-555555555555', name: 'YellowPlayer' },
+            { uuid: '66666666-6666-6666-6666-666666666666', name: 'GreenMate' },
+            { uuid: '77777777-7777-7777-7777-777777777777', name: 'BlueMate' }
         ];
         client.write('player_info', { action: 'add_player', data: reportPlayers.map(p => ({ ...p, properties: [], gamemode: 0, ping: 1, displayName: null })) });
         const team = (name, color, prefix, players) => client.write('scoreboard_team', {
@@ -58,8 +62,10 @@ require(${JSON.stringify(path.join(root, 'src/stats/fetch.js'))}).createStatsFet
         });
         team('Red1', 12, '\u00a7cR ', ['Alice']);
         team('Blue1', 9, '\u00a79B ', []);
+        team('Blue2', 9, '\u00a79B ', ['BlueMate']);
         team('Pink0', 15, '§lW §r§f', ['WhitePlayer']);
         team('Yellow0', 15, '§a§lG §r§a', ['DebugObserver']);
+        team('Yellow1', 15, '§a§lG §r§a', ['GreenMate']);
         team('Yellow11', 15, '§e§lY §r§e', ['YellowPlayer']);
         // Initially shares Yellow's registry entry, then must split out only
         // its own member when the server supplies the real Green prefix.
@@ -78,7 +84,10 @@ require(${JSON.stringify(path.join(root, 'src/stats/fetch.js'))}).createStatsFet
         player = mc.createClient({ host: '127.0.0.1', port: directPort, username: 'DebugObserver', auth: 'offline', version: '1.8.9', keepAlive: false });
         player.on('error', error => errors.push(error.message));
         player.on('packet', (data, meta) => {
-            if (meta.name === 'scoreboard_team') downstreamPackets.push(data);
+            if (meta.name === 'scoreboard_team') {
+                downstreamPackets.push(data);
+                clientView.observe(meta.name, compactPacket(meta.name, data));
+            }
             if (meta.name === 'player_info' && data.action === 'update_display_name') {
                 for (const row of data.data) if (row.displayName) tabUpdates.set(row.uuid, row.displayName);
             }
@@ -86,7 +95,7 @@ require(${JSON.stringify(path.join(root, 'src/stats/fetch.js'))}).createStatsFet
         });
         await eventually(async () => { assertRunning(child); assert(downstreamPackets.some(packet => packet.team === 'Blue1' && packet.mode === 3)); }, 'Forwarding team packets');
         await delay(800);
-        await eventually(async () => assert(tabUpdates.size >= 6), 'Rendering all fixture tab rows');
+        await eventually(async () => assert(tabUpdates.size >= 8), 'Rendering all fixture tab rows');
         // The real server temporarily replaces prefixes during invisibility.
         for (const [team, prefix] of [['Pink0', '§7'], ['Yellow2', ''], ['Yellow0', '§7']]) {
             upstreamClient.write('scoreboard_team', { team, mode: 2, name: team, prefix, suffix: '', friendlyFire: 3, nameTagVisibility: 'always', color: 15 });
@@ -109,7 +118,7 @@ require(${JSON.stringify(path.join(root, 'src/stats/fetch.js'))}).createStatsFet
         assert.strictEqual(report.state.gameActive, true);
         assert.strictEqual(report.state.players.find(row => row.name === 'Alice').rawTeam, 'Blue1');
         assert.strictEqual(report.state.players.find(row => row.name === 'Alice').resolvedTeam, 'Blue');
-        for (const [name, expected] of [['WhitePlayer', 'White'], ['GreenPlayer', 'Green'], ['DebugObserver', 'Green'], ['RedPlayer', 'Red'], ['YellowPlayer', 'Yellow']]) {
+        for (const [name, expected] of [['WhitePlayer', 'White'], ['GreenPlayer', 'Green'], ['DebugObserver', 'Green'], ['RedPlayer', 'Red'], ['YellowPlayer', 'Yellow'], ['BlueMate', 'Blue']]) {
             const row = report.state.players.find(row => row.name === name);
             assert.strictEqual(row?.resolvedTeam, expected, `${name}: resolver`);
             assert.strictEqual(row.cachedTeam, expected, `${name}: cached team`);
@@ -119,7 +128,7 @@ require(${JSON.stringify(path.join(root, 'src/stats/fetch.js'))}).createStatsFet
             assert.strictEqual(display.extra[0].text.trim(), expected[0], `${name}: outgoing tab marker`);
         }
         assert.strictEqual(report.state.myTeam, 'Green');
-        for (const [name, color] of [['WhitePlayer', 15], ['GreenPlayer', 10], ['RedPlayer', 12], ['YellowPlayer', 14]]) {
+        for (const [name, color] of [['WhitePlayer', 15], ['GreenPlayer', 10], ['RedPlayer', 12], ['YellowPlayer', 14], ['BlueMate', 9]]) {
             const row = report.state.players.find(row => row.name === name);
             assert(row.nametag, `${name}: missing annotation`);
             const outgoing = report.client.teams.find(team => team.team === row.nametag.teamName);
@@ -135,6 +144,53 @@ require(${JSON.stringify(path.join(root, 'src/stats/fetch.js'))}).createStatsFet
         assert.strictEqual(new Map(report.server.entries).get('Alice'), 'Blue1');
         await eventually(async () => assert(messages.some(message => message.includes('Report saved'))), 'Reporting saved path');
         assert(!receivedCommands.some(command => command.startsWith('/teamdebug')), 'Diagnostic command must not be sent upstream');
+        const clientTeamFor = name => {
+            const view = clientView.snapshot();
+            return view.teams.find(team => team.team === new Map(view.entries).get(name));
+        };
+        const updateVisibility = (team, visibility, prefix) => upstreamClient.write('scoreboard_team', {
+            team, mode: 2, name: team, prefix, suffix: '',
+            friendlyFire: 0, nameTagVisibility: visibility, color: 15
+        });
+        // Same-color players have distinct raw teams. Invisibility properties
+        // must stay individual for ourselves, teammates, and opponents alike.
+        for (const [rawTeam, affectedName, prefix, teamMembers, restoredName, restoredRawTeam] of [
+            ['Yellow0', 'DebugObserver', '§a§lG §r§a', ['DebugObserver', 'GreenPlayer', 'GreenMate'], 'GreenMate', 'Yellow1'],
+            ['Yellow2', 'GreenPlayer', '§a§lG §r§a', ['DebugObserver', 'GreenPlayer', 'GreenMate'], 'GreenMate', 'Yellow1'],
+            ['Blue1', 'Alice', '§9§lB §r§9', ['Alice', 'BlueMate'], 'BlueMate', 'Blue2']
+        ]) {
+            const unaffectedNames = teamMembers.filter(name => name !== affectedName);
+            const originalFlags = new Map(unaffectedNames.map(name => [name, clientTeamFor(name)?.friendlyFire]));
+            const start = downstreamPackets.length;
+            updateVisibility(rawTeam, 'never', prefix);
+            await eventually(async () => assert.strictEqual(clientTeamFor(affectedName)?.nameTagVisibility, 'never'), 'Applying individual invisibility visibility');
+            await delay(250);
+            for (const name of unaffectedNames) {
+                const team = clientTeamFor(name);
+                assert.strictEqual(team?.nameTagVisibility, 'always', `${affectedName} invisibility must not hide ${name}`);
+                assert.strictEqual(team.friendlyFire, originalFlags.get(name), `${name} keeps its own team flags`);
+                assert(!downstreamPackets.slice(start).some(packet => packet.team === team.team && packet.mode === 2 && packet.nameTagVisibility === 'never'), `${name} must not briefly receive hidden visibility`);
+            }
+            // A membership-only add must also read this player's raw team's
+            // properties rather than the last update for the whole color.
+            upstreamClient.write('scoreboard_team', { team: restoredRawTeam, mode: 3, players: [restoredName] });
+            await delay(250);
+            assert.strictEqual(clientTeamFor(restoredName)?.nameTagVisibility, 'always', 'Membership refresh keeps independent visibility');
+            // Removing an annotation restores the exact original properties,
+            // even while another raw team of the same color is hidden.
+            player.write('chat', { message: '/nametags clear' });
+            await eventually(async () => assert.strictEqual(clientTeamFor(restoredName)?.team, restoredRawTeam), 'Restoring original team');
+            assert.strictEqual(clientTeamFor(restoredName).nameTagVisibility, 'always', 'Restoration must not copy invisibility from another player');
+            assert.strictEqual(clientTeamFor(affectedName)?.nameTagVisibility, 'never', 'Restoration preserves the affected player visibility');
+            player.write('chat', { message: '/nametags refresh' });
+            await eventually(async () => {
+                const team = clientTeamFor(restoredName);
+                assert(team);
+                assert.notStrictEqual(team.team, restoredRawTeam);
+            }, 'Restoring custom nametag');
+            updateVisibility(rawTeam, 'always', prefix);
+            await eventually(async () => assert.strictEqual(clientTeamFor(affectedName)?.nameTagVisibility, 'always'), 'Restoring visibility after invisibility');
+        }
         // A true team change must win over previous prefix evidence, and an
         // old teammate's update must not pull that player back into its group.
         for (const [team, prefix] of [['Yellow2', '§c§lR §r§c'], ['Yellow0', '§a§lG §r§a']]) {
@@ -162,7 +218,7 @@ require(${JSON.stringify(path.join(root, 'src/stats/fetch.js'))}).createStatsFet
         assert(!changed.state.registry.find(team => team.name === 'Green').players.includes('GreenPlayer'));
         assert.strictEqual(changed.client.teams.find(team => team.team === changed.state.players.find(row => row.name === 'GreenPlayer').nametag.teamName).color, 12);
         assert.deepStrictEqual(errors, []);
-        console.log(`Team debug integration passed: report mismatches, tab/nametag colors, teammate audience, neutral updates, regrouping and recreate boundaries. Reports: ${reportDirectory}`);
+        console.log(`Team debug integration passed: report mismatches, tab/nametag colors, teammate audience, self/teammate/opponent invisibility, original-team restoration, neutral updates, regrouping and recreate boundaries. Reports: ${reportDirectory}`);
     } finally {
         player?.end();
         upstreamClient?.end();

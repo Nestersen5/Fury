@@ -83,7 +83,7 @@ function quietProfile(fkdr) {
 }
 
 async function runScan({ profiles, detectedNicks = [], scanMode = 'threats', scanChatLayout,
-    autoDenickResults = new Map(), getKnownDenick, onLookup, gameMode = 'BEDWARS' }) {
+    autoDenickResults = new Map(), getKnownDenick, onLookup, onResults, gameMode = 'BEDWARS' }) {
     const lines = [];
     const lobbyMap = new Map([
         ['samplename', { color: '§a', letter: 'G', team: 'Green', uuid: 'u1', inTab: true }],
@@ -116,7 +116,7 @@ async function runScan({ profiles, detectedNicks = [], scanMode = 'threats', sca
         formatBedwarsPrestige,
         getInteractiveTags: () => [],
         setLastScanSummary: () => {},
-        setLastScanResults: () => {}
+        setLastScanResults: result => onResults?.(result)
     });
 
     await runner.performFullScan({ username: 'Me' }, lobbyMap, detectedNickedPlayers, 'Red', {
@@ -133,6 +133,16 @@ async function runScan({ profiles, detectedNicks = [], scanMode = 'threats', sca
 }
 
 (async () => {
+    for (const [stars, fkdr, expected] of [[499, 7, false], [500, 1, true], [1200, 7, true]]) {
+        const profile = quietProfile(fkdr);
+        profile.data.player.achievements.bedwars_level = stars;
+        let snapshot;
+        await runScan({ profiles: { samplename: profile, quietguy: quietProfile(1) },
+            onResults: result => { snapshot = result; } });
+        const row = snapshot.results.find(row => row.name === 'samplename');
+        assert(row?.isThreat, 'Stars-only, FKDR-only, and combined threats retain classification');
+        assert.strictEqual(row.starThreat, expected, 'Share receives the exact star-threshold reason, including equality');
+    }
     for (const gameMode of ['BEDWARS', 'SKYWARS']) {
         const retired = quietProfile(1);
         retired.data.seraph = { tagged: true, report_type: 'Blacklisted' };

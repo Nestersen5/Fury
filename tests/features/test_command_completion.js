@@ -116,7 +116,7 @@ const completer = createProxyTabCompleter({
     duelsModeDefs: [{ id: 'classic_duel', short: 'classic' }, { id: 'bridge_duel', short: 'bridge' }]
 });
 
-assert(PROXY_COMMANDS.includes('/autogambler'), 'Visible command list should include /autogambler');
+assert(!PROXY_COMMANDS.includes('/autogambler'), 'Retired command is absent');
 assert(PROXY_COMMANDS.includes('/nickroll'));
 assert.deepStrictEqual(completer('/nickroll st'), ['start', 'stop', 'status']);
 assert.deepStrictEqual(completer('/nickroll filter digits e'), []);
@@ -148,7 +148,7 @@ assert.deepStrictEqual(completer('/stats De'), ['DemoPlayer_']);
 assert.deepStrictEqual(completer('/stats DemoPlayer_ d'), ['doubles']);
 assert.deepStrictEqual(completer('/sw DemoPlayer_ solo'), ['solo_insane']);
 assert.deepStrictEqual(completer('/duels DemoPlayer_ b'), ['bridge']);
-assert.deepStrictEqual(completer('/autogambler '), ['on', 'off', 'status', 'info']);
+assert.strictEqual(completer('/autogambler '), null, 'Retired command uses normal server completion');
 assert(completer('/share t').includes('threats'), '/share should tab-complete share categories');
 assert.deepStrictEqual(completer('/share auto '), ['on', 'off']);
 assert(completer('/share i').includes('include'), '/share should tab-complete include controller command');
@@ -171,6 +171,8 @@ assert.deepStrictEqual(completer('/dodge include n'), ['nicks']);
 assert.deepStrictEqual(completer('/dodge include nicks '), ['on', 'off']);
 assert.deepStrictEqual(completer('/dodge threat f'), ['fkdr']);
 assert.deepStrictEqual(completer('/session st'), ['start']);
+assert.deepStrictEqual(completer('/session ga'), ['games']);
+assert.deepStrictEqual(completer('/session history 3 ga'), ['games']);
 assert.deepStrictEqual(completer('/session en'), ['end']);
 assert.deepStrictEqual(completer('/session debug '), ['on', 'off', 'status']);
 assert.deepStrictEqual(completer('/session result '), ['win', 'loss', 'skip']);

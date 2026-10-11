@@ -8,7 +8,7 @@ const { superviseChild } = require('./src/bootstrap/childShutdown');
 let quitting = false, quitAllowed = false, quitOperation = null, relaunchRequested = false;
 let rendererFlushing = false, acceptedSaveFailure = false;
 const acceptedSaves = new Set();
-const durableChannels = /^(settings:save|profiles:(apply|save|duplicate|update|delete|import)|session:action|account:(select|remove)|denick:(add|remove))/;
+const durableChannels = /^(updates:dismiss|settings:save|profiles:(apply|save|duplicate|update|delete|import)|session:action|account:(select|remove)|denick:(add|remove))/;
 function handleLauncherRequest(channel, handler) {
     ipcMain.handle(channel, (event, ...args) => {
         if (quitting && !(rendererFlushing && channel.startsWith('settings:save'))) throw new Error('Fury is stopping.');
@@ -1240,15 +1240,15 @@ function settingChanges(before, after) {
     for (const [label, key] of [
         ['AntiCheat', 'anticheatEnabled'],
         ['Scaffold', 'anticheatScaffoldEnabled'],
-        ['AutoBlock', 'anticheatAutoblockEnabled'],
-        ['Stasis', 'anticheatStasisEnabled'],
-        ['Possible Alerts', 'anticheatPossibleAlertsEnabled'],
-        ['Team Alerts', 'anticheatTeamAlertsEnabled']
+        ['Team Alerts', 'anticheatTeamAlertsEnabled'],
+        ['Party Broadcasts', 'anticheatPartyBroadcastEnabled']
     ]) add(label, before.features?.[key], after.features?.[key]);
     add('Ender Dust reminder threshold', before.features?.enderDustReminderThreshold, after.features?.enderDustReminderThreshold);
     addList('Chat triggers', before.chatTriggers?.triggers || [], after.chatTriggers?.triggers || []);
     [
         ['Tab stats', 'tabStatsEnabled'],
+        ['Tab resource timers', 'tabResourcesEnabled'],
+        ['Tab phase timers', 'tabPhasesEnabled'],
         ['Auto share tags to party', 'shareTagsAuto'],
         ['Fancy share lines', 'shareTagsFancy'],
         ['Recolor own share lines', 'shareTagsColorLocal'],
@@ -1256,7 +1256,6 @@ function settingChanges(before, after) {
         ['Share tagged players', 'shareTagsIncludeTagged'],
         ['Share nicked players', 'shareTagsIncludeNicks'],
         ['Share stat threats', 'shareTagsIncludeThreats'],
-        ['Auto gambler', 'autoGamblerEnabled'],
         ['Quick Maths', 'quickMathsEnabled'],
         ['Auto dodge', 'autoDodgeEnabled'],
         ['Dodge tagged players', 'autoDodgeTaggedPlayers'],
@@ -1297,6 +1296,8 @@ function settingChanges(before, after) {
         add(label, before.features?.[key] ? 'on' : 'off', after.features?.[key] ? 'on' : 'off');
     });
     addList('BedWars tab fields', before.features?.tabStatsBedwarsFields || [], after.features?.tabStatsBedwarsFields || []);
+    addList('Tab resources', before.features?.tabResourceTypes || [], after.features?.tabResourceTypes || []);
+    addList('Tab phases', before.features?.tabPhaseTypes || [], after.features?.tabPhaseTypes || []);
     addList('SkyWars tab fields', before.features?.tabStatsSkywarsFields || [], after.features?.tabStatsSkywarsFields || []);
     add('Tab stat label style', before.features?.tabStatsLabelStyle || 'compact', after.features?.tabStatsLabelStyle || 'compact');
     add('Nametag tag style', before.features?.nametagTagDisplayMode || 'acronyms', after.features?.nametagTagDisplayMode || 'acronyms');
@@ -1317,6 +1318,8 @@ function settingChanges(before, after) {
     add('Session inactivity boundary', before.features?.sessionBoundaryMinutes ?? 180, after.features?.sessionBoundaryMinutes ?? 180);
     add('Session history retention', before.features?.sessionRetention ?? 100, after.features?.sessionRetention ?? 100);
     add('Session recap style', before.features?.sessionRecapStyle || 'scoreboard', after.features?.sessionRecapStyle || 'scoreboard');
+    add('Average game time in recaps', before.features?.sessionAverageGameTimeEnabled ?? true,
+        after.features?.sessionAverageGameTimeEnabled ?? true);
     addList('Session recap fields', before.features?.sessionRecapFields || [], after.features?.sessionRecapFields || []);
     addList('BedWars session fields', before.features?.sessionBedwarsFields || [], after.features?.sessionBedwarsFields || []);
     addList('SkyWars session fields', before.features?.sessionSkywarsFields || [], after.features?.sessionSkywarsFields || []);
@@ -1974,10 +1977,8 @@ handleLauncherRequest('settings:save-features', async (event, settings) => {
         nickRoll,
         anticheatEnabled: settings?.features?.anticheatEnabled ?? before.features?.anticheatEnabled,
         anticheatScaffoldEnabled: settings?.features?.anticheatScaffoldEnabled ?? before.features?.anticheatScaffoldEnabled,
-        anticheatAutoblockEnabled: settings?.features?.anticheatAutoblockEnabled ?? before.features?.anticheatAutoblockEnabled,
-        anticheatStasisEnabled: settings?.features?.anticheatStasisEnabled ?? before.features?.anticheatStasisEnabled,
-        anticheatPossibleAlertsEnabled: settings?.features?.anticheatPossibleAlertsEnabled ?? before.features?.anticheatPossibleAlertsEnabled,
         anticheatTeamAlertsEnabled: settings?.features?.anticheatTeamAlertsEnabled ?? before.features?.anticheatTeamAlertsEnabled,
+        anticheatPartyBroadcastEnabled: settings?.features?.anticheatPartyBroadcastEnabled ?? before.features?.anticheatPartyBroadcastEnabled,
         tabStatsEnabled: settings?.features?.tabStatsEnabled ?? before.features?.tabStatsEnabled,
         autoScanOnGameStart: true,
         shareTagsAuto: settings?.features?.shareTagsAuto ?? before.features?.shareTagsAuto,
@@ -1987,7 +1988,6 @@ handleLauncherRequest('settings:save-features', async (event, settings) => {
         shareTagsIncludeTagged: settings?.features?.shareTagsIncludeTagged ?? before.features?.shareTagsIncludeTagged,
         shareTagsIncludeNicks: settings?.features?.shareTagsIncludeNicks ?? before.features?.shareTagsIncludeNicks,
         shareTagsIncludeThreats: settings?.features?.shareTagsIncludeThreats ?? before.features?.shareTagsIncludeThreats,
-        autoGamblerEnabled: settings?.features?.autoGamblerEnabled ?? before.features?.autoGamblerEnabled,
         quickMathsEnabled: settings?.features?.quickMathsEnabled ?? before.features?.quickMathsEnabled,
         autoDodgeEnabled: settings?.features?.autoDodgeEnabled ?? before.features?.autoDodgeEnabled,
         autoDodgeDelaySeconds: settings?.features?.autoDodgeDelaySeconds ?? before.features?.autoDodgeDelaySeconds,
@@ -2032,6 +2032,7 @@ handleLauncherRequest('settings:save-features', async (event, settings) => {
         sessionTrackingEnabled: settings?.features?.sessionTrackingEnabled ?? before.features?.sessionTrackingEnabled,
         gameRecapEnabled: settings?.features?.gameRecapEnabled ?? before.features?.gameRecapEnabled,
         replayDetailsEnabled: settings?.features?.replayDetailsEnabled ?? before.features?.replayDetailsEnabled,
+        sessionAverageGameTimeEnabled: settings?.features?.sessionAverageGameTimeEnabled ?? before.features?.sessionAverageGameTimeEnabled ?? true,
         sessionBoundaryMinutes: settings?.features?.sessionBoundaryMinutes ?? before.features?.sessionBoundaryMinutes,
         sessionRetention: settings?.features?.sessionRetention ?? before.features?.sessionRetention,
         sessionRecapStyle: settings?.features?.sessionRecapStyle ?? before.features?.sessionRecapStyle,
@@ -2045,6 +2046,10 @@ handleLauncherRequest('settings:save-features', async (event, settings) => {
         sessionGoalMinutes: settings?.features?.sessionGoalMinutes ?? before.features?.sessionGoalMinutes,
         showTagsInTabStats: settings?.features?.showTagsInTabStats ?? before.features?.showTagsInTabStats,
         tabStatsBedwarsFields: settings?.features?.tabStatsBedwarsFields ?? before.features?.tabStatsBedwarsFields,
+        tabResourcesEnabled: settings?.features?.tabResourcesEnabled ?? before.features?.tabResourcesEnabled,
+        tabResourceTypes: settings?.features?.tabResourceTypes ?? before.features?.tabResourceTypes,
+        tabPhasesEnabled: settings?.features?.tabPhasesEnabled ?? before.features?.tabPhasesEnabled,
+        tabPhaseTypes: settings?.features?.tabPhaseTypes ?? before.features?.tabPhaseTypes,
         tabStatsSkywarsFields: settings?.features?.tabStatsSkywarsFields ?? before.features?.tabStatsSkywarsFields,
         tabStatsLabelStyle: settings?.features?.tabStatsLabelStyle ?? before.features?.tabStatsLabelStyle,
         tabStatsShowKillRatio: settings?.features?.tabStatsShowKillRatio ?? before.features?.tabStatsShowKillRatio,
@@ -2255,21 +2260,30 @@ handleLauncherRequest('network:validate', (event, payload = {}) => validateNetwo
 // Renderer readiness triggers one optional, anonymous check. This is outside
 // launcher state/history refresh and never participates in persistence drains.
 let updateNotifications = null;
+let releaseExperience = null;
+function getReleaseExperience() {
+    updateNotifications ||= require('./src/updates/updateNotifications').createUpdateNotifications({
+        installedVersion: app.getVersion(), isPackaged: app.isPackaged,
+        openExternal: url => shell.openExternal(url)
+    });
+    return releaseExperience ||= require('./src/updates/releaseExperience').createReleaseExperience({
+        installedVersion: app.getVersion(), isPackaged: app.isPackaged,
+        statePath: dataPath('launcher_data', 'release-notifications.json'), updates: updateNotifications
+    });
+}
 function updateSender(event) {
     return win && !win.isDestroyed() && event.sender === win.webContents
         && event.senderFrame === win.webContents.mainFrame;
 }
 handleLauncherRequest('updates:check', event => {
     if (!updateSender(event)) return null;
-    updateNotifications ||= require('./src/updates/updateNotifications').createUpdateNotifications({
-        installedVersion: app.getVersion(), isPackaged: app.isPackaged,
-        openExternal: url => shell.openExternal(url)
-    });
-    return updateNotifications.check();
+    return getReleaseExperience().check();
 });
+handleLauncherRequest('updates:notes', event => updateSender(event) ? getReleaseExperience().notes() : null);
+handleLauncherRequest('updates:dismiss', (event, version) => updateSender(event) ? getReleaseExperience().dismiss(version) : false);
 handleLauncherRequest('updates:open', event => updateSender(event) && updateNotifications
     ? updateNotifications.open() : false);
-app.on('before-quit', () => updateNotifications?.dispose());
+app.on('before-quit', () => { updateNotifications?.dispose(); releaseExperience?.dispose(); });
 
 async function prepareRenderer(deadline) {
     if (!win || win.isDestroyed() || win.webContents.isDestroyed()) return;
@@ -2301,6 +2315,7 @@ function requestQuit(reason) {
             while (acceptedSaves.size) await within(Promise.allSettled([...acceptedSaves]), deadline, phase);
             if (acceptedSaveFailure) throw new Error('Accepted launcher saves failed.');
             profileStore.flush({ strict: true, onlyPending: true });
+            if (releaseExperience) await within(releaseExperience.flush(), deadline, phase);
             phase = 'authentication';
             if (auth) {
                 await within(auth.done, deadline, phase);

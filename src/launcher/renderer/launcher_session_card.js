@@ -73,7 +73,9 @@ function stats(mode, fields) {
         ['kills','Kills','pink'], ['deaths','Deaths','white'], ['beds','Beds broken','red'], ['bedsLost','Beds lost','white'], ['assists','Assists','pink'],
         ['wlr','WLR','gold'], ['fkdr','FKDR','gold'], ['kdr','KDR','gold'], ['bblr','BBLR','gold'], ['games','Games','green'], ['stars','Stars gained','cyan'], ['localStreak','Local streak','gold']
     ];
-    return defs.filter(([key]) => key in mode && (!mode.local || (key!=='stars' && Number.isFinite(mode[key]))) && (!Array.isArray(fields) || fields.includes(key))).map(([key,label,color]) => ({ key, label, color: entryColor(mode,key,COLORS[color]), value: ['wlr','fkdr','kdr','bblr','stars'].includes(key) ? `${key === 'stars' ? '+' : ''}${number(mode[key]).toFixed(2)}` : count(mode[key]) }));
+    return defs.filter(([key]) => Array.isArray(fields)
+        ? fields.includes(key) || (mode.local && key === 'localStreak' && key in mode)
+        : key in mode).map(([key,label,color]) => ({ key, label, color: entryColor(mode,key,COLORS[color]), value: ['wlr','fkdr','kdr','bblr','stars'].includes(key) ? `${key === 'stars' ? '+' : ''}${number(mode[key]).toFixed(2)}` : count(mode[key]) }));
 }
 async function render(session, { mode: requestedMode, submode = 'overall', fields, avatar = true, skinAccount = session } = {}) {
     const f = await font();
@@ -83,7 +85,7 @@ async function render(session, { mode: requestedMode, submode = 'overall', field
     const calendar=session.calendar;
     const periodTitle=calendar?calendar.kind[0].toUpperCase()+calendar.kind.slice(1):'Session';
     const mode = selected ? { ...selected, label: `${overall.label} - ${selected.label}`, breakdown: overall.breakdown, ...('stars' in overall ? {stars: overall.stars} : {}) } : overall;
-    const entries = stats(mode, mode.local ? undefined : fields);
+    const entries = stats(mode, fields);
     if(selected)entries.forEach(entry=>{if(entry.key==='stars')entry.label=calendar?'Full period stars':'Full session stars';if(entry.key==='games')entry.label=`${selected.label} games`;});
     const advance = (text, scale = 2) => [...String(text)].reduce((sum,c) => sum + (c===MINECRAFT_STAR_SYMBOL?8.5:((f.widths[c.charCodeAt(0)] || 5) + 1)) * scale, 0);
     const labelValue = entry => `${entry.label}: ${entry.value}`;
@@ -118,8 +120,6 @@ async function render(session, { mode: requestedMode, submode = 'overall', field
     const dateText = calendar?`${calendar.label.replace(/\u2013/g,'-')} - ${calendar.timeZone}`:date(session.startedAt), ageText = calendar?'':relativeDate(session.startedAt);
     const cardTitle=`${mode.label.toUpperCase()} ${periodTitle.toUpperCase()}`;
     const dateLine = `${dateText}${ageText ? `  ${ageText}` : ''}`;
-    const localStatus = 'Local tracking - API off';
-    const localDetail = mode.unavailable?.length ? 'Incomplete coverage - uncertain stats hidden' : 'Local streak counts consecutive observed wins';
     const emptyLocal = 'No verified counters available';
     const wrapLabel=(label,max)=>{
         const result=[];let line='';
@@ -131,14 +131,15 @@ async function render(session, { mode: requestedMode, submode = 'overall', field
     };
     const width = Math.max(avatarWidth + totalWidth + (!showChart || wideChart ? 0 : chartWidth + 10) + 46, wideChart ? 1120 : 0,
         advance(timeline) + 52, advance(dateLine) + 52, advance(title, 3) + advance(cardTitle) + 70,
-        mode.local ? avatarWidth + Math.max(advance(localDetail), advance(emptyLocal)) + 52 : 0);
+        mode.local ? avatarWidth + advance(emptyLocal) + 52 : 0);
     const rowHeight = compactSkywars?24:28;
     const statsHeight = Math.max(compactSkywars?106:130, middle * rowHeight + 54) + (ratios.length ? 110 : 0);
+    const hasStars = entries.some(entry => entry.key === 'stars');
     const chartColumns=wideChart?Math.min(10,bars.length):Math.max(1,bars.length);
     const chartCell=((wideChart?width-24:chartWidth)-28)/chartColumns;
     const chartLabelLines=Math.max(1,...bars.map(e=>wrapLabel(e.label,chartCell-8).length));
     const chartRowHeight=Math.max(234,180+chartLabelLines*18);
-    const footerHeight = (mode.local?108:entries.some(e => e.key === 'stars')?82:54)+(calendar?22:0);
+    const footerHeight = (hasStars?82:54)+(calendar?22:0);
     const bodyHeight = Math.max(monthly&&showChart?340:0,avatar ? (compactSkywars?210:238) : 160, statsHeight, !showChart || wideChart ? 0 : Math.max(compactSkywars?220:260,(compactSkywars?154:194)+chartLabelLines*18+(breakdown.note?26:0)));
     const chartRows = Math.ceil(bars.length / 10) || 1;
     const chartHeight = 60 + chartRows * chartRowHeight + (breakdown.note ? 26 : 0);
@@ -178,7 +179,7 @@ async function render(session, { mode: requestedMode, submode = 'overall', field
     const totalsWidth=!showChart?width-x-12:wideChart?width-x-12-(ratioPanelWidth?ratioPanelWidth+10:0):width-x-chartWidth-22;
     box(x,y,totalsWidth,bodyHeight);text(selected?`${selected.label} totals`:`${periodTitle} totals`,x+14,y+14);
     lines(left,x+14,y+46);lines(right,x+14+widthOf(left),y+46);
-    if(!totals.length){text(mode.local?emptyLocal:'Stats unavailable',x+14,y+46);canvas.setAttribute('aria-label',`${canvas.getAttribute('aria-label')}. ${mode.local?emptyLocal:'Stats unavailable'}`);}
+    if(!entries.length){text(mode.local?emptyLocal:'Stats unavailable',x+14,y+46);canvas.setAttribute('aria-label',`${canvas.getAttribute('aria-label')}. ${mode.local?emptyLocal:'Stats unavailable'}`);}
     if(ratios.length){
         const rx=wideChart?x+totalsWidth+10:x,rw=wideChart?ratioPanelWidth:totalsWidth;
         const ry=wideChart?y+8:y+Math.max(100,middle*rowHeight+56);
@@ -242,8 +243,7 @@ async function render(session, { mode: requestedMode, submode = 'overall', field
     }
     const bottomX=12,bottomY=height-footerHeight-12;
     box(bottomX,bottomY,width-24,footerHeight);
-    if(calendar){const status=`${session.active?'In progress - ':''}${calendar.partial?'Partial coverage - uncertain stats hidden - ':''}Stats recorded by Fury`;text(status,26,height-28,'#a1aab5',1);canvas.setAttribute('aria-label',`${canvas.getAttribute('aria-label')}. ${status}`);}
-    if(mode.local){text(localStatus,26,bottomY+42,COLORS.gold);text(localDetail,26,bottomY+72);canvas.setAttribute('aria-label',`${canvas.getAttribute('aria-label')}. ${localStatus}. ${localDetail}`);}
+    if(calendar){const status=`${session.active?'In progress - ':''}Stats recorded by Fury`;text(status,26,height-28,'#a1aab5',1);canvas.setAttribute('aria-label',`${canvas.getAttribute('aria-label')}. ${status}`);}
     const games=entries.find(e=>e.key==='games'),stars=entries.find(e=>e.key==='stars');
     let bx=26;
     if(games){lines([games],bx,bottomY+14);bx+=advance(labelValue(games))+26;}

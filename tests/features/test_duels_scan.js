@@ -10,7 +10,8 @@ const {
     matchDuelsMode,
     parseOpponentsFromLabeledLine,
     extractDuelsInfoFromScoreboard,
-    isDuelsScoreboard
+    isDuelsScoreboard,
+    bedwarsDuelsIntroMode
 } = require('../../src/net/session/duelsMatch.js');
 const { createStatsCollector } = require('../../src/stats/collect.js');
 
@@ -162,5 +163,101 @@ assert.strictEqual(classicFamily.bestWs, 7, 'family best WS = max of sub-modes')
 // Single-mode family: modeCount 1 so the scan skips the redundant "overall" line.
 const sumoFamily = collectDuelsFamilyStats(duels, 'Sumo');
 assert.strictEqual(sumoFamily.modeCount, 1);
+
+{
+    const fs = require('fs');
+    const vm = require('vm');
+    const proxy = fs.readFileSync(require('path').resolve(__dirname, '../../proxy.js'), 'utf8');
+    const intro = '     Bed Wars Duels\n     Destroy the enemy bed and then eliminate them!';
+    assert.equal(bedwarsDuelsIntroMode(intro), 'Bed Wars Duels');
+    assert.equal(bedwarsDuelsIntroMode('§eBed Wars Duels'), 'Bed Wars Duels');
+    assert.equal(bedwarsDuelsIntroMode('Destroy the enemy bed and then eliminate them!'), 'Bed Wars Duel');
+    assert.equal(bedwarsDuelsIntroMode('Player: Bed Wars Duels'), null);
+    assert.equal(bedwarsDuelsIntroMode('Player: Destroy the enemy bed and then eliminate them!'), null);
+    assert.equal(bedwarsDuelsIntroMode('Protect your bed and destroy the enemy beds.'), null);
+    assert(isDuelsScoreboard('§eBED WARS DUELS', []), 'Duel title is enough before opponents arrive');
+    assert(isDuelsScoreboard('BED WARS', ['Mode: Bed Wars Duel']), 'A duel mode line overrides the plain Bed Wars title');
+    assert(!isDuelsScoreboard('DUELS', []), 'The generic Duels lobby remains excluded');
+    const { isBedwarsPregameScoreboard } = require('../../src/net/session/pregame_chat');
+    assert(!isBedwarsPregameScoreboard('BED WARS DUELS Map: Arena Mode: Bed Wars Duel Players: 2/2 Starting in 1s'));
+    const context = vm.createContext({
+        stripAnsi: value => value.replace(/§./g, ''), displayValueToString: String,
+        bedwarsDuelsIntroMode, matchDuelsMode, DUELS_MODE_DEFS: DEFS,
+        gameActive: true, currentGamemode: 'BEDWARS', sessionGameFinalized: false,
+        bedwarsPregameActive: true,
+        bedwarsDuelConfirmed: false,
+        isDuelsScoreboard, extractDuelsInfoFromScoreboard, isBedwarsPregameScoreboard,
+        getCompactScoreboardText: value => value.toUpperCase().replace(/[^A-Z]/g, ''),
+        detectLobbyFromScoreboard: require('../../src/net/session/pregame_chat').detectLobbyModeScoreboard,
+        getCurrentScoreboardTitle: () => context.title,
+        getScoreboardLineList: () => context.lines,
+        nametagOverlayEnabled: false,
+        clearDuelsState() { context.duelsState.active = false; },
+        duelsState: { active: false, sessionId: 0 },
+        sessionTracker: { excludeCurrentGame() { context.excluded = true; } },
+        bedwarsStatsDebug: { discardCurrentGame() { context.debugDiscarded = true; } },
+        resetMatchState() {
+            assert(context.excluded && context.sessionGameFinalized, 'Discard a provisional Bed Wars game before reset can finalize it');
+            context.gameActive = false;
+        },
+        leaveBedwarsPregame() { context.bedwarsPregameActive = false; }
+    });
+    for (const [startMarker, endMarker] of [
+        ['function detectGamemodeFromText(', '\nfunction isSupportedTabStatsMode('],
+        ['        function observeBedwarsDuelsIntro(', '\n        function clearDuelsState('],
+        ['        function updateDuelsStateFromScoreboard(', '\n        function scheduleDuelsAutoScan(']
+    ]) {
+        const start = proxy.indexOf(startMarker);
+        const end = proxy.indexOf(endMarker, start);
+        assert(start >= 0 && end > start);
+        vm.runInContext(proxy.slice(start, end), context);
+    }
+    for (const sidebar of ['BED WARS DUELS Red: Alive Blue: Alive', 'DUELS Mode: Bed Wars Duel', 'DUELS Mode: SkyWars Duel']) {
+        assert.equal(context.detectGamemodeFromText(sidebar), null, 'Duels never enter Bed Wars/SkyWars activation');
+    }
+    assert.equal(context.detectGamemodeFromText('BED WARS Red: Alive Blue: Alive'), 'BEDWARS');
+    assert.equal(context.detectGamemodeFromText('BED WARS Map: DuelArena Red: DuelPlayer'), 'BEDWARS',
+        'Names containing duel are not a game-mode signal');
+    assert.equal(context.detectGamemodeFromText('SKYWARS Players left: 12'), 'SKYWARS');
+    assert(context.observeBedwarsDuelsIntro(intro));
+    assert(context.duelsState.active && context.duelsState.modeDef.id === 'bedwars_duel');
+    assert(!context.gameActive && !context.bedwarsPregameActive && context.debugDiscarded);
+    assert.equal(context.duelsState.sessionId, 1);
+    context.observeBedwarsDuelsIntro('Bed Wars Duels');
+    assert.equal(context.duelsState.sessionId, 1, 'Repeated introduction does not start another duel');
+    context.duelsState.opponents = [];
+    for (const [title, lines] of [['', []], ['DUELS', []], ['BED WARS', ['Red: Alive', 'Blue: Alive']]]) {
+        context.title = title;
+        context.lines = lines;
+        assert(context.updateDuelsStateFromScoreboard(), 'Partial and plain Bed Wars sidebars keep the confirmed duel excluded');
+        assert(context.duelsState.active);
+    }
+    context.duelsState.active = false; // GAME OVER resets scan state, but the sidebar can linger.
+    assert(context.updateDuelsStateFromScoreboard(), 'Post-game sidebar cannot reactivate a Bed Wars session game');
+    const startChat = proxy.indexOf('                    let gameStartMode = null;');
+    const endChat = proxy.indexOf('                    // Each packet is already forwarded above;', startChat);
+    assert(startChat >= 0 && endChat > startChat);
+    context.isSupportedTabStatsMode = mode => mode === 'BEDWARS' || mode === 'SKYWARS';
+    context.isActionBar = false;
+    context.activated = 0;
+    context.activateGame = () => context.activated++;
+    for (const chat of ['protect your bed and destroy the enemy beds', 'the game starts in 1 second']) {
+        context.cleanChatText = chat;
+        vm.runInContext(`{ ${proxy.slice(startChat, endChat)} }`, context);
+    }
+    assert.equal(context.activated, 0, 'Start instructions cannot create Bed Wars games after duel scan state resets');
+    context.lines = ['Map: Airshow', 'Mode: Doubles', 'Players: 1/16', 'Waiting...'];
+    assert(!context.updateDuelsStateFromScoreboard(), 'A real Bed Wars waiting room releases the exclusion');
+    assert(!context.bedwarsDuelConfirmed);
+    context.lines = ['Mode: Bed Wars Duel'];
+    assert(context.updateDuelsStateFromScoreboard(), 'Scoreboard evidence also confirms a duel without its intro');
+    assert(context.bedwarsDuelConfirmed);
+    context.lines = ['Level: 98', 'Progress: 10%'];
+    assert(!context.updateDuelsStateFromScoreboard(), 'A lobby releases the exclusion');
+    assert(!context.bedwarsDuelConfirmed);
+    assert(proxy.indexOf('if (!isActionBar) observeBedwarsDuelsIntro(text);')
+        < proxy.indexOf('if (!isActionBar) observeSessionGameChat(text);'),
+    'Duel introduction is classified before session chat observations');
+}
 
 console.log('test_duels_scan.js passed');

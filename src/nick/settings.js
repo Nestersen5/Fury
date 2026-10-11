@@ -6,7 +6,7 @@ const DEFAULTS = Object.freeze({ rank: 'NONE', skin: 'random', delay: 1500, adap
 const RANKS = ['NONE', 'VIP', 'VIP_PLUS', 'MVP', 'MVP_PLUS'];
 
 function validate(settings) {
-    if (typeof settings.ogEnabled !== 'boolean') throw new Error('OG matching must be on or off.');
+    if (typeof settings.ogEnabled !== 'boolean') throw new Error('Legacy nick matching must be on or off.');
     if (settings.adaptive !== true || settings.delay !== DEFAULTS.delay) throw new Error('Nickrolling pacing is automatic and cannot be changed.');
     if (!RANKS.includes(settings.rank)) throw new Error(`Rank: ${RANKS.join(', ')}`);
     if (!/^(random|actual|previous|[A-Z0-9_]{1,64})$/.test(settings.skin)) throw new Error('Skin: random, actual, or previous.');
@@ -69,7 +69,7 @@ function hasFilters(s) { return s.min !== 3 || s.max !== 16 || s.digits !== 'any
 
 function matchReason(name, settings) {
     const lower = name.toLowerCase();
-    if (settings.ogEnabled !== false && /([a-zA-Z])\1{2,}/.test(name)) return 'OG: repeated letters';
+    if (settings.ogEnabled !== false && name.length <= 8 && /([a-zA-Z])\1{2,}/.test(name)) return 'Legacy nick: repeated letters';
     const word = settings.words.find(word => lower.includes(word));
     if (word) return `Word: ${word}`;
     const group = settings.wordGroups.find(group => group.every(word => lower.includes(word)));

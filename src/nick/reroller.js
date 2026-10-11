@@ -123,7 +123,7 @@ function createNickReroller({ sendCommand, sendChat, getSettings, playSound = ()
         candidate = null; rolls = 0; started = now();
         run = { config, abort: new AbortController(), stage: 'delay', timer: null, retried: false };
         pacing.begin(config.delay);
-        say(`Rolling for filters${config.ogEnabled ? ', OG repeated letters' : ''}, or your word lists. Stop: §f/nickroll stop`);
+        say(`Rolling for filters${config.ogEnabled ? ', Legacy nicks (up to 8 characters)' : ''}, or your word lists. Stop: §f/nickroll stop`);
         request(again ? '/nick help setrandom' : '/nick help start', again ? 'candidate' : 'rank', again ? pacing.delay(config.delay, config.adaptive) : 0);
     }
     function observeServer(data, meta) {

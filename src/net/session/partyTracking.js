@@ -168,6 +168,7 @@ function createPartyTracker(deps) {
     function touchUpdate(fullRefresh) {
         lastStateUpdateTime = Date.now();
         if (fullRefresh) lastFullRefreshTime = lastStateUpdateTime;
+        deps.onUpdate?.();
     }
 
     function resetPendingPartyListState() {

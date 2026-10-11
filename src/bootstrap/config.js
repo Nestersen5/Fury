@@ -1,6 +1,6 @@
 'use strict';
 
-const { normalizeRecapFields } = require('../session/settings');
+const { normalizeRecapFields, SESSION_DEFAULTS } = require('../session/settings');
 
 // Bootstrap config loaders extracted from proxy.js. Owns parsing + defaults
 // for keys, scan thresholds, chat triggers, and feature flags from disk.
@@ -93,7 +93,7 @@ function createConfigLoader(deps) {
                 }
             }
         } else {
-            autoGamblerEnabled = bool('autoGamblerEnabled', false);
+            autoGamblerEnabled = false;
         }
 
         const dodgeThreshold = (key, fallback) => {
@@ -110,10 +110,11 @@ function createConfigLoader(deps) {
             chatPrefixAccentHex: String(features.chatPrefixAccentHex || '#e5b35d'),
             anticheatEnabled: bool('anticheatEnabled', true),
             anticheatScaffoldEnabled: bool('anticheatScaffoldEnabled', true),
-            anticheatAutoblockEnabled: bool('anticheatAutoblockEnabled', false),
-            anticheatStasisEnabled: bool('anticheatStasisEnabled', false),
-            anticheatPossibleAlertsEnabled: bool('anticheatPossibleAlertsEnabled', true),
+            anticheatAutoblockEnabled: false,
+            anticheatStasisEnabled: false,
+            anticheatPossibleAlertsEnabled: true,
             anticheatTeamAlertsEnabled: bool('anticheatTeamAlertsEnabled', false),
+            anticheatPartyBroadcastEnabled: bool('anticheatPartyBroadcastEnabled', true),
             accentBedwarsEventLabelsEnabled: bool('accentBedwarsEventLabelsEnabled', true),
             bedwarsSidebarTeamColorsEnabled: bool('bedwarsSidebarTeamColorsEnabled', true),
             tabStatsEnabled: Boolean(features.tabStatsEnabled),
@@ -173,6 +174,7 @@ function createConfigLoader(deps) {
             sessionBoundaryMinutes: 30,
             sessionRetention: 0,
             sessionRecapStyle: 'scoreboard',
+            sessionAverageGameTimeEnabled: bool('sessionAverageGameTimeEnabled', SESSION_DEFAULTS.sessionAverageGameTimeEnabled),
             sessionRecapFields: normalizeRecapFields(features.sessionRecapFields),
             sessionBedwarsFields: Array.isArray(features.sessionBedwarsFields) ? features.sessionBedwarsFields.slice() : ['wins', 'losses', 'finals', 'finalDeaths', 'beds', 'bedsLost', 'kills', 'deaths', 'wlr', 'fkdr', 'kdr', 'bblr', 'games', 'stars'],
             sessionSkywarsFields: Array.isArray(features.sessionSkywarsFields) ? features.sessionSkywarsFields.slice() : ['wins', 'losses', 'kills', 'deaths', 'wlr', 'kdr', 'games', 'assists'],
@@ -199,6 +201,7 @@ function createConfigLoader(deps) {
                 : 'auto',
             tabStatsShowKillRatio: bool('tabStatsShowKillRatio', true),
             tabStatsShowWinRatio: bool('tabStatsShowWinRatio', true),
+            ...require('../session/bedwarsTabSettings').normalizeBedwarsTabSettings(features),
             tabStatsBedwarsFields: Array.isArray(features.tabStatsBedwarsFields)
                 ? features.tabStatsBedwarsFields.slice()
                 : ['name', 'stars', 'fkdr', 'wlr', 'tags'],

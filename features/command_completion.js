@@ -12,7 +12,7 @@ const PROXY_COMMANDS = [
     '/profile', '/profiles', '/preset', '/presets',
     '/info', '/general', '/ping', '/urchin', '/sw', '/duels',
     '/scan', '/share', '/anticheat', '/scafdetect', '/scaffolddetect',
-    '/ol', '/autogambler', '/chattrigger', '/chattriggers', '/ctriggers',
+    '/ol', '/chattrigger', '/chattriggers', '/ctriggers',
     '/chatstats', '/lobbychatstats', '/lf',
     '/autododge', '/dodge', '/cancel', '/c', '/autododgetest',
     '/partycheck',
@@ -493,7 +493,7 @@ function createProxyTabCompleter(options = {}) {
             const search = args[args.length - 1] || '';
 
             if (scoped.length <= 1) {
-                const controls = leadingRefresh ? [] : ['refresh', 'history', 'start', 'end', 'reset', 'recap', 'debug', 'result', 'on', 'off'];
+                const controls = leadingRefresh ? [] : ['refresh', 'history', 'games', 'start', 'end', 'reset', 'recap', 'debug', 'result', 'on', 'off'];
                 return uniqueTabMatches([
                     ...completeFromList(controls, search),
                     ...completeFromList(['bw', 'sw', 'duels'], search)
@@ -504,6 +504,9 @@ function createProxyTabCompleter(options = {}) {
             }
             if (String(scoped[0] || '').toLowerCase() === 'result') {
                 return scoped.length === 2 ? completeFromList(['win', 'loss', 'skip'], search) : [];
+            }
+            if (String(scoped[0] || '').toLowerCase() === 'history' && scoped.length === 3) {
+                return completeFromList(['games'], search);
             }
             const game = normalizeGame(scoped[0], null);
             if (!game) return [];
@@ -573,9 +576,6 @@ function createProxyTabCompleter(options = {}) {
         }
         if (cmd === '/anticheat' || cmd === '/scafdetect' || cmd === '/scaffolddetect') {
             return args.length === 2 ? completeFromList(['on', 'off', 'status'], args[1] || '') : [];
-        }
-        if (cmd === '/autogambler') {
-            return args.length === 2 ? completeFromList(['on', 'off', 'status', 'info'], args[1] || '') : [];
         }
         if (cmd === '/chattrigger' || cmd === '/chattriggers' || cmd === '/ctriggers') {
             const sub = (args[1] || '').toLowerCase();

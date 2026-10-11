@@ -47,19 +47,26 @@ async function render(container, messages) {
         return font.tinted.get(key);
     };
     function draw(line, row, shadow) {
-        let color = 'ffffff', x = 2;
+        let color = 'ffffff', bold = false, x = 2;
         for (let i = 0; i < line.length; i++) {
             if (line[i] === '§') {
                 const code = line[++i]?.toLowerCase();
-                if (/^[0-9a-f]$/.test(code)) color = COLORS[parseInt(code, 16)];
-                else if (code === 'r') color = 'ffffff';
+                if (/^[0-9a-f]$/.test(code)) {
+                    color = COLORS[parseInt(code, 16)];
+                    bold = false;
+                } else if (code === 'r') {
+                    color = 'ffffff';
+                    bold = false;
+                } else if (code === 'l') bold = true;
                 continue;
             }
             const char = line[i], code = char.charCodeAt(0) < 256 ? char.charCodeAt(0) : 63;
             const tint = shadow ? color.match(/../g).map(hex => (parseInt(hex, 16) >> 2).toString(16).padStart(2, '0')).join('') : color;
             ctx.drawImage(atlas(tint), (code % 16) * 8, (code >> 4) * 8, 8, 8,
                 (x + Number(shadow)) * scale, (2 + row * 9 + Number(shadow)) * scale, 8 * scale, 8 * scale);
-            x += chatCharWidth(char);
+            if (bold) ctx.drawImage(atlas(tint), (code % 16) * 8, (code >> 4) * 8, 8, 8,
+                (x + Number(shadow) + 1) * scale, (2 + row * 9 + Number(shadow)) * scale, 8 * scale, 8 * scale);
+            x += chatCharWidth(char) + Number(bold);
         }
     }
     lines.forEach((line, row) => { draw(line, row, true); draw(line, row, false); });

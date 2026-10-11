@@ -284,8 +284,26 @@ assert.strictEqual(
 
 assert.strictEqual(
     formatLine({ name: 'QuasiDig2073', team: 'RED', stars: 460, fkdr: 2.3, isThreat: true }, 'BEDWARS', new Set(['threats']), true),
-    '[RED] [460✫] QuasiDig2073 ✔ | FKDR 2.30'
+    '[RED] QuasiDig2073 ✔ | FKDR 2.30'
 );
+
+// Stars appear in threat messages only when the scan's star threshold matched.
+for (const fkdr of [1.2, 6.7]) {
+    for (const fancy of [false, true]) {
+        const row = { name: 'StarThreat', team: 'RED', stars: 1200, fkdr, isThreat: true, starThreat: true };
+        const include = new Set(['threats']);
+        const line = formatLine(row, 'BEDWARS', include, fancy);
+        assert(line.startsWith('[RED] [1200✫] StarThreat'), 'Stars-only and stars-plus-FKDR threats include the fancy star badge');
+        const { formatLineComponent } = require('../../src/overlay/shareTags');
+        const { extractText } = require('../../features/minecraft_chat');
+        assert.equal(extractText(formatLineComponent(row, 'BEDWARS', include, fancy)), line,
+            'Local recoloring matches the outgoing threat message');
+        const fkdrOnly = { ...row, starThreat: false };
+        const plainLine = formatLine(fkdrOnly, 'BEDWARS', include, fancy);
+        assert(!plainLine.includes('✫'), 'FKDR-only threats omit the star badge in both styles');
+        assert.equal(extractText(formatLineComponent(fkdrOnly, 'BEDWARS', include, fancy)), plainLine);
+    }
+}
 
 const state = {
     shareTagsAuto: false,
@@ -499,6 +517,26 @@ assert.strictEqual(state.shareTagsIncludeThreats, true);
         assert(!partyFilterChat.some(line => line.includes(hidden)),
             `${hidden} is in our party and must never be broadcast`);
     }
+
+    const retryMessages = [];
+    let retryMonthlyFetches = 0;
+    const failed = { name: 'RetryPlayer', team: 'GREEN', fkdr: 0, isThreat: true, lookupFailed: true };
+    const retryState = { shareTagsIncludeThreats: true,
+        lastScanResults: { at: Date.now(), gameMode: 'BEDWARS', results: [failed] } };
+    const retry = createShareTagsBroadcaster({
+        state: retryState, sendChat() {}, getLocalUsername: () => 'Tester',
+        getHypixelClient: () => ({ write: (_packet, data) => retryMessages.push(data.message) }),
+        fetchMonthlySession: async () => { retryMonthlyFetches++; return {}; }
+    });
+    const skipped = await retry.broadcast({}, { source: 'manual', includeSet: ['threat'] });
+    assert.equal(skipped.reason, 'nothing-eligible');
+    assert.equal(retryMessages.length, 0, 'Manual share also skips lookup failures');
+    assert.equal(retryMonthlyFetches, 0, 'Skipped failures do not trigger monthly stats lookups');
+    retryState.lastScanResults = { at: Date.now(), gameMode: 'BEDWARS',
+        results: [{ ...failed, lookupFailed: false, fkdr: 5 }] };
+    const recovered = await retry.broadcast({}, { source: 'manual', includeSet: ['threat'] });
+    assert.equal(recovered.sent, 1, 'Successful later scans are still eligible');
+    assert(retryMessages[0].includes('RetryPlayer: FKDR: 5.00'));
 
     console.log('ShareTags tests passed.');
 })().catch((error) => {

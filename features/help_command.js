@@ -41,7 +41,7 @@ const HELP_SECTIONS = [
                 label: '/session',
                 command: '/session',
                 description: 'Your local session deltas, overall or per mode.',
-                variations: ['/session', '/session start', '/session end', '/session bw solo', '/session history', '/session history 3', '/session debug on', '/session result win', '/ses refresh'],
+                variations: ['/session', '/session start', '/session end', '/session bw solo', '/session games', '/session games 2', '/session history', '/session history 3', '/session history 3 games', '/session debug on', '/session result win', '/ses refresh'],
                 startup: 'Session tracking and history'
             },
             {
@@ -131,7 +131,7 @@ const HELP_SECTIONS = [
                 label: '/anticheat',
                 aliases: ['/scafdetect', '/scaffolddetect'],
                 command: '/anticheat',
-                description: 'Private chat flags for Scaffold, Autoblock and Stasis in BedWars/SkyWars (Scaffold and Autoblock in replays too).',
+                description: 'Private chat flags for Scaffold in BedWars/SkyWars and replays.',
                 variations: ['/anticheat on', '/anticheat off', '/anticheat status', '/scafdetect on']
             },
             {
@@ -187,12 +187,6 @@ const HELP_SECTIONS = [
                 command: '/lf ',
                 description: 'Mode-specific party-ad triggers for the Bed Wars lobby you are in.',
                 variations: ['/lf fours', '/lf threes fours 4v4', '/lf off fours', '/lf off', '/lf status']
-            },
-            {
-                label: '/autogambler',
-                command: '/autogambler status',
-                description: 'Automatically accepts the quest from gambler George.',
-                variations: ['/autogambler on', '/autogambler false', '/autogambler status']
             },
             {
                 label: '/dodge',
@@ -307,7 +301,7 @@ const HELP_SUMMARIES = {
     '/po': 'Local party check', '/scan': 'Scan current players', '/share': 'Scan broadcasts',
     '/overlay': 'Visibility & threat rules', '/ol': 'Manual overlay players',
     '/tabstats': 'Tab list stats', '/nametags': 'Above-player stats',
-    '/chatstats': 'Chat stats & triggers', '/autogambler status': 'Accept George quest',
+    '/chatstats': 'Chat stats & triggers',
     '/dodge status': 'Pregame auto dodge', '/autododgetest': 'Dodge timing preview',
     '/denick': 'Resolve nicked players',
     '/denickskin': 'Skin-owner lookup', '/apikey': 'API keys & usage',

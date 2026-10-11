@@ -52,6 +52,7 @@ const state = {
     sessionBoundaryMinutes: 30,
     sessionRetention: 0,
     sessionRecapStyle: 'scoreboard',
+    sessionAverageGameTimeEnabled: true,
     sessionRecapFields: normalizeRecapFields(),
     sessionBedwarsFields: ['wins', 'losses', 'finals', 'finalDeaths', 'beds', 'bedsLost', 'kills', 'deaths', 'wlr', 'fkdr', 'kdr', 'bblr', 'games', 'stars'],
     sessionSkywarsFields: ['wins', 'losses', 'kills', 'deaths', 'wlr', 'kdr', 'games', 'assists'],

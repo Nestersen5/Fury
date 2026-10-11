@@ -1,13 +1,17 @@
 'use strict';
 
 // Join announcements plus live Tab/visible-player evidence confirm arrivals.
-// The caller supplies lobby-scoped presence; no profile/API lookups are used.
+// The caller supplies lobby-scoped presence and optional coordinated evidence.
+// Unreachable/incompatible peers retain the existing local arrival checks.
 function createPartyArrivalCheck({ getMembers, getKnownDenick, isOwnName, sendChat, playSound,
     enabled = true,
     getVisibleNames = () => [],
+    getCoordination = () => null,
+    hasCoordination = () => false,
     dismissCommand = '/partycheck dismiss',
     setTimer = setTimeout, clearTimer = clearTimeout }) {
     let active = false, timer = null, started = false, warned = false, unavailable = false;
+    let initialChecked = false;
     const joined = new Set();
     const key = name => String(name || '').toLowerCase();
     function stop() {
@@ -16,6 +20,7 @@ function createPartyArrivalCheck({ getMembers, getKnownDenick, isOwnName, sendCh
         timer = null;
         joined.clear();
         started = warned = unavailable = false;
+        initialChecked = false;
     }
     function enter() { stop(); active = true; }
     function setEnabled(value) {
@@ -29,28 +34,45 @@ function createPartyArrivalCheck({ getMembers, getKnownDenick, isOwnName, sendCh
         // forget teammates who joined while the preference was off.
         if (enabled && active && started) timer = setTimer(check, 1000);
     }
-    function missingMembers() {
+    function memberEvidence() {
         const members = getMembers();
         if (members === null) return null;
-        const observed = new Set([...joined, ...getVisibleNames().map(key)]);
-        const arrived = new Set(observed);
-        for (const name of observed) {
-            const known = getKnownDenick(name);
-            if (known) arrived.add(key(known.realName || known.realIGN));
+        const result = { missing: [], different: [], pending: [] };
+        const fallback = [];
+        for (const name of new Map(members.filter(name => !isOwnName(name)).map(name => [key(name), name])).values()) {
+            const coordinated = getCoordination(name);
+            if (coordinated?.status === 'same') continue;
+            if (coordinated?.status === 'different') result.different.push(name);
+            else if (coordinated?.status === 'pending') result.pending.push(name);
+            else fallback.push(name);
         }
-        return [...new Map(members.filter(name => !isOwnName(name)).map(name => [key(name), name])).values()]
-            .filter(name => !arrived.has(key(name)));
+        // Coordinated members do not need a Tab/entity traversal or denick
+        // resolution. Collect local evidence only for the fallback subset.
+        if (fallback.length) {
+            const observed = new Set([...joined, ...getVisibleNames().map(key)]);
+            const arrived = new Set(observed);
+            for (const name of observed) {
+                const known = getKnownDenick(name);
+                if (known) arrived.add(key(known.realName || known.realIGN));
+            }
+            result.missing = fallback.filter(name => !arrived.has(key(name)));
+        }
+        return result;
     }
     function check() {
         timer = null;
         if (!active || !enabled) return;
-        const missing = missingMembers();
-        if (missing === null) {
+        initialChecked = true;
+        const evidence = memberEvidence();
+        if (evidence === null) {
             if (!unavailable) sendChat('\u00a76Party check unavailable: waiting for a confirmed party roster.');
             unavailable = true;
-        } else if (missing.length) {
-            sendChat('\u00a7c\u00a7lLEAVE THIS LOBBY \u00a78- \u00a7cPOSSIBLE PARTY SPLIT');
-            sendChat(`\u00a7eArrival unconfirmed: \u00a7f${missing.join(', ')}`);
+        } else if (evidence.missing.length || evidence.different.length) {
+            sendChat(evidence.different.length
+                ? '\u00a7c\u00a7lLEAVE THIS LOBBY \u00a78- \u00a7cPARTY SPLIT DETECTED'
+                : '\u00a7c\u00a7lLEAVE THIS LOBBY \u00a78- \u00a7cPOSSIBLE PARTY SPLIT');
+            if (evidence.different.length) sendChat(`\u00a7eDifferent pregame server: \u00a7f${evidence.different.join(', ')}`);
+            if (evidence.missing.length) sendChat(`\u00a7eArrival unconfirmed: \u00a7f${evidence.missing.join(', ')}`);
             sendChat({ text: '', extra: [
                 { text: 'Everyone is here? ', color: 'gray' },
                 {
@@ -61,7 +83,7 @@ function createPartyArrivalCheck({ getMembers, getKnownDenick, isOwnName, sendCh
             ] });
             playSound({ name: 'note.pling', volume: 1, pitch: 63 });
             warned = true;
-        } else {
+        } else if (!evidence.pending.length) {
             if (warned) sendChat('\u00a7aParty check: all current party members have joined.');
             warned = false;
             return;
@@ -77,12 +99,28 @@ function createPartyArrivalCheck({ getMembers, getKnownDenick, isOwnName, sendCh
         if (!started) {
             started = true;
             if (enabled) timer = setTimer(check, 1000);
-        } else if (enabled && warned && missingMembers()?.length === 0) {
-            if (timer !== null) clearTimer(timer);
-            check();
+        } else if (enabled && warned) {
+            const evidence = memberEvidence();
+            if (evidence && !evidence.missing.length && !evidence.different.length && !evidence.pending.length) {
+                if (timer !== null) clearTimer(timer);
+                check();
+            }
         }
     }
-    return { enter, stop, setEnabled, observeChatLine };
+    function refresh() {
+        if (!active || !enabled) return;
+        if (!started) {
+            if (!hasCoordination()) return;
+            started = true;
+            if (timer === null) timer = setTimer(check, 1000);
+        } else if (initialChecked) {
+            if (timer !== null) clearTimer(timer);
+            timer = setTimer(check, 0);
+        }
+        // Keep the initial join grace. Later evidence changes wake an idle or
+        // pending check immediately; unchanged heartbeats do not call refresh.
+    }
+    return { enter, stop, setEnabled, observeChatLine, refresh };
 }
 
 module.exports = { createPartyArrivalCheck };

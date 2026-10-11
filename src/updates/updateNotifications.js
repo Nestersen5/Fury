@@ -61,7 +61,7 @@ function endpoint({ isPackaged, env, release }) {
     return url;
 }
 
-function readManifest(url, { signal, timeoutMs = TIMEOUT_MS } = {}) {
+function readManifest(url, { signal, timeoutMs = TIMEOUT_MS, maxBytes = MAX_BYTES } = {}) {
     return new Promise((resolve, reject) => {
         let request, timer, settled = false;
         const finish = (error, value) => {
@@ -84,13 +84,13 @@ function readManifest(url, { signal, timeoutMs = TIMEOUT_MS } = {}) {
                 agent: false, headers: { Accept: 'application/json' }
             }, response => {
                 if (response.statusCode !== 200 || !/^application\/json(?:;|$)/i.test(response.headers['content-type'] || '')
-                    || Number(response.headers['content-length']) > MAX_BYTES) {
+                    || Number(response.headers['content-length']) > maxBytes) {
                     response.destroy(); finish(new Error('Invalid update response')); return;
                 }
                 const chunks = []; let bytes = 0;
                 response.on('data', chunk => {
                     bytes += chunk.length;
-                    if (bytes > MAX_BYTES) { response.destroy(); finish(new Error('Update response too large')); }
+                    if (bytes > maxBytes) { response.destroy(); finish(new Error('Update response too large')); }
                     else chunks.push(chunk);
                 });
                 response.on('error', error => finish(error));

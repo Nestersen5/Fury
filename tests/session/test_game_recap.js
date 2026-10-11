@@ -48,6 +48,7 @@ const sessionRenderDeps = {
 
 const {
     renderLocalSession,
+    renderSessionGames,
     renderGameRecap: renderGameRecapActual,
     sessionFooter,
     renderSessionHistory,
@@ -345,10 +346,49 @@ function makeRecap(overrides = {}) {
     assert.ok(text.includes('BED WARS'), 'card shows the game');
     assert.ok(text.includes('6m 12s'), 'card shows the game duration');
     assert.ok(text.includes('VICTORY'), 'card shows the result badge');
-    assert.ok(text.includes('3 FINALS'), 'finals render as a plain count, not a delta');
-    assert.ok(text.includes('7 KILLS'));
+    assert.ok(text.includes('Finals/Beds: 3/'), 'finals render as a plain count, not a delta');
+    assert.ok(text.includes('Kills/Deaths: 7/'));
     assert.ok(text.includes('SESSION'), 'card shows the running session footer');
     assert.ok(text.includes('4W'), 'footer shows session wins');
+}
+
+{
+    const recap = makeRecap({ sessionDelta: {
+        local: true,
+        modes: [{ mode: 'BEDWARS', wins: 3, losses: 1 }],
+        session: { games: [
+            { mode: 'BEDWARS', durationMs: 120000,
+                localModes: [{ mode: 'BEDWARS', finals: 4, finalDeaths: 2 }] },
+            { mode: 'BEDWARS', durationMs: 90000,
+                localModes: [{ mode: 'BEDWARS', finalDeaths: 1, unavailable: ['finals'] }] },
+            { mode: 'BEDWARS', durationMs: 90000, metadata: { privateGame: true },
+                localModes: [{ mode: 'BEDWARS', finals: 100, finalDeaths: 1 }] },
+            { mode: 'DUELS', durationMs: 90000,
+                localModes: [{ mode: 'DUELS', finals: 100, finalDeaths: 1 }] }
+        ] }
+    } });
+    const client = fakeClient();
+    renderGameRecap(client, recap);
+    assert.ok(client.text().includes('FKDR 2.00'),
+        'session FKDR uses games with both counters known and excludes unknown, private, and other-mode games');
+    assert.ok(client.text().includes('AVG TIME 1m 45s'),
+        'average game time still includes games with known duration even when their stats are incomplete');
+}
+
+{
+    const recap = makeRecap({ sessionDelta: {
+        local: true,
+        modes: [{ mode: 'BEDWARS', wins: 1, losses: 0 }],
+        session: { games: [{ mode: 'BEDWARS', durationMs: 120000,
+            result: 'win', localModes: [{ mode: 'BEDWARS', unavailable: ['finals', 'finalDeaths'] }] }] }
+    } });
+    const client = fakeClient();
+    renderGameRecapActual(client, recap, {
+        style: 'scoreboard', fields: ['session_wins', 'session_losses', 'session_games', 'session_ratio']
+    });
+    assert.ok(client.text().includes('FKDR 0.00'), 'an incomplete match contributes zero to FKDR instead of hiding the total');
+    assert.ok(client.text().includes('SESSION 1W / 0L'), 'a known result remains counted when game stats are incomplete');
+    assert.ok(client.text().includes('PLAYED 1'), 'a game with unknown stats still contributes to games played');
 }
 
 {
@@ -371,7 +411,7 @@ function makeRecap(overrides = {}) {
     // Every supported game uses the same layout, with its own headline stats.
     for (const [game, mode, stats, expected] of [
         ['SkyWars', 'SKYWARS', { wins: 1, kills: 4, assists: 2 }, '4 KILLS'],
-        ['Duels', 'DUELS', { wins: 1, kills: 2, deaths: 1 }, '2 KILLS   1 DEATHS']
+        ['Duels', 'DUELS', { wins: 1, kills: 2, deaths: 1 }, 'Kills/Deaths: 2/1']
     ]) {
         const client = fakeClient();
         renderGameRecap(client, { game, mode,
@@ -419,11 +459,15 @@ function makeRecap(overrides = {}) {
     assert.equal(plain.lines.length, 4, 'Default scoreboard has exactly two content rows and two rules');
     assert(plain.lines[0].includes('------ BED WARS RECAP ------'));
     assert(plain.lines[1].includes('VICTORY   11m 06s   Solos'));
-    assert(plain.lines[2].includes('3 FINALS   1 BEDS   7 KILLS'));
+    assert(plain.lines[2].includes('Finals/Beds: 3/1   Kills/Deaths: 7/'));
     assert(!plain.text().includes('Session:') && !plain.text().includes('GAMES GOAL'));
-    assert(plain.colored().includes('<yellow>1 BEDS') && plain.colored().includes('<aqua>7 KILLS'),
+    assert(plain.colored().includes('<gray>Finals/Beds: <green>3<dark_gray>/<yellow>1') && plain.colored().includes('<gray>Kills/Deaths: <green>7<dark_gray>/<red>'),
         'Scoreboard keeps the selected semantic colors');
-    const { chatTextWidth } = require('../../src/stats/recapScoreboard');
+    const { chatTextWidth, scoreboardRecapLines } = require('../../src/stats/recapScoreboard');
+    const headerLines = scoreboardRecapLines({ game: 'Bedwars', fields: ['header'] });
+    assert(headerLines[0].includes('\u00a78------ \u00a7c\u00a7lBED \u00a7f\u00a7lWARS RECAP\u00a78 ------'),
+        'Bedwars title is bold light red and white with dark gray rules');
+    assert(headerLines[1].trimStart().startsWith('\u00a78'), 'Bottom rule is dark gray');
     for (const map of ['Airshow', '§cAirshow\nDoubles', 'W'.repeat(80), null, undefined, '', '  ']) {
         const mapped = fakeClient();
         renderGameRecapActual(mapped, { ...sample, record: { ...sample.record,
@@ -442,8 +486,9 @@ function makeRecap(overrides = {}) {
     assert.equal(goal.lines.length, 5, 'Only the enabled games goal adds a third content row');
     assert(goal.lines[3].includes('GAMES GOAL 6/10 [||||||----]'));
     assert(!goal.text().includes('wins:') && !goal.text().includes('finals:'));
-    for (const line of goal.lines) {
-        const width = helpers.chatTextWidth(line), contentWidth = helpers.chatTextWidth(line.trimStart());
+    // Plain captured text loses the bold header's glyph width.
+    for (const line of [...headerLines, ...goal.lines.slice(1)]) {
+        const width = chatTextWidth(line), contentWidth = chatTextWidth(line.trimStart());
         const center = width - contentWidth / 2;
         assert(Math.abs(center - 160) <= 2, 'Chat rows share a center within one half-space');
         assert(width <= 320, 'Normal scoreboard content fits standard chat width');
@@ -463,17 +508,18 @@ function makeRecap(overrides = {}) {
         sessionDelta: { local: true, modes: [{ mode: 'DUELS', wins: 1 }] }
     }, { ...goalOnly, goals: { games: 10 } });
     assert(local.lines[0].includes('DUELS RECAP') && local.lines[1].includes('DEFEAT'));
-    assert(local.lines[2].includes('0 KILLS   1 DEATHS'));
+    assert(local.lines[2].includes('Kills/Deaths: 0/1'));
     assert(local.lines[3].includes('GAMES GOAL ?/10 [----------]'), 'Unavailable local progress is not an invented zero');
 
     const combined = fakeClient();
     renderGameRecapActual(combined, makeRecap(), { goals: { games: 10 } });
-    assert.equal(combined.lines.length, 5, 'Session totals and games goal share one optional row');
-    assert(combined.lines[3].includes('SESSION 4W / 2L   FKDR 2.00   GAMES'));
+    assert.equal(combined.lines.length, 6, 'Session totals have a blank separator and share one row with the games goal');
+    assert.equal(combined.lines[3].trim(), '', 'Blank line separates game stats from session totals');
+    assert(combined.lines[4].includes('SESSION 4W / 2L   FKDR 2.00   GAMES'));
     assert(combined.clicks().includes('/session'), 'The session row opens the existing full session command');
     const sessionOnly = fakeClient();
     renderGameRecapActual(sessionOnly, sample, { style: 'scoreboard', fields: ['session_totals'], goals: { games: 10 } });
-    assert(sessionOnly.lines[3].includes('SESSION 4W / 2L'));
+    assert(sessionOnly.lines[4].includes('SESSION 4W / 2L'));
     assert(!sessionOnly.text().includes('GAMES'), 'The goal toggle hides a configured target');
     const incomplete = fakeClient();
     renderGameRecapActual(incomplete, {
@@ -481,7 +527,7 @@ function makeRecap(overrides = {}) {
         delta: { local: true, modes: [{ mode: 'BEDWARS', finals: 2, beds: 1, kills: 3 }] },
         sessionDelta: { local: true, modes: [{ mode: 'BEDWARS', wins: 1 }] }
     }, { goals: { games: 10 } });
-    assert(incomplete.lines[3].includes('SESSION 1W / ?L   FKDR ?   GAMES ?/10'), 'Partial local session coverage stays explicit');
+    assert(incomplete.lines[4].includes('SESSION 1W / ?L   FKDR ?   GAMES ?/10'), 'Partial local session coverage stays explicit');
 }
 
 {
@@ -494,7 +540,7 @@ function makeRecap(overrides = {}) {
     const custom = fakeClient();
     renderGameRecapActual(custom, makeRecap(), { style: 'custom', fields: ['game_stats'] });
     assert.equal(custom.lines.length, 4);
-    assert(custom.text().includes('VICTORY') && custom.text().includes('3 FINALS'));
+    assert(custom.text().includes('VICTORY') && custom.text().includes('Finals/Beds: 3/'));
     assert(!custom.text().includes('SESSION'), 'The session toggle is still respected after migration');
 }
 
@@ -758,4 +804,260 @@ function makeRecap(overrides = {}) {
     }
 }
 
-console.log('test_game_recap.js: all assertions passed');
+
+{
+    const { scoreboardRecapLines } = require('../../src/stats/recapScoreboard');
+    for (const [duration, color] of [['1m 59s', 'a'], ['2m 0s', 'e'], ['4m 59s', 'e'],
+        ['5m 0s', 'c'], ['9m 59s', 'c'], ['10m 0s', '4'], ['25m 0s', '4'],
+        ['25m 1s', '5'], ['1h 0m', '5']]) {
+        const lines = scoreboardRecapLines({ game: 'Bedwars', averageGameTime: duration, fields: [] });
+        assert(lines.some(line => line.includes('\u00a77SESSION \u00a77AVG TIME \u00a7' + color + duration)),
+            'Average time color at ' + duration);
+    }
+}
+
+{
+    const { scoreboardRecapLines, chatTextWidth } = require('../../src/stats/recapScoreboard');
+    const fields = ['session_avg_finals', 'session_avg_beds'];
+    const { normalizeRecapFields } = require('../../src/session/settings');
+    assert.deepEqual(normalizeRecapFields(fields), fields, 'Average toggles survive settings normalization');
+    for (const [finals, beds, games, expectedFinals, expectedBeds] of [
+        [10, 4, 3, '3.33', '1.33'], [0, 0, 2, '0.00', '0.00'],
+        [0, 0, 0, '0.00', '0.00'], [1000, 200, 2, '500.00', '100.00'],
+        [undefined, 4, 2, '?', '2.00']
+    ]) {
+        const lines = scoreboardRecapLines({ game: 'Bedwars', fields, session: { finals, beds, games } });
+        assert(lines.some(line => line.includes(`Avg. finals/beds: §a${expectedFinals}§8/§a${expectedBeds}`)));
+        assert(lines.every(line => chatTextWidth(line) <= 320), 'Averages wrap within Minecraft chat width');
+    }
+    for (const game of ['SkyWars', 'Duels']) {
+        assert.deepEqual(scoreboardRecapLines({ game, fields, session: { finals: 5, beds: 2, games: 3 } }), [],
+            'Bed Wars averages do not appear in other games');
+    }
+    const local = makeRecap({ sessionDelta: {
+        local: true, modes: [{ mode: 'BEDWARS', finals: 10, beds: 4 }],
+        session: { games: [
+            ...Array.from({ length: 3 }, () => ({ mode: 'BEDWARS', durationMs: 60000 })),
+            { mode: 'BEDWARS', durationMs: 60000, metadata: { privateGame: true } },
+            { mode: 'DUELS', durationMs: 60000 },
+            { mode: 'BEDWARS', durationMs: 0 }
+        ] }
+    } });
+    const client = fakeClient();
+    renderGameRecapActual(client, local, { fields });
+    assert(client.text().includes('Avg. finals/beds: 3.33/1.33'));
+    assert(!client.text().includes('PLAYED'), 'Averages do not require enabling the games played toggle');
+    const api = makeRecap();
+    api.sessionDelta.stats.Bedwars.games_played_bedwars = 6;
+    const apiClient = fakeClient();
+    renderGameRecapActual(apiClient, api, { fields: ['session_avg_finals'] });
+    assert(apiClient.text().includes('Avg. finals: 3.33'), 'API session counters supply the average');
+    assert(!apiClient.text().includes('Avg. beds'), 'Average fields toggle independently');
+}
+
+{
+    const { scoreboardRecapLines } = require('../../src/stats/recapScoreboard');
+    const { normalizeRecapFields } = require('../../src/session/settings');
+    const fields = ['session_finals', 'session_beds'];
+    assert.deepEqual(normalizeRecapFields(fields), fields, 'Session total toggles survive settings normalization');
+    for (const [field, label, key, value] of [
+        ['session_finals', 'Finals:', 'finals', 20],
+        ['session_beds', 'Beds:', 'beds', 6]
+    ]) {
+        const client = fakeClient();
+        renderGameRecapActual(client, makeRecap(), { fields: [field] });
+        assert(client.text().includes(`${label} ${value}`), 'API session totals render');
+        assert(!client.text().includes(field === 'session_finals' ? 'Beds:' : 'Finals:'),
+            'Session totals toggle independently');
+        for (const count of [value, 0, undefined]) {
+            const lines = scoreboardRecapLines({ game: 'Bedwars', fields: [field], session: { [key]: count } });
+            assert(lines.some(line => line.includes(`${label} §f${count === undefined ? '?' : count}`)),
+                'Session totals, including zero and unknown, preserve white formatting');
+        }
+    }
+    const local = fakeClient();
+    renderGameRecapActual(local, makeRecap({ sessionDelta: {
+        local: true, modes: [{ mode: 'BEDWARS', finals: 7, beds: 3 }]
+    } }), { fields });
+    assert(local.text().includes('Finals/Beds: 7/3'),
+        'Local session totals render without requiring game count or average toggles');
+    for (const game of ['SkyWars', 'Duels']) {
+        assert.deepEqual(scoreboardRecapLines({ game, fields, session: { finals: 5, beds: 2 } }), [],
+            'Bed Wars totals do not appear in other games');
+    }
+}
+
+{
+    const fields = ['stars'];
+    for (const [experience, expected] of [[100, '+0.02'], [0, '+0.00']]) {
+        const recap = makeRecap();
+        recap.delta.stats.Bedwars.Experience = experience;
+        const client = fakeClient();
+        renderGameRecapActual(client, recap, { fields });
+        assert.equal(client.text().trim(), `${expected} STARS`, 'Enabled stars render even when no XP was gained');
+        assert(client.colored().includes(`<aqua>${expected}`), 'Star gain is aqua');
+        assert(client.colored().includes('<gray>STARS'), 'Stars label is light grey');
+    }
+    for (const [experience, expected] of [[100, '+0.02'], [undefined, '?']]) {
+        const client = fakeClient();
+        renderGameRecapActual(client, makeRecap({ delta: {
+            local: true, modes: [{ mode: 'BEDWARS', finals: 2, experience }]
+        } }), { fields });
+        assert.equal(client.text().trim(), `${expected} STARS`, 'Local recaps show available XP or an explicit unknown');
+    }
+    const disabled = fakeClient();
+    renderGameRecapActual(disabled, makeRecap(), { fields: ['finals'] });
+    assert(!disabled.text().includes('STARS'), 'Disabled stars remain hidden');
+    const { scoreboardRecapLines } = require('../../src/stats/recapScoreboard');
+    assert(scoreboardRecapLines({ game: 'Bedwars', fields,
+        stats: [{ label: 'Stars', value: '+0.02', color: '§6' }] })[0].includes('§b+0.02 §7STARS'),
+    'Shared preview formatting uses aqua values and a light grey label');
+}
+
+{
+    const fields = ['session_finals', 'session_beds', 'session_avg_finals', 'session_avg_beds'];
+    const savedGames = [
+        { mode: 'BEDWARS', durationMs: 60000, result: 'win',
+            localModes: [{ mode: 'BEDWARS', finals: 5, beds: 2, finalDeaths: 0 }] },
+        { mode: 'BEDWARS', durationMs: 60000, result: 'loss',
+            localModes: [{ mode: 'BEDWARS', unavailable: ['finals', 'beds'] }] },
+        { mode: 'BEDWARS', durationMs: 60000, metadata: { privateGame: true },
+            localModes: [{ mode: 'BEDWARS', finals: 100, beds: 100 }] },
+        { mode: 'DUELS', durationMs: 60000, localModes: [{ mode: 'DUELS', finals: 100, beds: 100 }] }
+    ];
+    // Replay serialized data as after a restart; no renderer-owned totals cache.
+    const delta = JSON.parse(JSON.stringify({ local: true,
+        modes: [{ mode: 'BEDWARS', games: 2, unavailable: ['finals', 'beds'] }],
+        session: { games: savedGames }
+    }));
+    const render = (sessionDelta, selected = fields) => {
+        const client = fakeClient();
+        renderGameRecapActual(client, makeRecap({ sessionDelta }), { fields: selected });
+        return client.text();
+    };
+    const text = render(delta);
+    assert(text.includes('Finals/Beds: 5/2'), 'An unknown game preserves earlier known totals');
+    assert(text.includes('Avg. finals/beds: 2.50/1.00'), 'Unknown games count as zero and remain in the denominator');
+    assert(!text.includes('?'), 'Session finals and beds no longer become unavailable');
+    assert(render(delta, ['session_finals']).includes('SESSION Finals: 5'), 'Totals-only selections use saved game fallback');
+    const unknown = { local: true, modes: [{ mode: 'BEDWARS', games: 1 }],
+        session: { games: [savedGames[1]] } };
+    assert(render(unknown).includes('Finals/Beds: 0/0'));
+    assert(render(unknown).includes('Avg. finals/beds: 0.00/0.00'));
+    const game = fakeClient();
+    renderGameRecapActual(game, makeRecap({ delta: {
+        local: true, modes: [{ mode: 'BEDWARS', kills: 2, deaths: 0 }]
+    } }), { fields: ['finals', 'beds'] });
+    assert(game.text().includes('Finals/Beds: 0/0'), 'Undetected per-game finals and beds display as zero');
+    for (const [source, expectedTotal, expectedAverage] of [
+        ['local', '8/3', '2.00/0.75'], ['api', '13/5', '2.17/0.83']
+    ]) {
+        const archived = JSON.parse(JSON.stringify(delta));
+        delete archived.modes[0].games;
+        archived.session.trackingSource = source;
+        archived.session.localTracking = { totals: { BEDWARS: {
+            finals: { value: 8, available: false }, beds: { value: 3, available: false },
+            games: { value: 4, available: true }
+        } } };
+        const archivedText = render(archived);
+        assert(archivedText.includes(`Finals/Beds: ${expectedTotal}`), 'Persisted totals survive missing coverage and game eviction');
+        assert(archivedText.includes(`Avg. finals/beds: ${expectedAverage}`), 'Archived games are counted exactly once');
+    }
+}
+
+{
+    const games = Array.from({ length: 23 }, (_, index) => ({
+        mode: 'BEDWARS', at: 1000 + index * 60000, durationMs: 60000,
+        result: index % 2 ? 'loss' : 'win', metadata: { map: `Map${index + 1}` },
+        localModes: [{ mode: 'BEDWARS', finals: index, beds: 1, kills: 2 }]
+    }));
+    const session = { id: 'session_fixture', startedAt: 1000, games };
+    for (const [page, first, last, previous, next] of [[1, 1, 10, false, true], [2, 11, 20, true, true], [3, 21, 23, true, false]]) {
+        const client = fakeClient();
+        renderSessionGames(client, session, { page });
+        const rows = client.lines.filter(line => /^\d+\./.test(line));
+        assert.equal(rows.length, last - first + 1);
+        assert(rows[0].startsWith(`${first}. Map${first} `));
+        assert(rows.at(-1).startsWith(`${last}. Map${last} `));
+        assert(rows.some(row => row.includes('WIN')) && rows.some(row => row.includes('LOSS')));
+        assert(rows[0].includes(`F/B/K ${first - 1}/1/2`));
+        assert.equal(client.clicks().includes(`/session games ${page - 1} session_fixture`), previous);
+        assert.equal(client.clicks().includes(`/session games ${page + 1} session_fixture`), next);
+    }
+    const clamped = fakeClient();
+    renderSessionGames(clamped, session, { page: 999 });
+    assert(clamped.text().includes('Page 3/3'));
+    const unordered = { ...session, games: games.slice().reverse() };
+    const chronological = fakeClient();
+    renderSessionGames(chronological, unordered);
+    assert(chronological.lines.find(line => line.startsWith('1.')).includes('Map1 '),
+        'Delayed verification append order cannot reorder played games');
+    assert.equal(unordered.games[0].metadata.map, 'Map23', 'Rendering does not mutate saved ordering');
+    const empty = fakeClient();
+    renderSessionGames(empty, { games: [] });
+    assert(empty.text().includes('No games recorded') && !empty.clicks());
+    const single = fakeClient();
+    renderSessionGames(single, { id: 'fixture', games: [{ mode: 'BEDWARS', metadata: { map: 'A very long map name that must still fit on one chat row' } }] });
+    const row = single.lines.find(line => line.startsWith('1.'));
+    assert(row.includes('UNKNOWN') && row.includes('F/B/K 0/0/?'));
+    assert(require('../../src/stats/recapScoreboard').chatTextWidth(row) <= 320);
+    assert(!single.clicks(), 'One page needs no pagination buttons');
+    const verified = fakeClient();
+    renderSessionGames(verified, { games: [{ mode: 'BEDWARS', result: 'win', verificationStatus: 'verified',
+        delta: { stats: { Bedwars: { wins_bedwars: 1, final_kills_bedwars: 5, beds_broken_bedwars: 2, kills_bedwars: 3 } } },
+        localModes: [{ mode: 'BEDWARS', finals: 1, beds: 1, kills: 1 }] }] });
+    assert(verified.text().includes('F/B/K 5/2/3'), 'Game list uses reconciled API counters when verified');
+    const local = fakeClient();
+    renderLocalSession(local, { local: true, spanMs: 60000, modes: [{ mode: 'BEDWARS', label: 'BedWars',
+        wins: 2, losses: 1, games: 3, finals: 5, finalDeaths: 1, beds: 2, bedsLost: 1,
+        kills: 4, deaths: 2, fkdr: 5, wlr: 2, kdr: 2, bblr: 2, winRate: 66.67, localStreak: 2 }] },
+    { name: 'Tester', focus: { game: 'Bedwars', mode: BEDWARS_MODE_DEFS[0], modes: BEDWARS_MODE_DEFS, commandToken: 'bw' } });
+    for (const label of ['FKDR', 'WLR', 'KDR', 'BBLR', 'FDeaths', 'Beds Lost', 'Win rate', 'Local streak', 'Avg. finals', 'Avg. beds']) {
+        assert(local.text().includes(label), `Local session includes ${label}`);
+    }
+    assert(local.colored().includes('<green>+5') && local.colored().includes('<red>+1'), 'Session counters use /stats semantic colors');
+    assert(local.clicks().includes('/session bw solo'), 'Local session mode navigation remains available');
+    assert(!local.text().includes('?8'), 'Session formatting preserves Minecraft section codes');
+}
+
+(async () => {
+    const vm = require('vm');
+    const proxy = require('fs').readFileSync(require('path').resolve(__dirname, '../../proxy.js'), 'utf8');
+    const start = proxy.indexOf('        async function handleLocalSessionCommand(');
+    const end = proxy.indexOf('\n        function handleRecapCommand(', start);
+    assert(start >= 0 && end > start);
+    const owner = 'a'.repeat(32);
+    const active = { id: 'active', uuid: owner, games: [] };
+    const saved = { id: 'saved', uuid: owner, games: [] };
+    const renders = [];
+    const messages = [];
+    const context = vm.createContext({
+        state: { sessionTrackingEnabled: true }, normalizeUuid: uuid => uuid,
+        sessionStore: { getSessions: uuid => { assert.equal(uuid, owner); return [active, saved]; } },
+        sessionTracker: {
+            getActiveSession: () => active,
+            ensureSession: async () => {},
+            getHistory: () => [{ session: active }, { session: saved }]
+        },
+        renderSessionGames: (_client, session, options) => renders.push({ session, options }),
+        sendChat: (_client, text) => messages.push(text)
+    });
+    vm.runInContext(proxy.slice(start, end), context);
+    const client = { uuid: owner };
+    await context.handleLocalSessionCommand(client, ['/session', 'games', '2']);
+    assert.equal(renders.at(-1).session.id, 'active');
+    assert.equal(renders.at(-1).options.page, '2');
+    await context.handleLocalSessionCommand(client, ['/session', 'history', '2', 'games', '3']);
+    assert.equal(renders.at(-1).session.id, 'saved');
+    assert.equal(renders.at(-1).options.page, '3');
+    await context.handleLocalSessionCommand(client, ['/session', 'games', '1', 'saved']);
+    assert.equal(renders.at(-1).session.id, 'saved', 'Pagination retains the selected session');
+    const count = renders.length;
+    await context.handleLocalSessionCommand(client, ['/session', 'games', '1', 'other-account-session']);
+    assert.equal(renders.length, count, 'Unknown or foreign session IDs cannot render');
+    active.uuid = 'b'.repeat(32);
+    await context.handleLocalSessionCommand(client, ['/session', 'games']);
+    assert.equal(renders.length, count, 'An active session owned by another account cannot render');
+    assert(messages.some(text => text.includes('No session found')));
+    console.log('test_game_recap.js: all assertions passed');
+})().catch(error => { console.error(error); process.exitCode = 1; });

@@ -12,6 +12,7 @@ const {
 } = require('./src/session/settings.js');
 const { normalizeGamblerGeorgeReminderState } = require('./features/gambler_george_reminder.js');
 const { SNOOZE_DURATION } = require('./src/reminders/hypixelKeyReminder.js');
+const { BEDWARS_TAB_DEFAULTS, normalizeBedwarsTabSettings } = require('./src/session/bedwarsTabSettings.js');
 
 const paths = {
     keys: dataPath('statmod_key.txt'),
@@ -124,6 +125,7 @@ const defaults = {
         anticheatStasisEnabled: false,
         anticheatPossibleAlertsEnabled: true,
         anticheatTeamAlertsEnabled: false,
+        anticheatPartyBroadcastEnabled: true,
         accentBedwarsEventLabelsEnabled: true,
         bedwarsSidebarTeamColorsEnabled: true,
         tabStatsEnabled: true,
@@ -192,6 +194,7 @@ const defaults = {
         shareTagsDestination: 'party',
         shareTagsGroupByTeam: true,
         tabStatsBedwarsMode: 'auto',
+        ...BEDWARS_TAB_DEFAULTS,
         tabStatsSkywarsMode: 'auto',
         tabStatsShowKillRatio: true,
         tabStatsShowWinRatio: true,
@@ -434,6 +437,7 @@ function loadFeatureSettings() {
         defaults.features.autoDodgeIncludePreset
     );
     features.tabStatsBedwarsFields = normalizeTabStatsFields(features.tabStatsBedwarsFields, 'BEDWARS');
+    Object.assign(features, normalizeBedwarsTabSettings(features));
     features.tabStatsSkywarsFields = normalizeTabStatsFields(features.tabStatsSkywarsFields, 'SKYWARS');
     features.tabStatsLabelStyle = normalizeTabStatsLabelStyle(features.tabStatsLabelStyle, defaults.features.tabStatsLabelStyle);
     features.chatPrefixAccentHex = normalizeChatPrefixAccentHex(
@@ -481,18 +485,17 @@ function saveFeatureSettings(features) {
         bedwarsSidebarTeamColorsEnabled,
         anticheatEnabled: next.anticheatEnabled !== undefined ? Boolean(next.anticheatEnabled) : defaults.features.anticheatEnabled,
         anticheatScaffoldEnabled: next.anticheatScaffoldEnabled !== undefined ? Boolean(next.anticheatScaffoldEnabled) : defaults.features.anticheatScaffoldEnabled,
-        anticheatAutoblockEnabled: next.anticheatAutoblockEnabled !== undefined ? Boolean(next.anticheatAutoblockEnabled) : defaults.features.anticheatAutoblockEnabled,
-        anticheatStasisEnabled: next.anticheatStasisEnabled !== undefined ? Boolean(next.anticheatStasisEnabled) : defaults.features.anticheatStasisEnabled,
-        anticheatPossibleAlertsEnabled: next.anticheatPossibleAlertsEnabled !== undefined ? Boolean(next.anticheatPossibleAlertsEnabled) : defaults.features.anticheatPossibleAlertsEnabled,
+        anticheatAutoblockEnabled: false, // Fixed; ignore legacy saved toggles.
+        anticheatStasisEnabled: false, // Fixed; ignore legacy saved toggles.
+        anticheatPossibleAlertsEnabled: true, // Fixed; ignore legacy saved toggles.
         anticheatTeamAlertsEnabled: next.anticheatTeamAlertsEnabled !== undefined ? Boolean(next.anticheatTeamAlertsEnabled) : defaults.features.anticheatTeamAlertsEnabled,
+        anticheatPartyBroadcastEnabled: next.anticheatPartyBroadcastEnabled !== undefined ? Boolean(next.anticheatPartyBroadcastEnabled) : defaults.features.anticheatPartyBroadcastEnabled,
         tabStatsEnabled: Boolean(next.tabStatsEnabled),
         autoScanOnGameStart: true,
         quickMathsEnabled: next.quickMathsEnabled !== undefined
             ? Boolean(next.quickMathsEnabled)
             : defaults.features.quickMathsEnabled,
-        autoGamblerEnabled: next.autoGamblerEnabled !== undefined
-            ? Boolean(next.autoGamblerEnabled)
-            : defaults.features.autoGamblerEnabled,
+        autoGamblerEnabled: false, // Retired; ignore legacy saved values.
         autoSkinDenickEnabled: Boolean(next.autoSkinDenickEnabled),
         autoStatsDenickEnabled: Boolean(next.autoStatsDenickEnabled),
         denickChatAnnouncementsEnabled: Boolean(next.denickChatAnnouncementsEnabled),
@@ -647,6 +650,7 @@ function saveFeatureSettings(features) {
             ? Boolean(next.tabStatsShowWinRatio)
             : defaults.features.tabStatsShowWinRatio,
         tabStatsBedwarsFields: normalizeTabStatsFields(next.tabStatsBedwarsFields, 'BEDWARS'),
+        ...normalizeBedwarsTabSettings(next),
         tabStatsSkywarsFields: normalizeTabStatsFields(next.tabStatsSkywarsFields, 'SKYWARS'),
         tabStatsLabelStyle: normalizeTabStatsLabelStyle(next.tabStatsLabelStyle, defaults.features.tabStatsLabelStyle),
         nametagScope: normalizeNametagScope(

@@ -13,9 +13,10 @@
 // difference of two lifetime ratios.
 
 const { sendChat } = require('../../../features/minecraft_chat.js');
-const { formatInt, formatRatio } = require('../format.js');
-const { scoreboardRecapMessages } = require('../recapScoreboard.js');
+const { formatInt, formatRatio, formatDuration } = require('../format.js');
+const { scoreboardRecapMessages, chatTextWidth, CHAT_WIDTH } = require('../recapScoreboard.js');
 const { normalizeRecapFields } = require('../../session/settings.js');
+const { gameModes } = require('../../session/observedStats.js');
 const {
     getWlrColor,
     getFkdrColor,
@@ -96,7 +97,8 @@ function createSessionRender({ helpers, deps } = {}) {
         statPair,
         cardDivider,
         navButton,
-        sendStatRow
+        sendStatRow,
+        sendUrchinSection
     } = helpers;
 
     const {
@@ -158,7 +160,10 @@ function createSessionRender({ helpers, deps } = {}) {
             [['Kills', good(stats.kills)], ['Deaths', bad(stats.deaths)]],
             [['WLR', coloredRatio(stats.wlr, getWlrColor)], ['FKDR', coloredRatio(stats.fkdr, getFkdrColor)]],
             [['KDR', coloredRatio(stats.kdr, getKdrColor)], ['BBLR', `§e${formatRatio(stats.bblr)}`]],
-            [['Games', neutral(stats.games)], ['Stars', coloredSignedFixed(stats.starsGained, '§6', 2)]]
+            [['Win rate', `§a${(stats.wins / Math.max(1, stats.games || stats.wins + stats.losses) * 100).toFixed(1)}%`]],
+            [['Games', neutral(stats.games)], ['Stars', coloredSignedFixed(stats.starsGained, '§b', 2)]],
+            [['Avg. finals', `§a${(stats.games ? stats.finals / stats.games : 0).toFixed(2)}`],
+                ['Avg. beds', `§a${(stats.games ? stats.beds / stats.games : 0).toFixed(2)}`]]
         ];
     }
 
@@ -170,7 +175,9 @@ function createSessionRender({ helpers, deps } = {}) {
             [['Wins', good(stats.wins)], ['Losses', bad(stats.losses)]],
             [['Kills', good(stats.kills)], ['Deaths', bad(stats.deaths)]],
             [['WLR', coloredRatio(stats.wlr, getWlrColor)], ['KDR', coloredRatio(stats.kdr, getKdrColor)]],
-            [['Games', neutral(stats.games)], ['Assists', neutral(stats.assists)]]
+            [['Win rate', `§a${(stats.wins / Math.max(1, stats.games || stats.wins + stats.losses) * 100).toFixed(1)}%`]],
+            [['Games', neutral(stats.games)], ['Assists', neutral(stats.assists)]],
+            [['Playtime', `§b${formatDuration(stats.playtime)}`], ['Level', coloredSignedFixed(stats.levelGained, '§b', 2)]]
         ];
     }
 
@@ -181,7 +188,11 @@ function createSessionRender({ helpers, deps } = {}) {
         return [
             [['Wins', good(stats.wins)], ['Losses', bad(stats.losses)]],
             [['Kills', good(stats.kills)], ['Deaths', bad(stats.deaths)]],
-            [['WLR', coloredRatio(stats.wlr, getWlrColor)], ['KDR', coloredRatio(stats.kdr, getKdrColor)]]
+            [['WLR', coloredRatio(stats.wlr, getWlrColor)], ['KDR', coloredRatio(stats.kdr, getKdrColor)]],
+            [['Games', neutral(stats.games)], ['Goals', good(stats.goals)]],
+            [['Win rate', `§a${(stats.winrate * 100).toFixed(1)}%`]],
+            [['Melee', `§b${(stats.meleeAccuracy * 100).toFixed(1)}%`], ['Bow', `§b${(stats.bowAccuracy * 100).toFixed(1)}%`]],
+            [['Damage', neutral(stats.damage)], ['Blocks', neutral(stats.blocksPlaced + stats.blocksBroken)]]
         ];
     }
 
@@ -220,9 +231,7 @@ function createSessionRender({ helpers, deps } = {}) {
             [['Beds', count(stats.beds)], ['Deaths', count(stats.deaths, '§c')]],
             [['Bed lost', didHappen(stats.bedsLost)], ['Final killed', didHappen(stats.finalDeaths)]]
         ];
-        if ((Number(stats.starsGained) || 0) > 0) {
-            rows.push([['Stars', coloredSignedFixed(stats.starsGained, '§6', 2)]]);
-        }
+        rows.push([['Stars', `§b+${Math.max(0, Number(stats.starsGained) || 0).toFixed(2)}`]]);
         return rows;
     }
 
@@ -253,12 +262,15 @@ function createSessionRender({ helpers, deps } = {}) {
     function localRecapRows(recap) {
         const stats = recap.delta.modes?.find(entry => entry.mode === recap.mode);
         if (!stats) return null;
-        const value = (key, color = '§a') => Number.isFinite(stats[key]) ? count(stats[key], color) : '§8?';
+        const value = (key, color = '§a') => Number.isFinite(stats[key]) ? count(stats[key], color)
+            : ['finals', 'beds'].includes(key) ? count(0, color) : '§8?';
         const happened = key => Number.isFinite(stats[key]) ? didHappen(stats[key]) : '§8?';
         if (recap.mode === 'BEDWARS') return [
             [['Finals', value('finals')], ['Kills', value('kills')]],
             [['Beds', value('beds')], ['Deaths', value('deaths', '§c')]],
-            [['Bed lost', happened('bedsLost')], ['Final killed', happened('finalDeaths')]]
+            [['Bed lost', happened('bedsLost')], ['Final killed', happened('finalDeaths')]],
+            [['Stars', Number.isFinite(stats.experience)
+                ? `§b+${Math.max(0, stats.experience / 5000).toFixed(2)}` : '§b?']]
         ];
         return [[['Kills', value('kills')], ['Deaths', value('deaths', '§c')]]];
     }
@@ -309,31 +321,35 @@ function createSessionRender({ helpers, deps } = {}) {
             return false;
         }
 
-        if (delta.local) {
-            sendChat(client, `§6[FURY] §f${name || 'Session'} §8· §7${formatShortDuration(delta.spanMs)} §8· §eLocal tracking`);
-            for (const overall of delta.modes || []) {
-                if (focus?.game && overall.mode !== String(focus.game).toUpperCase()) continue;
-                const mode = focus?.mode?.id && focus.mode.id !== 'overall'
-                    ? overall.submodes?.find(entry => entry.id === focus.mode.id) : overall;
-                if (!mode) {
-                    sendChat(client, `§6${overall.label} §8» §7No observed counters for this mode.`);
-                    continue;
-                }
-                const fields = [['wins','Wins'],['losses','Losses'],['games','Completed games'],['finals', 'Final kills'],['finalDeaths','Final deaths'],['kills','Kills'],['deaths','Deaths'], ['beds', 'Beds broken'], ['bedsLost', 'Beds lost'],['wlr','WLR'],['fkdr','FKDR'],['kdr','KDR'],['bblr','BBLR'],['winRate','Win rate'],['localStreak','Local streak']]
-                    .filter(([key]) => Number.isFinite(mode[key]));
-                if(!fields.length)sendChat(client,`§6${mode.label} §8» §7No verified counters available`);
-                for(let i=0;i<fields.length;i+=4)sendChat(client,`§6${i?'':mode.label} §8» §7${fields.slice(i,i+4).map(([key,label])=>`${label}: §f${['wlr','fkdr','kdr','bblr'].includes(key)?formatRatio(mode[key]):key==='winRate'?mode[key].toFixed(1)+'%':formatInt(mode[key])}§7`).join(' §8· §7')}`);
-                if (mode.unavailable?.length) sendChat(client, '§8Incomplete coverage — uncertain stats hidden.');
-            }
-            return true;
-        }
-
         const builderFor = game => GAME_BLOCKS.find(([blockGame]) => blockGame === game)?.[1] || null;
-        const blocks = focus
-            ? [[focus.game, builderFor(focus.game)?.(delta, focus.mode) || null]].filter(([, rows]) => Boolean(rows))
-            : GAME_BLOCKS
-                .map(([game, builder]) => [game, builder(delta)])
-                .filter(([, rows]) => Boolean(rows));
+        const blocks = delta.local
+            ? (delta.modes || []).filter(mode => !focus?.game || mode.mode === String(focus.game).toUpperCase())
+                .map(overall => {
+                    let mode = focus?.mode?.id && focus.mode.id !== 'overall'
+                        ? overall.submodes?.find(entry => entry.id === focus.mode.id) : overall;
+                    if (mode?.mode === 'BEDWARS' && (!focus?.mode?.id || focus.mode.id === 'overall')) {
+                        const known = knownSessionRecapTotals(delta, 'BEDWARS');
+                        mode = { ...mode };
+                        for (const key of ['finals', 'beds']) {
+                            if (!Number.isFinite(mode[key])) mode[key] = known?.[key] || 0;
+                        }
+                    }
+                    const rows = mode ? localSessionRows(mode, delta) : [];
+                    const game = GAME_BLOCKS.find(([name]) => name.toUpperCase() === overall.mode)?.[0];
+                    if (mode && game && !delta.unmeasurable?.includes(game)) {
+                        // API-only progress/precision counters can coexist with
+                        // the immediate local combat totals; never replace them.
+                        const extraLabels = ['Stars', 'Playtime', 'Level', 'Goals', 'Melee', 'Bow', 'Damage', 'Blocks'];
+                        const existingLabels = new Set(rows.flat().map(([label]) => label));
+                        const extras = (builderFor(game)?.(delta, focus?.mode) || []).flat()
+                            .filter(([label]) => extraLabels.includes(label) && !existingLabels.has(label));
+                        extras.forEach(cell => rows.push([cell]));
+                    }
+                    return [overall.label, rows, mode?.unavailable?.length];
+                })
+            : focus
+                ? [[focus.game, builderFor(focus.game)?.(delta, focus.mode) || null]].filter(([, rows]) => Boolean(rows))
+                : GAME_BLOCKS.map(([game, builder]) => [game, builder(delta)]).filter(([, rows]) => Boolean(rows));
 
         const modeSuffix = focus?.mode && focus.mode.id !== 'overall'
             ? ` §8» §7${focus.mode.label || focus.mode.id}`
@@ -344,6 +360,7 @@ function createSessionRender({ helpers, deps } = {}) {
             ? `§b§lSession §8» §f${title} §8(§7${formatShortDuration(delta.spanMs)}§8)${modeSuffix}`
             : `§b§lSession §8» §f${name || 'You'} §8(§7${formatShortDuration(delta.spanMs)}§8)${modeSuffix}`);
         if (subtitle) sendChat(client, subtitle);
+        if (delta.local) sendChat(client, '§8Local tracking — observed session counters.');
 
         if (focus) sendModeNav(client, focus);
 
@@ -356,10 +373,12 @@ function createSessionRender({ helpers, deps } = {}) {
             return true;
         }
 
-        blocks.forEach(([game, rows]) => {
+        blocks.forEach(([game, rows, incomplete]) => {
             sendChat(client, cardDivider('§8'));
             sendChat(client, `§6§l${GAME_LABELS[game] || game}`);
-            sendRows(client, rows);
+            if (rows.length) sendSessionRows(client, rows);
+            else sendChat(client, '§7No observed counters for this mode.');
+            if (incomplete) sendChat(client, '§8Incomplete coverage — uncertain stats hidden.');
         });
 
         sendChat(client, `${wideLine}\n`);
@@ -447,6 +466,110 @@ function createSessionRender({ helpers, deps } = {}) {
         return true;
     }
 
+    // Same paired stat rows and section primitive used by /stats.
+    function sendSessionRows(client, rows) {
+        const cells = rows.flat();
+        const groups = [
+            ['Ratios', ['WLR', 'FKDR', 'KDR', 'BBLR', 'Win rate']],
+            ['Performance', ['Kills', 'Deaths', 'Beds', 'Beds Lost', 'Wins', 'Losses', 'Finals', 'FDeaths', 'Assists', 'Goals']],
+            ['Details', ['Games', 'Stars', 'Avg. finals', 'Avg. beds', 'Local streak', 'Playtime', 'Level', 'Melee', 'Bow', 'Damage', 'Blocks']]
+        ];
+        for (const [title, labels] of groups) {
+            const values = labels.map(label => cells.find(cell => cell[0] === label)).filter(Boolean);
+            if (!values.length) continue;
+            const pairs = [];
+            for (let i = 0; i < values.length; i += 2) pairs.push(values.slice(i, i + 2));
+            if (typeof sendUrchinSection === 'function') sendUrchinSection(client, title, pairs);
+            else { sendChat(client, cardDivider('§8')); sendRows(client, pairs); }
+        }
+    }
+
+    function localSessionRows(mode, delta) {
+        const definitions = [
+            ['wins', 'Wins', good], ['losses', 'Losses', bad], ['games', 'Games', neutral],
+            ['finals', 'Finals', good], ['finalDeaths', 'FDeaths', bad],
+            ['kills', 'Kills', good], ['deaths', 'Deaths', bad], ['beds', 'Beds', good], ['bedsLost', 'Beds Lost', bad],
+            ['assists', 'Assists', neutral], ['goals', 'Goals', good],
+            ['wlr', 'WLR', value => coloredRatio(value, getWlrColor)],
+            ['fkdr', 'FKDR', value => coloredRatio(value, getFkdrColor)],
+            ['kdr', 'KDR', value => coloredRatio(value, getKdrColor)],
+            ['bblr', 'BBLR', value => `§e${formatRatio(value)}`],
+            ['winRate', 'Win rate', value => `§a${value.toFixed(1)}%`],
+            ['localStreak', 'Local streak', neutral]
+        ];
+        const rows = definitions.filter(([key]) => Number.isFinite(mode[key]))
+            .map(([key, label, format]) => [[label, format(mode[key])]]);
+        if (mode.mode === 'BEDWARS' && Number.isFinite(mode.games)) {
+            for (const key of ['finals', 'beds']) {
+                if (Number.isFinite(mode[key])) rows.push([[`Avg. ${key}`, `§a${(mode.games ? mode[key] / mode.games : 0).toFixed(2)}`]]);
+            }
+        }
+        const bw = delta?.stats?.Bedwars;
+        if (mode.mode === 'BEDWARS' && Object.hasOwn(bw || {}, 'Experience')
+            && !delta.unmeasurable?.includes('Bedwars')) {
+            const stats = collectBedwarsStats(bw, BEDWARS_MODE_DEFS[0], delta.root);
+            rows.push([['Stars', coloredSignedFixed(stats.starsGained, '§b', 2)]]);
+        }
+        return rows;
+    }
+
+    function averageGameTime(sessionDelta, mode) {
+        const durations = (sessionDelta?.session?.games || [])
+            .filter(game => game?.mode === mode && !game.metadata?.privateGame
+                && Number.isFinite(game.durationMs) && game.durationMs >= 1000)
+            .map(game => game.durationMs);
+        if (!durations.length) return '';
+        return formatShortDuration(durations.reduce((sum, duration) => sum + duration, 0) / durations.length);
+    }
+
+    function knownSessionRecapTotals(sessionDelta, mode) {
+        let games = 0;
+        let wins = 0;
+        let losses = 0;
+        let finals = 0;
+        let beds = 0;
+        let ratioFinals = 0;
+        let finalDeaths = 0;
+        for (const game of sessionDelta?.session?.games || []) {
+            if (game?.mode !== mode || game.metadata?.privateGame || !(game.durationMs >= 1000)) continue;
+            games++;
+            const stats = gameModes(game)?.find(entry => entry.mode === mode);
+            // Missing counters contribute zero without erasing earlier games.
+            finals += Number.isFinite(stats?.finals) ? Math.max(0, stats.finals) : 0;
+            beds += Number.isFinite(stats?.beds) ? Math.max(0, stats.beds) : 0;
+            if (game.result === 'win') wins++;
+            else if (game.result === 'loss') losses++;
+            else {
+                wins += Number.isFinite(stats?.wins) ? stats.wins : 0;
+                losses += Number.isFinite(stats?.losses) ? stats.losses : 0;
+            }
+            // FKDR needs both counters from a match. If either is unknown,
+            // treat that match as zero finals and zero final deaths while
+            // retaining its known game result and played count above.
+            if (Number.isFinite(stats?.finals) && Number.isFinite(stats?.finalDeaths)) {
+                ratioFinals += stats.finals;
+                finalDeaths += stats.finalDeaths;
+            }
+        }
+        // Local totals include retained games; observed/API totals archive only
+        // evicted games. Reuse these persisted values without counting twice.
+        const saved = sessionDelta?.session?.localTracking?.totals?.[mode];
+        const savedCount = key => Number.isFinite(saved?.[key]?.value) ? Math.max(0, saved[key].value) : 0;
+        const local = sessionDelta?.session?.trackingSource === 'local';
+        finals = local ? Math.max(finals, savedCount('finals')) : finals + savedCount('finals');
+        beds = local ? Math.max(beds, savedCount('beds')) : beds + savedCount('beds');
+        const trackedGames = local ? Math.max(games, savedCount('games')) : games + savedCount('games');
+        return games || trackedGames || finals || beds ? {
+            games,
+            trackedGames,
+            wins,
+            losses,
+            finals,
+            beds,
+            fkdr: ratioFinals / Math.max(finalDeaths, 1)
+        } : null;
+    }
+
     function renderGameRecap(client, recap, options = {}) {
         if (!recap?.delta) return false;
         const game = recap.game;
@@ -457,7 +580,7 @@ function createSessionRender({ helpers, deps } = {}) {
         const pairs = rows.flat();
         const definitions = [
             ['finals', 'Finals', '§a'], ['beds', 'Beds', '§e'], ['kills', 'Kills', '§b'],
-            ['deaths', 'Deaths', '§c'], ['deaths', 'Died', '§c'], ['stars', 'Stars', '§6']
+            ['deaths', 'Deaths', '§c'], ['deaths', 'Died', '§c'], ['stars', 'Stars', '§b']
         ];
         const stats = definitions.map(([field, label, color]) => {
             const pair = pairs.find(([name]) => name === label);
@@ -478,9 +601,37 @@ function createSessionRender({ helpers, deps } = {}) {
                 }
             }
         }
+        const needsAverageGames = game === 'Bedwars'
+            && fields.some(field => ['session_avg_finals', 'session_avg_beds'].includes(field));
+        const needsBedwarsCounts = needsAverageGames || (game === 'Bedwars'
+            && fields.some(field => ['session_finals', 'session_beds'].includes(field)));
+        if (needsBedwarsCounts || fields.some(field => ['session_wins', 'session_losses', 'session_games', 'session_ratio'].includes(field))) {
+            const observed = knownSessionRecapTotals(recap.sessionDelta, recap.mode);
+            if (observed) {
+                session = { ...(session || {}) };
+                if (fields.includes('session_wins') && !Number.isFinite(session.wins)) session.wins = observed.wins;
+                if (fields.includes('session_losses') && !Number.isFinite(session.losses)) session.losses = observed.losses;
+                if (fields.includes('session_games') || needsAverageGames) {
+                    session.games = Math.max(Number.isFinite(session.games) ? session.games : 0,
+                        needsAverageGames ? observed.trackedGames : observed.games);
+                }
+                if (fields.includes('session_ratio') && game === 'Bedwars' && !Number.isFinite(session.fkdr)) {
+                    session.fkdr = observed.fkdr;
+                }
+            }
+            if (needsBedwarsCounts && recap.sessionDelta) {
+                session = { ...(session || {}) };
+                for (const key of ['finals', 'beds']) {
+                    if (!Number.isFinite(session[key])) session[key] = observed?.[key] || 0;
+                }
+                if (needsAverageGames && !Number.isFinite(session.games)) session.games = observed?.trackedGames || 0;
+            }
+        }
         scoreboardRecapMessages({
             game, result: recap.record?.result,
             duration: recap.record?.durationMs ? formatShortDuration(recap.record.durationMs) : '',
+            averageGameTime: averageGameTime(recap.sessionDelta, recap.mode),
+            averageGameTimeEnabled: options.averageGameTimeEnabled !== false,
             variant: recap.record?.metadata?.variant,
             map: recap.record?.metadata?.map,
             stats, session, fields, gamesGoal: options.goals?.games,
@@ -550,8 +701,47 @@ function createSessionRender({ helpers, deps } = {}) {
         return true;
     }
 
+    function renderSessionGames(client, session, { page = 1 } = {}) {
+        const games = (session?.games || []).slice().sort((a, b) => (Number(a.at) || 0) - (Number(b.at) || 0));
+        const pageCount = Math.max(1, Math.ceil(games.length / 10));
+        const requested = Number(page);
+        const currentPage = Math.min(pageCount, Math.max(1, Number.isFinite(requested) ? Math.floor(requested) : 1));
+        sendChat(client, `\n${wideLine}`);
+        sendChat(client, `§b§lSession Games §8» §f${formatSessionStamp(session?.startedAt)} §8· §7Page ${currentPage}/${pageCount} §8· §f${games.length} games`);
+        sendChat(client, cardDivider('§8'));
+        if (!games.length) sendChat(client, '§7No games recorded in this session yet.');
+        const start = (currentPage - 1) * 10;
+        games.slice(start, start + 10).forEach((record, offset) => {
+            const stats = gameModes(record)?.find(mode => mode.mode === record.mode);
+            const value = key => Number.isFinite(stats?.[key]) ? formatInt(stats[key])
+                : ['finals', 'beds'].includes(key) ? '0' : '?';
+            let map = String(record.metadata?.map || 'Unknown map').replace(/§./g, '').replace(/[\r\n\x00-\x1f]/g, ' ').trim().slice(0, 40);
+            const result = record.result === 'win' ? '§aWIN' : record.result === 'loss' ? '§cLOSS' : '§7UNKNOWN';
+            const counts = record.mode === 'BEDWARS'
+                ? `§7F/B/K §a${value('finals')}§8/§e${value('beds')}§8/§b${value('kills')}`
+                : `§7Kills §b${value('kills')}`;
+            const game = MODE_LABELS[record.mode] || record.mode || 'Game';
+            const row = mapName => `§8${start + offset + 1}. §f${mapName} §8· §7${game} §8· ${result} §8· ${counts}`;
+            if (chatTextWidth(row(map)) > CHAT_WIDTH) {
+                while (map && chatTextWidth(row(map + '...')) > CHAT_WIDTH) map = map.slice(0, -1);
+                map = map.trimEnd() + '...';
+            }
+            sendChat(client, row(map));
+        });
+        if (pageCount > 1) {
+            const buttons = [];
+            const sessionToken = /^[A-Za-z0-9_-]+$/.test(session?.id || '') ? ` ${session.id}` : '';
+            if (currentPage > 1) buttons.push(modeNavButton('Previous', `/session games ${currentPage - 1}${sessionToken}`, '§7Previous 10 games'));
+            if (currentPage < pageCount) buttons.push(modeNavButton('Next', `/session games ${currentPage + 1}${sessionToken}`, '§7Next 10 games'));
+            sendModeNavRow(client, buttons);
+        }
+        sendChat(client, `${wideLine}\n`);
+        return true;
+    }
+
     return {
         renderLocalSession,
+        renderSessionGames,
         renderGameRecap,
         bedwarsRecapRows,
         renderSessionHistory,

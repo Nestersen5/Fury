@@ -14,6 +14,7 @@
 const { simplifyNbt } = require('./menuMonitor');
 const { resolveGameResult } = require('../session/gameResult');
 const { formatClipTime } = require('../session/gameClips');
+const { gameModes } = require('../session/observedStats');
 
 const EASTERN_OFFSETS_MS = [4 * 3600000, 5 * 3600000];
 const MAX_START_DRIFT_MS = 3 * 60000;
@@ -65,12 +66,17 @@ function sameName(a, b) {
     return Boolean(a && b) && String(a).toLowerCase() === String(b).toLowerCase();
 }
 
-// The player's own BedWars kills/finals/beds: the verified API delta when
-// present, otherwise counted from the chat events the proxy recorded.
+// Reuse the same per-match observations/reconciliation as session game lists.
+// Older records without observations retain the API/event fallback.
 function bedwarsCounts(game, selfName) {
     if (game?.mode !== 'BEDWARS') return null;
+    const mode = gameModes(game)?.find(entry => entry.mode === 'BEDWARS');
+    if (mode) {
+        return Object.fromEntries(Object.keys(BEDWARS_STAT_KEYS).map(key => [key,
+            Number.isFinite(mode[key]) ? Math.max(0, mode[key]) : key === 'kills' ? '?' : 0]));
+    }
     const stats = game.delta?.stats?.Bedwars;
-    if (stats && typeof stats === 'object') {
+    if (!game.localModes?.length && stats && typeof stats === 'object') {
         const counts = {};
         for (const [label, key] of Object.entries(BEDWARS_STAT_KEYS)) {
             counts[label] = Math.max(0, Number(stats[key]) || 0);
@@ -130,7 +136,8 @@ function teammatesOf(game, selfName, resolvePlayer = null) {
 
 function statsLine(counts) {
     if (!counts) return null;
-    return `§7Kills §a${counts.kills} §8· §7Finals §a${counts.finals} §8· §7Beds §a${counts.beds}`;
+    const value = key => `${counts[key] === '?' ? '§8' : '§a'}${counts[key]}`;
+    return `§7Kills ${value('kills')} §8· §7Finals ${value('finals')} §8· §7Beds ${value('beds')}`;
 }
 
 function teammateLines(names) {
@@ -170,14 +177,16 @@ function buildIndex(games, selfName = null, resolvePlayer = null) {
     for (const game of games || []) {
         const serverId = normalizeServerId(game?.metadata?.serverId);
         const result = gameResult(game);
-        if (!serverId || !result || !game.at) continue;
+        if (!serverId || !game.at) continue;
+        const counts = bedwarsCounts(game, selfName);
+        if (!result && !counts) continue;
         const durationMs = Math.max(0, Number(game.durationMs) || 0);
         const teammates = teammatesOf(game, selfName, resolvePlayer);
         const entry = {
             startMs: game.at - durationMs,
             durationMs,
             result,
-            counts: bedwarsCounts(game, selfName),
+            counts,
             teammates: teammates.shown,
             missingRanks: teammates.missing
         };
@@ -208,7 +217,7 @@ function findMatch(index, parsed) {
 function annotateItem(item, index, missing = null) {
     if (!item || item.blockId === undefined || item.blockId < 0 || !item.nbtData) return null;
     const lore = simplifyNbt(item.nbtData)?.display?.Lore;
-    if (!Array.isArray(lore) || lore.some(line => /^(?:Result|Clips):/i.test(stripColors(line)))) return null;
+    if (!Array.isArray(lore) || lore.some(line => /^(?:(?:Result|Clips):|Kills\s)/i.test(stripColors(line)))) return null;
     const parsed = parseReplayLore(lore);
     if (!parsed) return null;
     const indexes = typeof index === 'function' ? index() : index;

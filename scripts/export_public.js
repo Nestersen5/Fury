@@ -41,6 +41,7 @@ const INCLUDE = [
     { category: 'production source', test: p => p === 'launcher.html' },
     { category: 'production source', test: p => p.startsWith('src/') },
     { category: 'production source', test: p => p.startsWith('features/') },
+    { category: 'coordination relay', test: p => /^cloudflare\/party-coordination\/(core\.mjs|worker\.mjs|wrangler\.json)$/.test(p) },
     // Assets the packaged application needs.
     { category: 'assets', test: p => p.startsWith('assets/') },
     // Package metadata and the packaging hooks electron-builder owns.

@@ -7,7 +7,8 @@ const SESSION_RETENTION_CHOICES = [0, 50, 100, 250, 1000];
 const SESSION_RECAP_STYLES = ['scoreboard'];
 const SESSION_RECAP_FIELDS = ['header', 'result', 'duration', 'map', 'mode', 'finals', 'beds', 'kills',
     'deaths', 'stars',
-    'session_wins', 'session_losses', 'session_ratio', 'session_games', 'goals'];
+    'session_wins', 'session_losses', 'session_ratio', 'session_games',
+    'session_finals', 'session_beds', 'session_avg_finals', 'session_avg_beds', 'goals'];
 // Explicit off preserves charts for older saved field lists without this option.
 const SESSION_CHART_FIELDS = ['gamesByMode', 'hideGamesByMode'];
 const SESSION_TRACKED_FIELDS = {
@@ -20,6 +21,7 @@ const SESSION_DEFAULTS = {
     sessionBoundaryMinutes: 30,
     sessionRetention: 0,
     sessionRecapStyle: 'scoreboard',
+    sessionAverageGameTimeEnabled: true,
     sessionRecapFields: ['header', 'result', 'duration', 'map', 'mode', 'finals', 'beds', 'kills',
         'deaths', 'session_wins', 'session_losses', 'session_ratio', 'goals'],
     sessionBedwarsFields: ['wins', 'losses', 'finals', 'finalDeaths', 'beds', 'bedsLost', 'kills', 'deaths', 'wlr', 'fkdr', 'kdr', 'bblr', 'games', 'stars'],
@@ -72,6 +74,7 @@ function normalizeSessionFeatureSettings(source = {}) {
         sessionBoundaryMinutes: SESSION_DEFAULTS.sessionBoundaryMinutes,
         sessionRetention: SESSION_DEFAULTS.sessionRetention,
         sessionRecapStyle: style,
+        sessionAverageGameTimeEnabled: source.sessionAverageGameTimeEnabled !== false,
         sessionRecapFields: normalizeRecapFields(source.sessionRecapFields),
         sessionBedwarsFields: normalizeFieldList(
             source.sessionBedwarsFields,

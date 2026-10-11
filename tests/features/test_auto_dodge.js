@@ -28,7 +28,10 @@ function makeHarness(overrides = {}) {
         // "Xs left" tests flaky whenever a millisecond ticks between calls.
         now: () => 100000,
         sendChat: msg => sent.push(msg),
-        sendLeaveCommand: () => { leaveSent += 1; },
+        sendLeaveCommand: shouldSend => {
+            if (overrides.sendLeaveCommand) overrides.sendLeaveCommand(shouldSend);
+            else leaveSent += 1;
+        },
         isPregameActive: () => state.pregame,
         isGameActive: () => state.game,
         getPregameSessionId: () => state.sessionId,
@@ -53,7 +56,9 @@ function makeHarness(overrides = {}) {
             if (minStars !== undefined) cfg.minStars = Math.max(0, Number(minStars));
         },
         compactTagName: tag => (tag ? String(tag).split(/[\s:\-]/)[0] : ''),
-        isPartyMember
+        isPartyMember,
+        isPartyRosterUsable: overrides.isPartyRosterUsable || (() => true),
+        getKnownDenick: overrides.getKnownDenick || (() => null)
     });
 
     return { dodger, sent, cfg, state, getLeaveSent: () => leaveSent };
@@ -91,6 +96,14 @@ function captureScheduleDelay(fn) {
     global.setTimeout = (cb, delay) => { captured = delay; return { __fake: true }; };
     try { fn(); } finally { global.setTimeout = realSetTimeout; }
     return captured;
+}
+
+function captureDodgeTimer(fn) {
+    const realSetTimeout = global.setTimeout;
+    let timer = null;
+    global.setTimeout = (callback, delay) => (timer = { callback, delay });
+    try { fn(); } finally { global.setTimeout = realSetTimeout; }
+    return timer;
 }
 
 function componentText(component) {
@@ -253,6 +266,63 @@ function findComponent(component, predicate) {
     });
     const delay = captureScheduleDelay(() => h.dodger.maybeSchedule('KnownNick', knownNickedThreatProfile, { knownDenick }));
     assert.equal(delay, null, 'the real IGN in the denick list must be checked against the party roster');
+}
+
+// Party membership can arrive after a match was found. Recheck the confirmed
+// roster when the countdown timer fires, including the target's real IGN.
+for (const [profile, settings] of [[taggedProfile, {}], [nickedProfile, { nickedPlayers: true }], [statThreatProfile, { statThreats: true }]]) {
+    const h = makeHarness({ ...settings, isPartyMember: name => name.toLowerCase() === 'fyechris' });
+    assert.strictEqual(captureScheduleDelay(() => h.dodger.maybeSchedule('FyeChris', profile)), null, 'Party members are protected across all dodge filters');
+}
+
+for (const known of [null, knownDenick]) {
+    const party = new Set();
+    const h = makeHarness({ isPartyMember: name => party.has(name.toLowerCase()) });
+    const name = known ? 'KnownNick' : 'fyechris';
+    const timer = captureDodgeTimer(() => h.dodger.maybeSchedule(name, taggedProfile, { knownDenick: known }));
+    assert(timer, 'a confirmed opponent initially schedules a dodge');
+    party.add(known ? 'partymate' : 'fyechris');
+    timer.callback();
+    assert.strictEqual(h.getLeaveSent(), 0, 'a newly confirmed party member must not cause a leave');
+    assert.strictEqual(h.dodger.getDebugState().pendingDodge, 'none');
+    assert(!h.sent.some(message => componentText(message).includes('Leaving lobby')), 'a cancelled party dodge must not announce a leave');
+}
+
+{
+    let usable = false;
+    const h = makeHarness({ isPartyRosterUsable: () => usable });
+    assert.strictEqual(captureScheduleDelay(() => h.dodger.maybeSchedule('fyechris', taggedProfile)), null, 'unknown party state must not be treated as solo');
+    usable = true;
+    const timer = captureDodgeTimer(() => h.dodger.maybeSchedule('Opponent', taggedProfile));
+    assert(timer, 'confirmed solo players still dodge tagged opponents');
+    usable = false;
+    timer.callback();
+    assert.strictEqual(h.getLeaveSent(), 0, 'an uncertain roster at execution must prevent a leave');
+}
+
+{
+    let mapping = null;
+    const h = makeHarness({
+        isPartyMember: name => name.toLowerCase() === 'partymate',
+        getKnownDenick: () => mapping
+    });
+    const timer = captureDodgeTimer(() => h.dodger.maybeSchedule('KnownNick', taggedProfile));
+    mapping = knownDenick;
+    timer.callback();
+    assert.strictEqual(h.getLeaveSent(), 0, 'a denick learned during the delay must protect a party member');
+}
+
+{
+    let member = false, dispatchGuard = null;
+    const h = makeHarness({
+        isPartyMember: () => member,
+        sendLeaveCommand: shouldSend => { dispatchGuard = shouldSend; }
+    });
+    const timer = captureDodgeTimer(() => h.dodger.maybeSchedule('fyechris', taggedProfile));
+    timer.callback();
+    assert.strictEqual(dispatchGuard(), true, 'A confirmed opponent permits dispatch');
+    member = true;
+    assert.strictEqual(dispatchGuard(), false, 'Party membership learned while the leave is queued prevents dispatch');
 }
 
 // 10f. Known denicks still use the enabled tag/stat checks with their real stats.

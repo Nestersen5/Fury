@@ -4,6 +4,7 @@
 const colors = require('../../stats/colors');
 const {closestLegacyChatColor} = require('../../../features/minecraft_chat');
 const {formatBedwarsPrestige,formatSkyWarsLevel} = require('../../stats/format');
+const {appendGeneratorRowToFooter,getBedwarsGeneratorStats} = require('../../session/bedwarsGeneratorSchedule');
 const palette = {0:'#000000',1:'#0000aa',2:'#00aa00',3:'#00aaaa',4:'#aa0000',5:'#aa00aa',6:'#ffaa00',7:'#aaaaaa',8:'#555555',9:'#5555ff',a:'#55ff55',b:'#55ffff',c:'#ff5555',d:'#ff55ff',e:'#ffff55',f:'#ffffff'};
 const mc = (text, color='f') => `<span style="color:${palette[color] || color}">${text}</span>`;
 const formatted = text => {
@@ -28,7 +29,7 @@ const samples = [
     {name:'oFourthDemo',team:'e',letter:'Y',stars:168,fkdr:'1.60',ws:'0'}
 ].map((p,i)=>({...p,kdr:['2.08','0.71','1.72','8.42','3.15'][i],wlr:['1.21','0.38','0.96','3.82','1.82'][i],dailyfkdr:'2.61',weeklyfkdr:'3.44',monthlyfkdr:'3.09',finals:'4120',wins:'945',guild:i===3?'FURY':'',ping:`${42+i*12}ms`}));
 
-function renderTab({document,layout,mode,style,enabled}) {
+function renderTab({document,layout,mode,style,enabled,footerSettings}) {
     const target=document.getElementById('tablist-preview-rows');
     const compact={fkdr:'F',dailyfkdr:'D.F',weeklyfkdr:'W.F',monthlyfkdr:'M.F',kdr:'K',wlr:'W',finals:'FK',wins:'WIN',ws:'WS',ping:'P'};
     const full={...compact,fkdr:'FKDR',dailyfkdr:'DAILY FKDR',weeklyfkdr:'WEEKLY FKDR',monthlyfkdr:'MONTHLY FKDR',kdr:'KDR',wlr:'WLR',finals:'FINALS',wins:'WINS',ping:'PING'};
@@ -61,6 +62,17 @@ function renderTab({document,layout,mode,style,enabled}) {
     }).join('');
     const title=document.getElementById('tablist-preview-title');
     title.innerHTML=`${mc('You are playing on ','b')}${mc('MC.HYPIXEL.NET','e')}`;
+    const footerTarget=document.querySelector('.minecraft-tablist-footer');
+    if(footerTarget){
+        const footer={text:'',extra:[
+            ...(mode==='BEDWARS'?[{text:'Kills: ',color:'aqua'},{text:'0 ',color:'yellow'},{text:'Final Kills: ',color:'aqua'},{text:'0 ',color:'yellow'},{text:'Beds Broken: ',color:'aqua'},{text:'0\n',color:'yellow'}]:[]),
+            {text:'Ranks, Boosters & MORE! ',color:'green'},{text:'STORE.HYPIXEL.NET',color:'red'}
+        ]};
+        const elapsedMs=199000;
+        const rendered=mode==='BEDWARS'?appendGeneratorRowToFooter(footer,getBedwarsGeneratorStats(elapsedMs),{settings:footerSettings,elapsedMs}):footer;
+        const codes={aqua:'b',green:'a',yellow:'e',gold:'6',red:'c',gray:'7',dark_gray:'8'};
+        footerTarget.innerHTML=rendered.extra.map(part=>mc(part.text,codes[part.color]||'f')).join('').replace(/\n/g,'<br>');
+    }
 }
 
 function mount({document}) {
@@ -84,6 +96,8 @@ function mount({document}) {
     };
     const row=(title,id,description)=>{const r=el('div','ia-setting-row'),copy=el('div');copy.append(el('h3','',title));if(description)copy.append(el('p','',description));r.append(copy,binary(id,title));return r;};
     const master=$('.tablist-master');master.replaceChildren(row('Tab stats','tab-stats-enabled'));
+    binary('tab-resources-enabled','Resource totals');
+    binary('tab-phases-enabled','Phase timers');
     $('.tablist-designer').prepend(master);
     const tagsInput=$('#show-tags-in-tabstats');
     tagsInput.checked=true;tagsInput.hidden=true;
@@ -97,9 +111,37 @@ function mount({document}) {
     $('.tablist-preview-toolbar').hidden=true;
     shell.prepend(el('h3','ia-section-title','Live preview'));
     $('.minecraft-tablist-subtitle').hidden=true;
-    $('.minecraft-tablist-footer').innerHTML=`${mc('Kills: ','b')}${mc('0','e')} ${mc('Final Kills: ','b')}${mc('0','e')} ${mc('Beds Broken: ','b')}${mc('0','e')}<br>${mc('Ranks, Boosters & MORE! ','a')}${mc('STORE.HYPIXEL.NET','c')}`;
     const available=$('#tablist-field-palette').closest('.tablist-field-section'),order=$('#tablist-order-list').closest('.tablist-field-section');
-    const details=el('details','ia-add-fields');details.append(el('summary','','＋ Add field'),$('#tablist-field-palette'));available.replaceWith(details);editor.append(details);
+    const details=el('details','ia-add-fields');details.append(el('summary','','＋ Add field'),$('#tablist-field-palette'));available.replaceWith(details);order.after(details);
+    const footerSections=$$('.tablist-editor-controls .ia-tab-footer-settings');
+    const footerButton=el('button','ia-tab-footer-open','Resource totals & phase timers');
+    footerButton.type='button';footerButton.setAttribute('aria-haspopup','dialog');footerButton.setAttribute('aria-controls','tab-footer-dialog');
+    footerSections[0].before(footerButton);
+    const footerDialog=el('dialog','ia-page ia-tab-footer-dialog');footerDialog.id='tab-footer-dialog';footerDialog.setAttribute('aria-labelledby','tab-footer-dialog-title');
+    const footerHeader=el('header','ia-tab-footer-dialog-header'),footerTitle=el('h2','','BedWars Tab footer');footerTitle.id='tab-footer-dialog-title';
+    const footerClose=el('button','','Close');footerClose.type='button';footerHeader.append(footerTitle,footerClose);
+    const footerBody=el('div','ia-tab-footer-dialog-body');footerBody.append(...footerSections);
+    footerDialog.append(footerHeader,footerBody,el('p','ia-note','Changes apply immediately.'));document.body.append(footerDialog);
+    footerDialog.setAttribute('aria-modal','false');
+    const footerWindow=document.defaultView;
+    const positionFooterDialog=()=>{
+        const width=Math.max(200,Math.min(560,shell.getBoundingClientRect().left-32,footerWindow.innerWidth-32));
+        footerDialog.style.setProperty('--tab-footer-width',`${width}px`);
+        footerDialog.classList.toggle('ia-tab-footer-narrow',width<440);
+    };
+    const dismissFooterDialog=event=>{if(event.key==='Escape'){event.preventDefault();footerDialog.close();}};
+    footerButton.addEventListener('click',()=>{
+        if(footerDialog.open)return;
+        positionFooterDialog();footerDialog.show();
+        footerWindow.addEventListener('resize',positionFooterDialog);
+        document.addEventListener('keydown',dismissFooterDialog);
+    });
+    footerClose.addEventListener('click',()=>footerDialog.close());
+    footerDialog.addEventListener('close',()=>{
+        footerWindow.removeEventListener('resize',positionFooterDialog);
+        document.removeEventListener('keydown',dismissFooterDialog);
+        footerButton.focus();
+    });
     $('.fury-tablist-available')?.remove();
     order.querySelector('strong').textContent='Field order';order.querySelector('small').textContent='Drag to reorder';
     $('.tablist-editor-hint').textContent='Each game mode keeps its own layout.';

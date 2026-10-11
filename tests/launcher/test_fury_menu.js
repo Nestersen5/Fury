@@ -80,7 +80,7 @@ assert.deepStrictEqual(
     Object.entries(FURY_HELP_TOPICS).filter(([, topic]) => !topic.hidden).map(([key]) => key),
     ['play', 'safety', 'social', 'history', 'system', 'settings']
 );
-['tabstats', 'nametags', 'overlay', 'share', 'dodge', 'partyoverview', 'denick', 'chatstats', 'reminders', 'proxyhealth', 'vanilla', 'autogambler', 'tag']
+['tabstats', 'nametags', 'overlay', 'share', 'dodge', 'partyoverview', 'denick', 'chatstats', 'reminders', 'proxyhealth', 'vanilla', 'tag']
     .forEach(topic => assert(FURY_HELP_TOPICS[topic]?.hidden, `${topic} should have a focused feature guide`));
 
 for (const page of FURY_PAGES) {

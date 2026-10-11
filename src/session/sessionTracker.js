@@ -664,8 +664,9 @@ function createSessionTracker({
             endedAt: now()
         };
         const outcome = resolveGameResult(null, context);
-        if (immediate && ['win', 'loss'].includes(outcome.result)) {
-            const observed = pendingGame?.observed || createGame({ mode: context.mode, key: sessionKey,
+        let observed = pendingGame?.observed || null;
+        if (['win', 'loss'].includes(outcome.result)) {
+            observed ||= createGame({ mode: context.mode, key: sessionKey,
                 startedAt: now() - (measured || 0), ownName: getIdentity?.()?.name, observedFromStart: false });
             observeResult(observed, outcome.result === 'win' ? 'VICTORY!' : 'DEFEAT!', { at: now() });
             // The end result is known even if we joined too late to cover all
@@ -673,6 +674,12 @@ function createSessionTracker({
             observed.counts.games = { value: 1, available: true };
             observed.counts.wins = { value: outcome.result === 'win' ? 1 : 0, available: true };
             observed.counts.losses = { value: outcome.result === 'loss' ? 1 : 0, available: true };
+        }
+        // Preserve each match's own chat observations even when its API
+        // snapshot is delayed or overlaps another game. A later cumulative
+        // API delta cannot be split safely between matches, but these local
+        // counters already belong to this game's observed instance.
+        if (observed && gameForMode(context.mode) && FIELDS.some(field => observed.counts[field]?.available)) {
             context.localModes = localModes({ totals: { [context.mode]: observed.counts } });
         }
         pendingGame = null;

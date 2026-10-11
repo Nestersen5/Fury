@@ -225,15 +225,6 @@ const FURY_HELP_TOPICS = Object.freeze({
             { label: 'Reconnect', command: '/vanilla', description: 'Reconnect after changing modes so the new brand is sent.', examples: ['/vanilla status'] }
         ]
     },
-    autogambler: {
-        hidden: true,
-        title: 'Auto Gambler',
-        description: 'Accept George the Gambler automatically after his exact prompt.',
-        entries: [
-            { label: 'Power', command: '/autogambler', description: 'Enable or disable automatic acceptance for this proxy session.', examples: ['/autogambler on', '/autogambler off'] },
-            { label: 'Rule', command: '/autogambler', description: 'The watched prompt and sent command are fixed for safety.', examples: ['/autogambler status'] }
-        ]
-    },
     tag: {
         hidden: true,
         title: 'Player Tag',

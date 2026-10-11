@@ -12,7 +12,7 @@ const ICONS = {
     profiles:'<path d="m2 7 10-5 10 5-10 5L2 7Zm0 5 10 5 10-5M2 17l10 5 10-5"/>',
     anticheat:'<path d="m12 2 9 4v6c0 5.5-3.5 9-9 11-5.5-2-9-5.5-9-11V6l9-4Z"/><path d="m8 12 3 3 5-6"/>',
     settings:'<path d="m9 2-.7 3-2.6 1.5L3 5.7 1 9l2 2v3l-2 2 2 3.3 2.7-.8L8.3 20l.7 3h4l.7-3 2.6-1.5 2.7.8 2-3.3-2-2v-3l2-2-2-3.3-2.7.8L13.7 5 13 2H9Z" transform="translate(1 -1) scale(.95)"/><circle cx="12" cy="12" r="3.5"/>',
-    console:'<path d="M4 1h10l6 6v16H4V1Zm10 0v7h6M8 12h8M8 16h8M8 20h5"/>',
+    console:'<rect x="2" y="3" width="20" height="18" rx="2"/><path d="M2 8h20m-15 4 4 3-4 3m7 0h4"/>',
     chevron:'<path d="m6 9 6 6 6-6"/>', close:'<path d="m5 5 14 14M19 5 5 19"/>', copy:'<rect x="8" y="7" width="13" height="15" rx="2"/><path d="M16 7V2H3v16h5"/>', download:'<path d="M12 2v13m-5-5 5 5 5-5M3 16v6h18v-6"/>'
 };
 const svg = name => `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[name] || ICONS.settings}</svg>`;

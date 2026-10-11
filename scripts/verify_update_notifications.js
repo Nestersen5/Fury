@@ -46,6 +46,10 @@ function forceFixtureTree(pid) {
 const server = http.createServer((req, res) => {
     requests.push({ path: req.url, headers: req.headers });
     res.setHeader('Content-Type', 'application/json');
+    if (req.url === '/release-notes.json') {
+        res.end(JSON.stringify({ schemaVersion: 1, releases: [{ version: latest,
+            features: ['Fixture new feature.'], improvements: ['Fixture improvement.'], fixes: ['Fixture bug fix.'] }] })); return;
+    }
     if (req.url === '/timeout') return;
     if (req.url === '/available') { held.set(req.url, res); return; }
     if (req.url === '/malformed') { res.end('{broken'); return; }
@@ -57,6 +61,10 @@ async function scenario(mode) {
     const fixturePids = new Set();
     const profile = path.join(temporary, mode), application = path.join(profile, 'fixture-app');
     fs.mkdirSync(application, { recursive: true });
+    fs.mkdirSync(path.join(profile, 'launcher_data'), { recursive: true });
+    fs.writeFileSync(path.join(profile, 'launcher_data', 'release-notifications.json'), JSON.stringify({
+        lastVersion: mode.startsWith('welcome') ? '1.1.0' : installed, seen: mode.startsWith('welcome') ? [] : [installed]
+    }));
     fs.writeFileSync(path.join(profile, 'features_config.json'), JSON.stringify({ apiKillSwitchEnabled: true }));
     const [debug, cosmetic, blocked] = await unusedPorts(3);
     const env = cleanEnvironment(profile, root, cosmetic, blocked); env.NODE_BINARY = process.execPath;
@@ -72,8 +80,8 @@ shell.openExternal=async url=>{if(url!==${JSON.stringify(pageUrl)})throw Error('
 require(${JSON.stringify(require.resolve('prismarine-auth'))}).Authflow.prototype.getMinecraftJavaToken=async()=>{throw Error('Real authentication blocked');};
 const cp=require('child_process'),spawn=cp.spawn;cp.spawn=(...args)=>{const child=spawn(...args);if(child.pid)status.pids.push(child.pid);return child;};
 app.whenReady().then(()=>session.defaultSession.on('will-download',event=>{status.downloads++;event.preventDefault();}));
-const updates=require(${JSON.stringify(require.resolve('../src/updates/updateNotifications'))}),create=updates.createUpdateNotifications;
-updates.createUpdateNotifications=options=>{const service=create(options),check=service.check;service.check=async()=>{status.checks++;const result=await check();status.result=result;status.settled++;return result;};return service;};
+const updates=require(${JSON.stringify(require.resolve('../src/updates/releaseExperience'))}),create=updates.createReleaseExperience;
+updates.createReleaseExperience=options=>{const service=create(options),check=service.check;service.check=async()=>{status.checks++;const result=await check();status.result=result;status.settled++;return result;};return service;};
 ipcMain.handle('fixture:update-status',()=>({...status,installedVersion:app.getVersion()}));
 require(${JSON.stringify(path.join(root, 'launcher.js'))});
 `);
@@ -112,10 +120,13 @@ require(${JSON.stringify(path.join(root, 'launcher.js'))});
                 await page.screenshot({ path: path.join(output, `update-${theme}.png`) });
             }
             await page.keyboard.press('Enter');
+            await page.waitForSelector('.fury-release-dialog[open]');
+            assert.equal((await status()).opens.length, 0, 'Changelog does not open browser');
+            await page.waitForFunction('document.querySelector(".fury-release-content").textContent.includes("Fixture new feature.")');
+            await page.screenshot({ path: path.join(output, 'changelog-light.png') });
+            await page.click('.fury-release-dialog .primary');
             await eventually(async () => assert.deepEqual((await status()).opens, [pageUrl]), 'Explicit action opens only fixed destination');
             await page.evaluate(async () => { await Promise.all([ipcRenderer.invoke('updates:check'), ipcRenderer.invoke('updates:check')]); await refresh(); });
-            assert.equal(await page.$$eval('.notification-update-action', elements => elements.length), 1);
-            await page.$eval('.notification-update-action', e => e.closest('article').querySelector('.notification-close').click());
             await page.waitForFunction('!document.querySelector(".notification-update-action")');
             await page.evaluate(() => ipcRenderer.invoke('updates:check'));
             assert.equal(await page.$('.notification-update-action'), null);
@@ -123,6 +134,29 @@ require(${JSON.stringify(path.join(root, 'launcher.js'))});
             await page.reload(); await page.waitForFunction('!!furyDesign && !!state?.settings');
             await eventually(async () => assert((await status()).settled >= 5), 'Reload check completed');
             assert.equal(await page.$('.notification-update-action'), null);
+        } else if (mode.startsWith('welcome')) {
+            await page.waitForSelector('.notification-update-action');
+            assert.equal(await page.$eval('.notification-update-action', e => e.closest('article').querySelector('.notification-title').textContent), `Welcome to Fury ${installed}`);
+            await page.evaluate(() => { document.documentElement.dataset.sidebar = 'collapsed'; });
+            assert.equal(await page.$eval('.fury-release-reopen span', el => getComputedStyle(el).display), 'none');
+            assert.equal(await page.$eval('.fury-release-reopen svg', el => el.getBoundingClientRect().width), 20);
+            await page.screenshot({ path: path.join(output, 'welcome-collapsed.png') });
+            if (mode === 'welcome-dismiss') await page.click('.notification-update-dismiss');
+            else {
+                await page.click('.notification-update-action');
+                await page.waitForSelector('.fury-release-dialog[open]');
+                assert.equal(await page.$eval('.fury-release-dialog .primary', el => el.hidden), true);
+                assert.equal(await page.$$eval('.fury-release-content h3', els => els.map(el => el.textContent).join(',')), 'New features,Improvements,Bug fixes');
+                await page.screenshot({ path: path.join(output, 'welcome-changelog.png') });
+                await page.keyboard.press('Escape');
+            }
+            await page.waitForFunction('!document.querySelector(".notification-update-action")');
+            const saved = JSON.parse(fs.readFileSync(path.join(profile, 'launcher_data', 'release-notifications.json')));
+            assert(saved.seen.includes(installed));
+            await page.click('.fury-release-reopen');
+            await page.waitForSelector('.fury-release-dialog[open]');
+            await page.keyboard.press('Escape');
+            assert.deepEqual((await status()).opens, []);
         } else {
             await eventually(async () => assert((await status()).settled >= 1), 'Silent check completion');
             assert.equal(await page.$('.notification-update-action'), null);
@@ -163,7 +197,7 @@ require(${JSON.stringify(path.join(root, 'launcher.js'))});
 (async () => {
     fs.mkdirSync(output, { recursive: true });
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-    for (const mode of ['available', 'equal', 'malformed', 'timeout', 'dev-disabled']) await scenario(mode);
+    for (const mode of ['available', 'welcome', 'welcome-dismiss', 'equal', 'malformed', 'timeout', 'dev-disabled']) await scenario(mode);
     fs.writeFileSync(path.join(output, 'verification.json'), JSON.stringify({ passed: true, platform: process.platform, architecture: process.arch, packaged: false, results, requests }, null, 2));
     console.log(JSON.stringify({ passed: true, results }, null, 2));
 })().catch(error => { console.error(error); process.exitCode = 1; }).finally(async () => {

@@ -70,6 +70,7 @@ const SETTING_LABELS = {
     showTagsInTabStats: 'Tags in Tab',
     sessionTrackingEnabled: 'Session Tracking',
     gameRecapEnabled: 'Game Recap',
+    sessionAverageGameTimeEnabled: 'Average Game Time in Recaps',
     sessionBoundaryMinutes: 'Session Inactivity Boundary',
     sessionRetention: 'Session History Retention',
     sessionRecapStyle: 'Session Recap Style',

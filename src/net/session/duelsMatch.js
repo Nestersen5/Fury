@@ -240,10 +240,24 @@ function extractDuelsInfoFromScoreboard(lines = []) {
     return { modeName, opponents };
 }
 
-// True when the sidebar clearly belongs to a Duels game (title "DUELS" plus a
-// labeled Mode/Opponent line — the lobby sidebar has neither).
+// Exact system introduction; player chat quoting the instructions is ignored.
+function bedwarsDuelsIntroMode(value = '') {
+    const clean = stripFmt(value).trim();
+    const heading = clean.split(/\r?\n/)[0].trim();
+    if (/^bed\s*wars(?:\s+rush)?\s+duels?$/i.test(heading)) return heading;
+    if (/^destroy the enemy bed and then eliminate them!$/i.test(clean)) return 'Bed Wars Duel';
+    return null;
+}
+
+// Explicit Bed Wars Duels titles are authoritative before detail lines arrive.
+// Generic DUELS titles still need Mode/Opponent evidence to exclude the lobby.
 function isDuelsScoreboard(title = '', lines = []) {
     const compactTitle = stripFmt(title).toUpperCase().replace(/[^A-Z]/g, '');
+    if (/^BEDWARS(?:RUSH)?DUELS?$/.test(compactTitle)) return true;
+    if (lines.some(line => {
+        const mode = stripFmt(line).trim().match(/^mode\s*:\s*(.+)$/i)?.[1];
+        return mode && bedwarsDuelsIntroMode(mode);
+    })) return true;
     if (!compactTitle.includes('DUELS')) return false;
     return lines.some(line => /^(mode|opponents?)\s*:/i.test(stripFmt(line).trim()));
 }
@@ -256,6 +270,7 @@ module.exports = {
     splitOpponentNames,
     extractDuelsInfoFromScoreboard,
     isDuelsScoreboard,
+    bedwarsDuelsIntroMode,
     looksLikeIgn,
     SCOREBOARD_NAME_TO_ID
 };

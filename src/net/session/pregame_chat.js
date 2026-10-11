@@ -25,6 +25,7 @@ function isBedwarsPregameScoreboard(value = '') {
     const clean = stripMinecraftFormatting(value).toUpperCase();
     const compact = clean.replace(/[^A-Z0-9/]/g, '');
     if (!compact.includes('BEDWARS')) return false;
+    if (/\bDUELS?\b/.test(clean)) return false;
     if (compact.includes('SLUMBERTICKETS') || compact.includes('LEVELPROGRESS')) return false;
 
     const hasPregameDetails = /\bMAP\s*:/.test(clean)

@@ -20,7 +20,6 @@ function mount({ document, icon, navigate, invoke }) {
         document.querySelector(`[data-settings-subpage="${category}"]`).classList.add('fc-consistent-page');
     }
     for (const [id, category, iconName] of [
-        ['auto-gambler-enabled', 'Queue automation', 'cardCheck'],
         ['quick-maths-enabled', 'Quick Maths', 'cardCheck'],
         ['party-split-warnings-enabled', 'Party safety', 'users']
     ]) {

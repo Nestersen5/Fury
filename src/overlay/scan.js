@@ -296,6 +296,7 @@ function createScanRunner(deps) {
                         const wlr = (bw.wins_bedwars || 0) / Math.max(bw.losses_bedwars || 1, 1);
                         stats = {
                             stars,
+                            starThreat: stars >= state.threatConfig.minStars,
                             fkdr,
                             wlr,
                             ws: bw.winstreak || 0,

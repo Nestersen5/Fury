@@ -46,6 +46,7 @@ const PRESET_SETTING_KEYS = {
         'tabStatsEnabled', 'tabStatsBedwarsMode', 'tabStatsSkywarsMode',
         'tabStatsShowKillRatio', 'tabStatsShowWinRatio',
         'tabStatsBedwarsFields', 'tabStatsSkywarsFields', 'tabStatsLabelStyle',
+        'tabResourcesEnabled', 'tabResourceTypes', 'tabPhasesEnabled', 'tabPhaseTypes',
         // Nametags
         'nametagOverlayEnabled', 'nametagStarBracketsEnabled', 'nametagTagDisplayMode', 'nametagScope',
         'nametagTeammatesEnabled', 'nametagThreatsEnabled', 'nametagOthersEnabled',
@@ -71,6 +72,7 @@ const PRESET_SETTING_KEYS = {
         'friendAliasEnabled', 'friendAliasNametags', 'friendAliasChat', 'friendAliasTabStats', 'friendAliasShowRealIgn',
         // Session tracking
         'sessionTrackingEnabled', 'gameRecapEnabled',
+        'sessionAverageGameTimeEnabled',
         'sessionBoundaryMinutes', 'sessionRetention', 'sessionRecapStyle', 'sessionRecapFields',
         'sessionBedwarsFields', 'sessionSkywarsFields', 'sessionDuelsFields',
         'sessionGoalWins', 'sessionGoalFinals', 'sessionGoalGames', 'sessionGoalMinutes',
@@ -117,6 +119,7 @@ const PROFILE_SETTING_LABELS = {
     partyOverviewEnabled: 'Party overview',
     sessionTrackingEnabled: 'Session tracking',
     gameRecapEnabled: 'Game recap',
+    sessionAverageGameTimeEnabled: 'Average game time in recaps',
     enderDustReminderEnabled: 'Ender Dust reminder',
     gamblerGeorgeReminderEnabled: 'Gambler George reminder',
     scanMode: 'Scan mode',
@@ -131,6 +134,10 @@ const PROFILE_SETTING_LABELS = {
     nametagScope: 'Name tag scope',
     shareTagsDestination: 'Share destination',
     tabStatsBedwarsFields: 'BedWars tab fields',
+    tabResourcesEnabled: 'Tab resource timers',
+    tabResourceTypes: 'Tab resources',
+    tabPhasesEnabled: 'Tab phase timers',
+    tabPhaseTypes: 'Tab phases',
     tabStatsSkywarsFields: 'SkyWars tab fields',
     chatTriggers: 'Chat triggers'
 };
@@ -141,7 +148,7 @@ const PROFILE_HIGHLIGHT_KEYS = [
     'autoStatsDenickEnabled',
     'lobbyChatStatsEnabled', 'pregameChatStatsEnabled',
     'partyOverviewEnabled',
-    'sessionTrackingEnabled', 'gameRecapEnabled',
+    'sessionTrackingEnabled', 'gameRecapEnabled', 'sessionAverageGameTimeEnabled',
     'enderDustReminderEnabled', 'gamblerGeorgeReminderEnabled'
 ];
 
@@ -434,7 +441,7 @@ function builtInProfiles() {
             scanMode: 'off',
             minStars: 400
         }),
-        create('4v4-tickets-grinding', '4v4 Tickets Grinding', '4v4 ticket grinding with sniper and strong-player intel. Auto Gambler stays a separate global control.', ['4v4', 'tickets', 'quests'], {
+        create('4v4-tickets-grinding', '4v4 Tickets Grinding', '4v4 ticket grinding with sniper and strong-player intel.', ['4v4', 'tickets', 'quests'], {
             autoDodgeEnabled: true,
             autoDodgeNickedPlayers: true,
             autoDodgeMinFkdr: 2,

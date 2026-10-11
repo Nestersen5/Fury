@@ -177,4 +177,63 @@ assert.deepStrictEqual(findReplayClips(clipGames, { serverId: 'mini144AN', start
 assert.deepStrictEqual(findReplayClips(clipGames, { serverId: 'mini9Z', startNaiveMs: replayStart }), []);
 assert.deepStrictEqual(findReplayClips(clipGames, { serverId: null, startNaiveMs: replayStart }), []);
 
+{
+    const base = { ...games[0], delta: null, events: [], verificationStatus: 'pending',
+        localModes: [{ mode: 'BEDWARS', kills: 7, finals: 5, beds: 2 }] };
+    const annotate = record => {
+        const renderer = createReplayResultAnnotator({ getGames: () => [record], getSelfName: () => 'Me' });
+        return loreOf(renderer.rewriteClientbound('set_slot', { windowId: 3, slot: 0, item: replayItem(LORE) }).item);
+    };
+    for (const verificationStatus of ['pending', 'local', 'unverified']) {
+        const lore = annotate({ ...base, verificationStatus });
+        assert(lore.includes('§7Kills §a7 §8· §7Finals §a5 §8· §7Beds §a2'),
+            'Replay shows saved local counters without requiring API verification');
+    }
+    const verified = { ...base, verificationStatus: 'verified', delta: { stats: { Bedwars: {
+        wins_bedwars: 1, kills_bedwars: 8, final_kills_bedwars: 6, beds_broken_bedwars: 3
+    } } } };
+    assert(annotate(verified).includes('§7Kills §a8 §8· §7Finals §a6 §8· §7Beds §a3'),
+        'Verified single-game API counters replace observations');
+    const overlapping = { ...verified, delta: { stats: { Bedwars: {
+        wins_bedwars: 2, kills_bedwars: 100, final_kills_bedwars: 100, beds_broken_bedwars: 100
+    } } } };
+    assert(annotate(overlapping).includes('§7Kills §a7 §8· §7Finals §a5 §8· §7Beds §a2'),
+        'A multi-game API window cannot overwrite per-game observations');
+    const unknownResult = annotate({ ...base, result: null });
+    assert(unknownResult.some(line => line.includes('§7Kills §a7')) && !unknownResult.some(line => line.includes('Result:')),
+        'Known stats remain visible when the result is unknown');
+    const unknownRenderer = createReplayResultAnnotator({ getGames: () => [{ ...base, result: null }], getSelfName: () => 'Me' });
+    const alreadyAnnotated = replayItem(unknownResult);
+    const repeated = unknownRenderer.rewriteClientbound('set_slot', { windowId: 3, slot: 0, item: alreadyAnnotated });
+    assert.strictEqual(repeated.item, alreadyAnnotated, 'Stats-only annotations cannot be added twice');
+    assert(annotate({ ...base, localModes: [{ mode: 'BEDWARS', finals: 5 }] })
+        .includes('§7Kills §8? §8· §7Finals §a5 §8· §7Beds §a0'),
+    'Partial local coverage keeps known counters and the recap zero fallback for beds');
+    const unmatched = annotate({ ...base, metadata: { serverId: 'mOther' } });
+    assert.deepStrictEqual(unmatched, LORE, 'Server mismatches remain unannotated');
+    assert.deepStrictEqual(annotate({ ...base, at: base.at + 2 * 3600000 }), LORE,
+        'Time mismatches remain unannotated');
+    assert.deepStrictEqual(annotate({ ...base, mode: 'DUELS', result: null }), LORE,
+        'Bed Wars counters do not appear on unmatched Duels records');
+
+    const source = require('fs').readFileSync(require('path').resolve(__dirname, '../../proxy.js'), 'utf8');
+    const start = source.indexOf('        const replayResults = require(');
+    const end = source.indexOf('\n        });', start) + '\n        });'.length;
+    assert(start >= 0 && end > start);
+    const owner = 'a'.repeat(32);
+    const own = { ...base, id: 'own' }, foreign = { ...base, id: 'foreign' };
+    const client = { uuid: owner, username: 'Me' };
+    let options;
+    const context = require('vm').createContext({
+        client, normalizeUuid: uuid => uuid,
+        require: () => ({ createReplayResultAnnotator: value => { options = value; return {}; } }),
+        sessionStore: { getSessions: uuid => uuid === owner ? [{ games: [own] }] : [{ games: [foreign] }] },
+        clipStore: { listGames: () => [] }, resolveRankedPlayer() {}, state: {}
+    });
+    require('vm').runInContext(source.slice(start, end), context);
+    assert.equal(options.getGames()[0].id, 'own', 'Replay indexes only the connected account');
+    client.uuid = null;
+    assert.equal(options.getGames().length, 0, 'Missing identity cannot fall back to all accounts');
+}
+
 console.log('Replay result tests passed.');

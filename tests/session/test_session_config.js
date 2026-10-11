@@ -181,13 +181,15 @@ try {
     const initial = configRuntime.loadFeatureSettings();
     configRuntime.saveFeatureSettings({
         ...initial,
-        autoGamblerEnabled: !initial.autoGamblerEnabled,
+        autoGamblerEnabled: true,
+        quickMathsEnabled: !initial.quickMathsEnabled,
         bedwarsSidebarTeamColorsEnabled: false
     });
     const saved = configRuntime.loadFeatureSettings();
+    assert.strictEqual(saved.autoGamblerEnabled, false, 'Legacy settings cannot enable retired Auto Gambler');
     assert.notStrictEqual(
-        saved.autoGamblerEnabled,
-        initial.autoGamblerEnabled,
+        saved.quickMathsEnabled,
+        initial.quickMathsEnabled,
         'saveFeatureSettings must persist an ordinary feature toggle'
     );
     assert.strictEqual(

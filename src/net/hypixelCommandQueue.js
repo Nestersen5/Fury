@@ -89,6 +89,11 @@ function createHypixelCommandQueue(options = {}) {
         }
 
         try {
+            if (entry.shouldSend && !entry.shouldSend()) {
+                settle(entry, { sent: false, reason: 'cancelled', command: entry.command });
+                scheduleDrain();
+                return;
+            }
             send(entry.command);
             lastSentAt = now();
             if (entry.dedupeKey) lastSentByKey.set(entry.dedupeKey, lastSentAt);
@@ -126,6 +131,7 @@ function createHypixelCommandQueue(options = {}) {
             promise
         };
         entry.signal = options.signal;
+        entry.shouldSend = typeof options.shouldSend === 'function' ? options.shouldSend : null;
         entry.onAbort = () => {
             const index = entries.indexOf(entry);
             if (index < 0) return;

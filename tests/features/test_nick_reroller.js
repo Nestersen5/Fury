@@ -76,7 +76,7 @@ async function main() {
     }
     assert.equal(normalizeSettings({ prefix: 'cat' }).ogEnabled, true, 'Existing profiles retain OG matching');
     assert.equal(matchReason('aaaName', { ...DEFAULTS, words: [], wordGroups: [], ogEnabled: false }), null, 'OG matching can be disabled');
-    assert.equal(matchReason('aaaName', { ...DEFAULTS, words: [], wordGroups: [], ogEnabled: true }), 'OG: repeated letters');
+    assert.equal(matchReason('aaaName', { ...DEFAULTS, words: [], wordGroups: [], ogEnabled: true }), 'Legacy nick: repeated letters');
     const helpOnly = harness();
     const originalPreferences = JSON.stringify(helpOnly.preferences());
     for (const command of ['/nickroll', '/nickroll help filters', '/nickroll help words', '/nickroll help setup',
@@ -203,7 +203,7 @@ async function main() {
     validate({ ...DEFAULTS, max: 3, prefix: 'ab', suffix: 'bc', contains: 'b' });
     const restrictive = { ...DEFAULTS, prefix: 'zzz', max: 3 };
     for (const name of ['MiIiA', 'MiiIa', 'MIIia', 'HopeEeE']) assert.equal(matchReason(name, restrictive), null, 'OG runs must have identical capitalization');
-    for (const name of ['Miiia', 'Miaaa', 'Coleee', 'Hopeeee', 'MIIIA', 'MiIIIa']) assert.equal(matchReason(name, restrictive), 'OG: repeated letters');
+    for (const name of ['Miiia', 'Miaaa', 'Coleee', 'Hopeeee', 'MIIIA', 'MiIIIa']) assert.equal(matchReason(name, restrictive), 'Legacy nick: repeated letters');
     for (const name of ['fresh_head', 'HeadXXFresh', 'FreshBlueHead']) assert.equal(matchReason(name, restrictive), 'Words: fresh + head');
     for (const name of ['MiiA', 'Mia111', 'Mia___', 'FreshName', 'HeadName', 'MiAiAiA']) assert.equal(matchReason(name, restrictive), null);
     assert.equal(matchReason('NormalName', DEFAULTS), null, 'unset filters must not match every name');

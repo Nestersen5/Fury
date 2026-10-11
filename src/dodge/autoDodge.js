@@ -37,6 +37,8 @@ function createAutoDodger(deps) {
         applyConfig,
         compactTagName,
         isPartyMember = () => false,
+        isPartyRosterUsable = () => true,
+        getKnownDenick = () => null,
         // Injectable clock so tests can pin the countdown math; live use
         // always runs on Date.now.
         now = Date.now
@@ -188,12 +190,23 @@ function createAutoDodger(deps) {
         return Math.max(0, Math.min(configured, latest));
     }
 
+    function canExecuteDodge(plan) {
+        if (plan.sessionId !== getPregameSessionId() || !isPregameActive() || isGameActive()) return false;
+        // Party updates and denick results can arrive during the delay. A
+        // scheduled match is not authority to leave over a current teammate.
+        if (!isEnabled() || !isPartyRosterUsable()
+            || isPartyTarget(plan.player, getKnownDenick(plan.player) || plan.knownDenick)) return false;
+        return true;
+    }
+
     function executeDodge(plan) {
         pendingDodge = null;
-        if (plan.sessionId !== getPregameSessionId() || !isPregameActive() || isGameActive()) return;
+        if (!canExecuteDodge(plan)) return;
         sendChat(`§b§lDodge §8» §cLeaving lobby §7— §f${plan.player} §7matched auto-dodge (${plan.reason}§7).`);
         try {
-            sendLeaveCommand();
+            // The shared command lane may add a pacing delay. Keep the same
+            // guard on dispatch so a party update in that gap also wins.
+            sendLeaveCommand(() => canExecuteDodge(plan));
         } catch (error) {
             sendChat(`§b§lDodge §8» §cFailed to send leave command: §f${error.message || 'unknown error'}`);
         }
@@ -215,21 +228,30 @@ function createAutoDodger(deps) {
         pregameCountdown.reset();
     }
 
+    function isPartyTarget(name, knownDenick) {
+        if (isPartyMember(name)) return true;
+        const realName = String(knownDenick?.realName || knownDenick?.realIGN || '').trim();
+        return Boolean(realName && isPartyMember(realName));
+    }
+
     function maybeSchedule(name, profile, options = {}) {
         if (!isEnabled() || !isPregameActive() || isGameActive()) return;
         if (pendingDodge) return; // first matching player wins; later triggers are ignored
-        if (isPartyMember(name)) return; // never dodge over your own party member
-        const knownDenick = options.knownDenick || null;
-        const realName = String(knownDenick?.realName || knownDenick?.realIGN || '').trim();
+        // A partial roster after joining or a leader change is not evidence
+        // that a missing name is an opponent. Wait for /p list to confirm it
+        // before acting on a party member's tag or stats.
+        if (!isPartyRosterUsable()) return;
+        const knownDenick = options.knownDenick || getKnownDenick(name) || null;
         // Party tracking sees the real IGN, while pregame chat sees the nick.
         // Resolve that mismatch before deciding whether this is an opponent.
-        if (realName && isPartyMember(realName)) return;
+        if (isPartyTarget(name, knownDenick)) return;
         const reason = getDodgeReason(profile?.data, knownDenick);
         if (!reason) return;
 
         const delaySeconds = effectiveDelaySeconds();
         const plan = {
             player: name,
+            knownDenick,
             reason,
             sessionId: getPregameSessionId(),
             timer: null,

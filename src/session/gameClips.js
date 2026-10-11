@@ -21,16 +21,7 @@ const MINUTE_MS = 60000;
 
 // Standard BedWars event timeline: when each sidebar countdown reaches zero,
 // measured from the game start. The game is over at 50 minutes.
-const BEDWARS_TIMELINE = [
-    { pattern: /^diamond ii$/i, atMs: 6 * MINUTE_MS, spanMs: 6 * MINUTE_MS },
-    { pattern: /^emerald ii$/i, atMs: 12 * MINUTE_MS, spanMs: 6 * MINUTE_MS },
-    { pattern: /^diamond iii$/i, atMs: 18 * MINUTE_MS, spanMs: 6 * MINUTE_MS },
-    { pattern: /^emerald iii$/i, atMs: 24 * MINUTE_MS, spanMs: 6 * MINUTE_MS },
-    { pattern: /^bed (?:gone|destruction)$/i, atMs: 30 * MINUTE_MS, spanMs: 6 * MINUTE_MS },
-    { pattern: /^sudden death$/i, atMs: 40 * MINUTE_MS, spanMs: 10 * MINUTE_MS },
-    { pattern: /^(?:more )?dragons?$/i, atMs: 45 * MINUTE_MS, spanMs: 5 * MINUTE_MS },
-    { pattern: /^game end$/i, atMs: 50 * MINUTE_MS, spanMs: 5 * MINUTE_MS }
-];
+const { BEDWARS_TAB_PHASES: BEDWARS_TIMELINE } = require('./bedwarsTabSettings.js');
 const STANDARD_BEDWARS_VARIANTS = /^(Solos|Doubles|Threes|Fours)$/i;
 
 // Longest a game can run (BedWars ends at 50 minutes) plus slack. A clip past

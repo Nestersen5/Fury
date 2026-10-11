@@ -3417,14 +3417,11 @@
                 <section id="anticheat-detectors" class="panel anticheat-panel anticheat-detectors" aria-labelledby="anticheat-checks-heading">
                     <div class="anticheat-section-heading"><h3 id="anticheat-checks-heading">Detection checks</h3><p>Choose what to detect.</p></div>
                     <div class="feature-card"><div><h3>Scaffold</h3><small>Automatic bridging.</small></div><div class="feature-toggle"><label class="switch"><input id="anticheat-scaffold-enabled" type="checkbox" aria-label="Scaffold detection"><span class="switch-track"></span><span class="switch-thumb"></span><span class="switch-label">ON</span></label></div></div>
-                    <div class="feature-card"><div><h3>AutoBlock</h3><small>Blocking while attacking.</small></div><div class="feature-toggle"><label class="switch"><input id="anticheat-autoblock-enabled" type="checkbox" aria-label="AutoBlock detection"><span class="switch-track"></span><span class="switch-thumb"></span><span class="switch-label">ON</span></label></div></div>
-                    <div class="feature-card"><div><h3>Stasis</h3><small>Suspicious freezing in mid-air.</small></div><div class="feature-toggle"><label class="switch"><input id="anticheat-stasis-enabled" type="checkbox" aria-label="Stasis detection"><span class="switch-track"></span><span class="switch-thumb"></span><span class="switch-label">ON</span></label></div></div>
                 </section>
-                <p class="note">Note: AutoBlock and Stasis flags are experimental and may not be accurate.</p>
                 <section class="panel anticheat-panel" aria-labelledby="anticheat-alerts-heading">
                     <div class="anticheat-section-heading"><h3 id="anticheat-alerts-heading">Chat alerts</h3><p>Choose what appears in chat.</p></div>
-                    <div class="feature-card"><div><h3>Possible Alerts <span class="anticheat-recommendation">Recommended</span></h3><small>Warn about suspected cheats.</small></div><div class="feature-toggle"><label class="switch"><input id="anticheat-possible-alerts-enabled" type="checkbox" aria-label="Possible Alerts"><span class="switch-track"></span><span class="switch-thumb"></span><span class="switch-label">ON</span></label></div></div>
                     <div class="feature-card"><div><h3>Team Alerts</h3><small>Include teammates in alerts.</small></div><div class="feature-toggle"><label class="switch"><input id="anticheat-team-alerts-enabled" type="checkbox" aria-label="Team Alerts"><span class="switch-track"></span><span class="switch-thumb"></span><span class="switch-label">OFF</span></label></div></div>
+                    <div class="feature-card"><div><h3>Party Broadcasts</h3><small>Share Scaffold flags with your party. Teammates are excluded.</small></div><div class="feature-toggle"><label class="switch"><input id="anticheat-party-broadcast-enabled" type="checkbox" aria-label="Party Broadcasts"><span class="switch-track"></span><span class="switch-thumb"></span><span class="switch-label">ON</span></label></div></div>
                 </section>
                 <p class="anticheat-save-note">Changes save automatically.</p>
             </section>
@@ -3618,16 +3615,6 @@
                                     <div class="note">Sharing, optional automations, and in-game helpers that shape how a match feels.</div>
                                 </div>
                                 <div class="settings-subgroup">
-                                    <div class="settings-subgroup-head"><h3>Queue Automation</h3></div>
-                                    <div class="feature-card settings-search-item">
-                                        <div>
-                                            <h3>Auto Gambler</h3>
-                                            <div class="note">Automatically accepts the quest from the gambler George.</div>
-                                        </div>
-                                        <div class="feature-toggle"><label class="switch"><input id="auto-gambler-enabled" type="checkbox"><span class="switch-track"></span><span class="switch-thumb"></span><span class="switch-label">OFF</span></label></div>
-                                    </div>
-                                </div>
-                                <div class="settings-subgroup">
                                     <div class="settings-subgroup-head"><h3>Quick Maths</h3></div>
                                     <div class="feature-card settings-search-item">
                                         <div>
@@ -3744,7 +3731,7 @@
                                     <section class="session-recap-designer settings-search-item">
                                         <div class="session-recap-editor">
                                             <div class="session-recap-master"><div><span class="eyebrow">Minecraft chat output</span><h3>Post-game recap</h3><div class="note">Choose how much information Fury prints after a verified game.</div></div><div class="feature-toggle"><label class="switch"><input id="game-recap-enabled" type="checkbox"><span class="switch-track"></span><span class="switch-thumb"></span><span class="switch-label">OFF</span></label></div></div>
-                                            <div class="session-field-section"><span>Include in recap</span><div class="session-field-chips" id="session-recap-fields"><label><input type="checkbox" value="header">Title and borders</label><label><input type="checkbox" value="result">Game result</label><label><input type="checkbox" value="duration">Game time</label><label><input type="checkbox" value="map">Map</label><label><input type="checkbox" value="mode">Mode</label><label><input type="checkbox" value="finals">Final kills</label><label><input type="checkbox" value="beds">Beds broken</label><label><input type="checkbox" value="kills">Kills</label><label><input type="checkbox" value="deaths">Deaths</label><label><input type="checkbox" value="stars">Stars gained</label><label><input type="checkbox" value="session_wins">Session wins</label><label><input type="checkbox" value="session_losses">Session losses</label><label><input type="checkbox" value="session_ratio">Session FKDR</label><label><input type="checkbox" value="session_games">Session games</label><label><input type="checkbox" value="goals">Games goal</label></div></div>
+                                            <div class="session-field-section"><span>Include in recap</span><div class="session-field-chips" id="session-recap-fields"><label><input type="checkbox" value="header">Title and borders</label><label><input type="checkbox" value="result">Game result</label><label><input type="checkbox" value="duration">Game time</label><label><input type="checkbox" value="map">Map</label><label><input type="checkbox" value="mode">Mode</label><label><input type="checkbox" value="finals">Final kills</label><label><input type="checkbox" value="beds">Beds broken</label><label><input type="checkbox" value="kills">Kills</label><label><input type="checkbox" value="deaths">Deaths</label><label><input type="checkbox" value="stars">Stars gained</label><label><input type="checkbox" value="session_wins">Session wins</label><label><input type="checkbox" value="session_losses">Session losses</label><label><input type="checkbox" value="session_ratio">Session FKDR</label><label><input type="checkbox" value="session_games">Session games</label><label><input type="checkbox" value="session_finals">Total finals this session</label><label><input type="checkbox" value="session_beds">Total beds this session</label><label><input type="checkbox" value="session_avg_finals">Avg finals per game</label><label><input type="checkbox" value="session_avg_beds">Avg beds per game</label><label><input type="checkbox" value="goals">Games goal</label><label><input type="checkbox" id="session-average-game-time" data-recap-setting="average-game-time">Average game time</label></div></div>
                                             <label class="session-setting-field" id="session-games-goal-field" for="session-goal-games"><span>Games goal</span><input id="session-goal-games" type="number" min="0" max="100000" step="1" value="0" aria-describedby="session-games-goal-note"><small id="session-games-goal-note" class="note">Completed games this session. Set to 0 to turn the goal off.</small></label>
                                         </div>
                                         <div class="session-recap-preview-shell"><span class="eyebrow">Live preview</span><div id="session-recap-preview" class="minecraft-session-recap" aria-live="polite"></div></div>
@@ -3940,6 +3927,16 @@
                                                     <span class="tablist-order-status" id="tablist-order-status" aria-live="polite"></span>
                                                 </div>
                                                 <div class="tablist-editor-hint">Each game mode keeps its own layout. Stars / level joins the name only when the first two fields are Player name, then Stars / level; otherwise it follows its own slot.</div>
+                                                <section class="ia-tab-footer-settings settings-search-item">
+                                                    <div class="ia-setting-row"><div><h3>Resource totals</h3></div><label class="switch"><input id="tab-resources-enabled" type="checkbox" aria-label="Resource totals"><span class="switch-track"></span><span class="switch-thumb"></span><span class="switch-label">OFF</span></label></div>
+                                                    <p class="ia-tab-footer-description">Estimated resources generated in the current match.</p>
+                                                    <div class="ia-tab-footer-options" id="tab-resource-types" role="group" aria-label="Resources shown in Tab"><label class="switch fury-chip ia-tab-footer-option" data-refined="1"><input type="checkbox" value="diamond" aria-label="Diamonds"><span class="fury-check-box" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12 4 4 10-10"></path></svg></span><span>Diamonds</span></label><label class="switch fury-chip ia-tab-footer-option" data-refined="1"><input type="checkbox" value="emerald" aria-label="Emeralds"><span class="fury-check-box" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12 4 4 10-10"></path></svg></span><span>Emeralds</span></label></div>
+                                                </section>
+                                                <section class="ia-tab-footer-settings settings-search-item">
+                                                    <div class="ia-setting-row"><div><h3>Phase timers</h3></div><label class="switch"><input id="tab-phases-enabled" type="checkbox" aria-label="Phase timers"><span class="switch-track"></span><span class="switch-thumb"></span><span class="switch-label">OFF</span></label></div>
+                                                    <p class="ia-tab-footer-description">Choose phases to show in game order.</p>
+                                                    <div class="ia-tab-footer-options" id="tab-phase-types" role="group" aria-label="Phases shown in Tab"></div>
+                                                </section>
                                             </div>
                                         </div>
                                     </div>
@@ -4344,7 +4341,7 @@
                 'players to share':'players', 'tagged players':'tagAlert', 'nicked players':'mask', 'stat threats':'statThreat',
                 'threat thresholds':'slidersWarning', 'bed wars':'bedChart', 'skywars':'islandChart',
                 'hypixel api settings':'keyShield', 'api kill switch':'shieldSlash', 'automation':'wand', 'automation & game tools':'wand',
-                'queue automation':'cardCheck', 'auto gambler':'cardCheck', 'auto dodge':'doorExit',
+                'auto dodge':'doorExit',
                 'who should trigger a dodge?':'doorExit', 'define a stat threat':'slidersWarning', 'timing':'countdown',
                 'sessions':'timeline',
                 'session tracking':'stopwatch', 'track play sessions':'stopwatch', 'post-game recap':'recap',
@@ -4578,10 +4575,8 @@
         const ids = {
             anticheatEnabled: document.getElementById('anticheat-enabled'),
             anticheatScaffoldEnabled: document.getElementById('anticheat-scaffold-enabled'),
-            anticheatAutoblockEnabled: document.getElementById('anticheat-autoblock-enabled'),
-            anticheatStasisEnabled: document.getElementById('anticheat-stasis-enabled'),
-            anticheatPossibleAlertsEnabled: document.getElementById('anticheat-possible-alerts-enabled'),
             anticheatTeamAlertsEnabled: document.getElementById('anticheat-team-alerts-enabled'),
+            anticheatPartyBroadcastEnabled: document.getElementById('anticheat-party-broadcast-enabled'),
             hypixel: document.getElementById('key-hypixel'),
             urchin: document.getElementById('key-urchin'),
             urchinadmin: document.getElementById('key-urchin-admin'),
@@ -4594,6 +4589,8 @@
             minSkywarsLevel: document.getElementById('min-sw-level'),
             countTags: document.getElementById('count-tags'),
             tabStatsEnabled: document.getElementById('tab-stats-enabled'),
+            tabResourcesEnabled: document.getElementById('tab-resources-enabled'),
+            tabPhasesEnabled: document.getElementById('tab-phases-enabled'),
             tabStatsPreset: document.getElementById('tab-stats-preset'),
             tabStatsLabelStyle: document.getElementById('tab-stats-label-style'),
             autoScanOnGameStart: document.getElementById('auto-scan-on-game-start'),
@@ -4603,7 +4600,6 @@
             shareTagsIncludeTagged: document.getElementById('share-tags-include-tagged'),
             shareTagsIncludeNicks: document.getElementById('share-tags-include-nicks'),
             shareTagsIncludeThreats: document.getElementById('share-tags-include-threats'),
-            autoGamblerEnabled: document.getElementById('auto-gambler-enabled'),
             quickMathsEnabled: document.getElementById('quick-maths-enabled'),
             autoDodgeEnabled: document.getElementById('auto-dodge-enabled'),
             autoDodgeDelaySeconds: document.getElementById('auto-dodge-delay-seconds'),
@@ -4636,6 +4632,7 @@
             denickRealIgnChat: document.getElementById('denick-real-ign-chat'),
             sessionTrackingEnabled: document.getElementById('session-tracking-enabled'),
             gameRecapEnabled: document.getElementById('game-recap-enabled'),
+            sessionAverageGameTimeEnabled: document.getElementById('session-average-game-time'),
             replayDetailsEnabled: document.getElementById('replay-details-enabled'),
             sessionGoalGames: document.getElementById('session-goal-games'),
             denickPartyAnnounceEnabled: document.getElementById('denick-party-announce-enabled'),
@@ -4674,13 +4671,13 @@
         const featureControlIds = new Set([
             'anticheatEnabled',
             'anticheatScaffoldEnabled',
-            'anticheatAutoblockEnabled',
-            'anticheatStasisEnabled',
-            'anticheatPossibleAlertsEnabled',
             'anticheatTeamAlertsEnabled',
+            'anticheatPartyBroadcastEnabled',
             'scanMode',
             'countTags',
             'tabStatsEnabled',
+            'tabResourcesEnabled',
+            'tabPhasesEnabled',
             'tabStatsPreset',
             'tabStatsLabelStyle',
             'autoScanOnGameStart',
@@ -4690,7 +4687,6 @@
             'shareTagsIncludeTagged',
             'shareTagsIncludeNicks',
             'shareTagsIncludeThreats',
-            'autoGamblerEnabled',
             'quickMathsEnabled',
             'autoDodgeEnabled',
             'autoDodgeDelaySeconds',
@@ -5196,7 +5192,7 @@
             document.getElementById('tablist-preview-shell')?.classList.toggle('preview-disabled', !ids.tabStatsEnabled?.checked);
 
             const previewRows = document.getElementById('tablist-preview-rows');
-            if (previewRows) require('./src/launcher/renderer/launcher_ingame_appearance').renderTab({document,layout,mode,style:ids.tabStatsLabelStyle?.value || 'compact',enabled:Boolean(ids.tabStatsEnabled?.checked)});
+            if (previewRows) require('./src/launcher/renderer/launcher_ingame_appearance').renderTab({document,layout,mode,style:ids.tabStatsLabelStyle?.value || 'compact',enabled:Boolean(ids.tabStatsEnabled?.checked),footerSettings:collectBedwarsTabSettings()});
 
             const orderList = document.getElementById('tablist-order-list');
             if (orderList) orderList.innerHTML = layout.map((field, index) => (
@@ -6274,7 +6270,9 @@
         });
 
         function checkedSessionFields(containerId) {
-            const fields = Array.from(document.querySelectorAll(`#${containerId} input[type="checkbox"]:checked`)).map(input => input.value);
+            const fields = Array.from(document.querySelectorAll(`#${containerId} input[type="checkbox"]:checked`))
+                .filter(input => !input.dataset.recapSetting)
+                .map(input => input.value);
             if (containerId === 'session-recap-fields') {
                 return fields;
             }
@@ -6286,8 +6284,48 @@
         function setCheckedSessionFields(containerId, values, fallback = []) {
             const selected = new Set(Array.isArray(values) ? values : fallback);
             document.querySelectorAll(`#${containerId} input[type="checkbox"]`).forEach((input) => {
+                if (input.dataset.recapSetting) return;
                 input.checked = input.value === 'gamesByMode' ? !selected.has('hideGamesByMode') : selected.has(input.value);
             });
+        }
+
+        const { BEDWARS_TAB_PHASES, normalizeBedwarsTabSettings } = require('./src/session/bedwarsTabSettings');
+        BEDWARS_TAB_PHASES.forEach(phase => {
+            const label = document.createElement('label');
+            label.className = 'switch fury-chip ia-tab-footer-option';
+            label.dataset.refined = '1';
+            const input = document.createElement('input');
+            input.type = 'checkbox'; input.value = phase.id;
+            input.setAttribute('aria-label', phase.label);
+            const check = document.createElement('span');
+            check.className = 'fury-check-box'; check.setAttribute('aria-hidden', 'true');
+            check.innerHTML = '<svg viewBox="0 0 24 24"><path d="m5 12 4 4 10-10"></path></svg>';
+            const text = document.createElement('span'); text.textContent = phase.label;
+            label.append(input, check, text);
+            document.getElementById('tab-phase-types').append(label);
+        });
+
+        function collectBedwarsTabSettings() {
+            return normalizeBedwarsTabSettings({
+                tabResourcesEnabled: ids.tabResourcesEnabled.checked,
+                tabResourceTypes: checkedSessionFields('tab-resource-types'),
+                tabPhasesEnabled: ids.tabPhasesEnabled.checked,
+                tabPhaseTypes: checkedSessionFields('tab-phase-types')
+            });
+        }
+
+        function updateBedwarsTabSelection(master, containerId, fromMaster) {
+            const inputs = [...document.querySelectorAll(`#${containerId} input`)];
+            if (fromMaster && master.checked && !inputs.some(input => input.checked)) {
+                inputs.forEach(input => { input.checked = true; });
+            }
+            if (!fromMaster) master.checked = inputs.some(input => input.checked);
+            renderTabStatsEditor();
+            scheduleFeatureAutoSave();
+        }
+        for (const [master, containerId] of [[ids.tabResourcesEnabled, 'tab-resource-types'], [ids.tabPhasesEnabled, 'tab-phase-types']]) {
+            master.addEventListener('change', () => updateBedwarsTabSelection(master, containerId, true));
+            document.getElementById(containerId).addEventListener('change', () => updateBedwarsTabSelection(master, containerId, false));
         }
 
         function effectiveSessionRecapFields() {
@@ -6303,11 +6341,12 @@
             if (enabled) {
                 const scoreboard = require('./src/stats/recapScoreboard').scoreboardRecapMessages({
                     game: 'Bedwars', result: 'win', duration: '11m 06s', variant: 'Solos', map: 'Airshow',
+                    averageGameTime: '9m 42s', averageGameTimeEnabled: ids.sessionAverageGameTimeEnabled.checked,
                     stats: [{ label: 'Finals', value: 6, color: '§a' },
                         { label: 'Beds', value: 3, color: '§e' }, { label: 'Kills', value: 9, color: '§b' },
                         { label: 'Deaths', value: 2, color: '§c' },
-                        { label: 'Stars', value: '+0.02', color: '§6' }],
-                    fields: [...fields], session: { wins: 6, losses: 2, fkdr: 4, games: 8 },
+                        { label: 'Stars', value: '+0.02', color: '§b' }],
+                    fields: [...fields], session: { wins: 6, losses: 2, fkdr: 4, games: 8, finals: 26, beds: 10 },
                     gamesGoal: fields.has('goals') ? Number(ids.sessionGoalGames.value) : 0, games: 8
                 });
                 if (!scoreboard.length) {
@@ -6343,11 +6382,10 @@
                 features: {
                     anticheatEnabled: ids.anticheatEnabled.checked,
                     anticheatScaffoldEnabled: ids.anticheatScaffoldEnabled.checked,
-                    anticheatAutoblockEnabled: ids.anticheatAutoblockEnabled.checked,
-                    anticheatStasisEnabled: ids.anticheatStasisEnabled.checked,
-                    anticheatPossibleAlertsEnabled: ids.anticheatPossibleAlertsEnabled.checked,
                     anticheatTeamAlertsEnabled: ids.anticheatTeamAlertsEnabled.checked,
+                    anticheatPartyBroadcastEnabled: ids.anticheatPartyBroadcastEnabled.checked,
                     tabStatsEnabled: ids.tabStatsEnabled.checked,
+                    ...collectBedwarsTabSettings(),
                     autoScanOnGameStart: true,
                     shareTagsAuto: ids.shareTagsAuto.checked,
                     shareTagsFancy: ids.shareTagsFancy.checked,
@@ -6356,7 +6394,6 @@
                     shareTagsIncludeTagged: ids.shareTagsIncludeTagged.checked,
                     shareTagsIncludeNicks: ids.shareTagsIncludeNicks.checked,
                     shareTagsIncludeThreats: ids.shareTagsIncludeThreats.checked,
-                    autoGamblerEnabled: ids.autoGamblerEnabled.checked,
                     quickMathsEnabled: ids.quickMathsEnabled.checked,
                     autoDodgeEnabled: ids.autoDodgeEnabled.checked,
                     autoDodgeDelaySeconds: Number(ids.autoDodgeDelaySeconds.value),
@@ -6391,6 +6428,7 @@
                     denickRealIgnChat: ids.denickRealIgnChat.checked,
                     sessionTrackingEnabled: ids.sessionTrackingEnabled.checked,
                     gameRecapEnabled: ids.gameRecapEnabled.checked,
+                    sessionAverageGameTimeEnabled: ids.sessionAverageGameTimeEnabled.checked,
                     replayDetailsEnabled: ids.replayDetailsEnabled.checked,
                     sessionBoundaryMinutes: 30,
                     sessionRetention: 0,
@@ -6502,10 +6540,8 @@
         [
             ids.anticheatEnabled,
             ids.anticheatScaffoldEnabled,
-            ids.anticheatAutoblockEnabled,
-            ids.anticheatStasisEnabled,
-            ids.anticheatPossibleAlertsEnabled,
             ids.anticheatTeamAlertsEnabled,
+            ids.anticheatPartyBroadcastEnabled,
             ids.scanMode,
             ids.countTags,
             ids.tabStatsEnabled,
@@ -6516,7 +6552,6 @@
             ids.shareTagsIncludeTagged,
             ids.shareTagsIncludeNicks,
             ids.shareTagsIncludeThreats,
-            ids.autoGamblerEnabled,
             ids.quickMathsEnabled,
             ids.autoDodgeEnabled,
             ids.autoDodgeDelaySeconds,
@@ -7725,12 +7760,15 @@
             const featureOn = (key, fallback = true) => features[key] !== undefined ? Boolean(features[key]) : fallback;
             ids.anticheatEnabled.checked = featureOn('anticheatEnabled');
             ids.anticheatScaffoldEnabled.checked = featureOn('anticheatScaffoldEnabled');
-            ids.anticheatAutoblockEnabled.checked = featureOn('anticheatAutoblockEnabled', false);
-            ids.anticheatStasisEnabled.checked = featureOn('anticheatStasisEnabled', false);
-            ids.anticheatPossibleAlertsEnabled.checked = featureOn('anticheatPossibleAlertsEnabled');
             ids.anticheatTeamAlertsEnabled.checked = featureOn('anticheatTeamAlertsEnabled', false);
+            ids.anticheatPartyBroadcastEnabled.checked = featureOn('anticheatPartyBroadcastEnabled', true);
             syncAntiCheatDetectorControls();
             ids.tabStatsEnabled.checked = featureOn('tabStatsEnabled', false);
+            const bedwarsTab = normalizeBedwarsTabSettings(features);
+            ids.tabResourcesEnabled.checked = bedwarsTab.tabResourcesEnabled;
+            ids.tabPhasesEnabled.checked = bedwarsTab.tabPhasesEnabled;
+            setCheckedSessionFields('tab-resource-types', bedwarsTab.tabResourceTypes);
+            setCheckedSessionFields('tab-phase-types', bedwarsTab.tabPhaseTypes);
             ids.autoScanOnGameStart.checked = true;
             ids.shareTagsAuto.checked = featureOn('shareTagsAuto', false);
             ids.shareTagsFancy.checked = featureOn('shareTagsFancy', false);
@@ -7740,7 +7778,6 @@
             ids.shareTagsIncludeThreats.checked = featureOn('shareTagsIncludeThreats', true);
             renderScanModeButtons();
             renderPartySharePreview();
-            ids.autoGamblerEnabled.checked = featureOn('autoGamblerEnabled', false);
             ids.quickMathsEnabled.checked = featureOn('quickMathsEnabled', false);
             ids.autoDodgeEnabled.checked = featureOn('autoDodgeEnabled', false);
             ids.autoDodgeDelaySeconds.value = Number.isFinite(Number(features.autoDodgeDelaySeconds))
@@ -7781,6 +7818,7 @@
             ids.denickRealIgnChat.checked = featureOn('denickRealIgnChat', false);
             ids.sessionTrackingEnabled.checked = featureOn('sessionTrackingEnabled', true);
             ids.gameRecapEnabled.checked = featureOn('gameRecapEnabled', true);
+            ids.sessionAverageGameTimeEnabled.checked = featureOn('sessionAverageGameTimeEnabled', true);
             ids.replayDetailsEnabled.checked = featureOn('replayDetailsEnabled', true);
             ids.sessionGoalGames.value = Number(features.sessionGoalGames) || 0;
             setCheckedSessionFields('session-recap-fields', require('./src/session/settings').normalizeRecapFields(features.sessionRecapFields));
@@ -9880,10 +9918,10 @@
             overlay: { label: 'Overlay', aliases: 'players stats board live columns', description: 'Live player board and overlay preview.' },
             sessions: { label: 'Sessions', aliases: 'history games matches recap calendar day week month', description: 'Tracked games, session history, and match recaps.' },
             denicks: { label: 'Nicks', aliases: 'nicknames denick disguised players identities mappings', description: 'Saved nickname mappings and matched identities.' },
-            nickroll: { label: 'Nick Reroller', aliases: 'nickroll reroll og names filters words rank skin timing', description: 'Configure nickname matching and rolling.' },
+            nickroll: { label: 'Nick Reroller', aliases: 'nickroll reroll legacy nicks og names filters words rank skin timing', description: 'Configure nickname matching and rolling.' },
             reminders: { label: 'Reminders', aliases: 'alerts slumber dust notifications gambler george quest bet wins', description: 'Slumber collection and reward alerts.' },
             profiles: { label: 'Profiles', aliases: 'presets setups playstyle configuration', description: 'Saved playstyle and launcher setups.' },
-            anticheat: { label: 'AntiCheat', aliases: 'scaffold autoblock stasis blink flags teammates', description: 'Choose which cheats Fury detects and which alerts appear in game.' },
+            anticheat: { label: 'AntiCheat', aliases: 'scaffold flags teammates', description: 'Choose which cheats Fury detects and which alerts appear in game.' },
             settings: { label: 'Settings', aliases: 'preferences options configuration controls', description: 'Appearance, scanning, automation, API, and network controls.' },
             console: { label: 'Console Logs', aliases: 'logs debug diagnostics output errors', description: 'Live proxy output and diagnostics.' }
         };
@@ -10451,11 +10489,10 @@
                 features: {
                     anticheatEnabled: ids.anticheatEnabled.checked,
                     anticheatScaffoldEnabled: ids.anticheatScaffoldEnabled.checked,
-                    anticheatAutoblockEnabled: ids.anticheatAutoblockEnabled.checked,
-                    anticheatStasisEnabled: ids.anticheatStasisEnabled.checked,
-                    anticheatPossibleAlertsEnabled: ids.anticheatPossibleAlertsEnabled.checked,
                     anticheatTeamAlertsEnabled: ids.anticheatTeamAlertsEnabled.checked,
+                    anticheatPartyBroadcastEnabled: ids.anticheatPartyBroadcastEnabled.checked,
                     tabStatsEnabled: ids.tabStatsEnabled.checked,
+                    ...collectBedwarsTabSettings(),
                     autoScanOnGameStart: true,
                     shareTagsAuto: ids.shareTagsAuto.checked,
                     shareTagsFancy: ids.shareTagsFancy.checked,
@@ -10464,7 +10501,6 @@
                     shareTagsIncludeTagged: ids.shareTagsIncludeTagged.checked,
                     shareTagsIncludeNicks: ids.shareTagsIncludeNicks.checked,
                     shareTagsIncludeThreats: ids.shareTagsIncludeThreats.checked,
-                    autoGamblerEnabled: ids.autoGamblerEnabled.checked,
                     quickMathsEnabled: ids.quickMathsEnabled.checked,
                     autoDodgeEnabled: ids.autoDodgeEnabled.checked,
                     autoDodgeDelaySeconds: Number(ids.autoDodgeDelaySeconds.value),
@@ -10499,6 +10535,7 @@
                     denickRealIgnChat: ids.denickRealIgnChat.checked,
                     sessionTrackingEnabled: ids.sessionTrackingEnabled.checked,
                     gameRecapEnabled: ids.gameRecapEnabled.checked,
+                    sessionAverageGameTimeEnabled: ids.sessionAverageGameTimeEnabled.checked,
                     replayDetailsEnabled: ids.replayDetailsEnabled.checked,
                     sessionBoundaryMinutes: 30,
                     sessionRetention: 0,
@@ -11576,7 +11613,7 @@
         window.addEventListener('DOMContentLoaded', () => {
             require('./src/launcher/renderer/launcher_updates').mount({
                 document, notifications: window.FuryNotifications,
-                invoke: channel => ipcRenderer.invoke(channel), isClosing: () => rendererClosing
+                invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args), isClosing: () => rendererClosing
             });
         }, { once: true });
 

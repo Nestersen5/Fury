@@ -1,0 +1,13 @@
+{
+  "name": "fury-party-coordination",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-10-07",
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": { "enabled": false },
+  "durable_objects": {
+    "bindings": [{ "name": "PARTIES", "class_name": "PartyRoom" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["PartyRoom"] }],
+  "routes": [{ "pattern": "furyproxy.online/party/*", "zone_name": "furyproxy.online" }]
+}

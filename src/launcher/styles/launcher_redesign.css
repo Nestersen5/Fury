@@ -1,4 +1,20 @@
 /* Final visual layer: shared geometry for every launcher page and dialog. */
+.fury-release-dialog { width:min(620px,calc(100vw - 40px));max-height:calc(100vh - 48px);box-sizing:border-box;overflow:auto;padding:24px;border:1px solid var(--fury-border);border-radius:12px;background:var(--fury-panel);color:var(--fury-text); }
+.fury-release-dialog::backdrop { background:#0008; }
+.fury-release-head { display:flex;align-items:center;justify-content:space-between;gap:16px; }
+.fury-release-head h2 { margin:0;font-size:22px; }
+.fury-release-head button { min-width:36px; }
+.fury-release-content { margin:20px 0; }
+.fury-release-content section + section { border-top:1px solid var(--fury-border);padding-top:12px;margin-top:18px; }
+.fury-release-content h3 { font-size:15px;margin:0 0 8px; }
+.fury-release-content ul { padding-left:20px;margin:0; }
+.fury-release-content li { color:var(--fury-muted);line-height:1.6;margin:4px 0; }
+.fury-release-actions { display:flex;gap:8px;flex-wrap:wrap; }
+.fury-release-actions button { margin:0; }
+.fury-release-reopen { margin:12px;flex-shrink:0;display:flex;align-items:center;justify-content:center;gap:8px; }
+.fury-release-reopen svg { width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round; }
+html[data-sidebar="collapsed"] .fury-release-reopen { margin:8px auto;padding:10px;width:40px;height:40px; }
+html[data-sidebar="collapsed"] .fury-release-reopen span { display:none; }
 html.fury-redesign #nickroll-form select.stat-select-native { display:none!important; }
 html.fury-redesign #nickroll-form .stat-select-shell { width:100%; min-width:0; }
 .nickroll-rank-vip { color:#55ff55; }

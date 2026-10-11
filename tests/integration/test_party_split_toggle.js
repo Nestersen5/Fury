@@ -96,7 +96,7 @@ require(${JSON.stringify(path.join(REPOSITORY_ROOT, 'src/accounts/connectionAuth
         for (const [input, title] of [
             ['/dodge', 'Auto Dodge'], ['/tabstats', 'Tab Stats'], ['/nametags', 'Name Tags'],
             ['/overlay', 'Scan Overlay'], ['/share', 'Share'], ['/denick', 'Denick'],
-            ['/autogambler', 'Auto Gambler'], ['/proxyhealth status', 'Proxy Health'],
+            ['/proxyhealth status', 'Proxy Health'],
             ['/reminder status', 'Reminders'], ['/deck', 'launcher']
         ]) {
             const output = await command(input, title, true);

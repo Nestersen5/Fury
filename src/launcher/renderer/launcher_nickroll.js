@@ -9,8 +9,8 @@ function mount({ document, invoke }) {
     const select = (name, title, entries, hint) => field(name, title, `<select>${entries.map(([value, label]) => `<option value="${value}">${label}</option>`).join('')}</select>`, hint);
     const ruleOptions = [['any', 'Allowed'], ['exclude', 'Excluded'], ['require', 'At least one required']];
     form.innerHTML = `<fieldset id="nickroll-controls" disabled>
-        <section class="panel"><h3>Matching</h3><p class="note">OG and word matches bypass name filters.</p>
-        <div class="feature-card"><div><h3>Include OG names</h3><small>Repeated-letter names, e.g. Cooool or Shhh.</small></div><div class="feature-toggle"><label class="switch"><input name="ogEnabled" type="checkbox" aria-label="Include OG names"><span class="switch-track"></span><span class="switch-thumb"></span><span class="switch-label">ON</span></label></div></div></section>
+        <section class="panel"><h3>Matching</h3><p class="note">Legacy nick and word matches bypass name filters.</p>
+        <div class="feature-card"><div><h3>Include Legacy nicks</h3><small>Repeated-letter names up to 8 characters, e.g. Cooool or Shhh.</small></div><div class="feature-toggle"><label class="switch"><input name="ogEnabled" type="checkbox" aria-label="Include Legacy nicks"><span class="switch-track"></span><span class="switch-thumb"></span><span class="switch-label">ON</span></label></div></div></section>
         <section class="panel"><h3>Name filters</h3><p class="note">All active filters must match.</p>
         <div class="nickroll-filter-options">${['Length', 'Characters', 'Rules'].map(label => `<label class="fury-chip"><input type="checkbox" name="enable${label}" aria-controls="nickroll-${label.toLowerCase()}-fields"><span class="fury-chip-label">${label}</span></label>`).join('')}</div>
         <fieldset id="nickroll-length-fields" class="nickroll-grid nickroll-filter-fields" hidden disabled>

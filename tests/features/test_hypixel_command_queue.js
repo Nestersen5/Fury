@@ -86,6 +86,28 @@ async function main() {
     closeQueue.close('connection-ended');
     assert.strictEqual((await pending).reason, 'connection-ended', 'Disconnecting must cancel queued commands');
 
+    const guardedClock = createFakeClock();
+    const guardedSent = [];
+    let opponent = true;
+    const guardedQueue = createHypixelCommandQueue({
+        now: guardedClock.now,
+        setTimeout: guardedClock.setTimeout,
+        clearTimeout: guardedClock.clearTimeout,
+        send: command => guardedSent.push(command)
+    });
+    await guardedQueue.enqueue('/p list');
+    const guardedLeave = guardedQueue.enqueue('/l', { priority: 0, shouldSend: () => opponent });
+    const announcement = guardedQueue.enqueue('/pc hello');
+    opponent = false; // party membership was confirmed during command pacing
+    guardedClock.runAll();
+    assert.strictEqual((await guardedLeave).reason, 'cancelled', 'A teammate must cancel a leave waiting in the command lane');
+    assert.strictEqual((await announcement).sent, true, 'Dropping a stale leave must not block other commands');
+    assert.deepStrictEqual(guardedSent, ['/p list', '/pc hello']);
+    opponent = true;
+    const allowedLeave = guardedQueue.enqueue('/l', { shouldSend: () => opponent });
+    guardedClock.runAll();
+    assert.strictEqual((await allowedLeave).sent, true, 'Current opponents still permit a guarded leave');
+
     console.log('Hypixel command queue tests passed.');
 }
 

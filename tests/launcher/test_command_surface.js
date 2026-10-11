@@ -51,7 +51,7 @@ function matchCssRule(selector) {
 
 const commandBlock = matchBlock(commandCompletionModule, /const PROXY_COMMANDS = \[/, /\];/);
 const tabRouterBlock = matchBlock(commandCompletionModule, /function proxyTabMatches\(rawText\)/, /return proxyTabMatches;/);
-['/duels', '/general', '/tabstats', '/denick', '/denickskin', '/autogambler', '/profile', '/profiles'].forEach(command => {
+['/duels', '/general', '/tabstats', '/denick', '/denickskin', '/profile', '/profiles'].forEach(command => {
     assert(commandBlock.includes(`'${command}'`), `Expected ${command} in proxy command surface`);
 });
 [
@@ -81,7 +81,6 @@ const hiddenCommandBlock = matchBlock(commandCompletionModule, /const HIDDEN_PRO
 assert(/if \(!visibleProxyCommand && !hiddenProxyCommand\) return null;/.test(tabRouterBlock), 'Unknown slash commands should still pass through to Hypixel tab completion');
 assert(/cmd === '\/activecosmetics'[\s\S]*completePlayers\(args\[1\]/.test(tabRouterBlock), 'Active cosmetics command should tab-complete player names');
 assert(/cmd === '\/hotkeydebug'[\s\S]*completeFromList\(\['on', 'off', 'status', 'enable', 'disable'\]/.test(tabRouterBlock), 'Hotkey debug command should tab-complete its subcommands');
-assert(/cmd === '\/autogambler'[\s\S]*completeFromList\(\['on', 'off', 'status', 'info'\]/.test(tabRouterBlock), '/autogambler should tab-complete on/off/status/info');
 assert(/cmd === '\/chattrigger' \|\| cmd === '\/chattriggers' \|\| cmd === '\/ctriggers'[\s\S]*completeFromList\(chatTriggerManager\.getTriggers\(\), args\.slice\(2\)\.join\(' '\)\)/.test(tabRouterBlock), '/chattrigger remove should tab-complete saved trigger names');
 assert(proxy.includes("require('./src/denick/history.js')"), 'Proxy should import the denick history module');
 assert(/createDenickHistory\(\{[\s\S]*historyFile: DENICKED_HISTORY_FILE[\s\S]*writeJsonOffThread[\s\S]*\}\)/.test(proxy), 'Proxy should wire createDenickHistory with the history file and off-thread writer');
@@ -111,7 +110,7 @@ assert(/function denickFilterFieldSuggestions\(\) \{[\s\S]*'finals', 'beds'[\s\S
 assert(/function completeDenickCommand\(args\)[\s\S]*completeDenickFilterSequence\(args, 1\)/.test(commandCompletionModule), '/denick tab completion should use the mixed filter completer');
 
 const helpBlock = helpCommandModule;
-['/duels', '/general', '/tabstats', '/autogambler', 'Core tab list stats'].forEach(text => {
+['/duels', '/general', '/tabstats', 'Core tab list stats'].forEach(text => {
     assert(helpBlock.includes(text), `Expected help to mention ${text}`);
 });
 ['/cosmetics', '/activecosmetics', '/woodskin', '/km', '/hotkeydebug', '/debugstate', 'Experimental tab stats'].forEach(text => {
@@ -208,44 +207,9 @@ assert(!proxy.includes('const PROXY_HEALTH_SAMPLE_MS'), 'Proxy Health constants 
 assert(!proxy.includes('const proxyHealthState'), 'Proxy Health state should not remain inline in proxy.js');
 assert(!proxy.includes('function activateProxyAutoThrottle'), 'Proxy Health throttle activation should not remain inline in proxy.js');
 assert(!proxy.includes("const { performance } = require('perf_hooks');"), 'Proxy Health performance timing should live in the feature module');
-assert(appConfig.includes('autoGamblerEnabled: false'), 'Config defaults must include the Auto Gambler toggle');
-assert(launcherHtml.includes('id="auto-gambler-enabled"'), 'Launcher settings must render the Auto Gambler toggle');
-assert(launcherHtml.includes('Auto Gambler'), 'Launcher settings should label the Auto Gambler toggle');
-assert(/autoGamblerEnabled: ids\.autoGamblerEnabled\.checked/.test(launcherHtml), 'Launcher feature autosave must include Auto Gambler');
-assert(/autoGamblerEnabled: settings\?\.features\?\.autoGamblerEnabled/.test(launcherJs), 'Launcher process must persist Auto Gambler feature changes');
-assert(proxy.includes("require('./features/auto_gambler.js')"), 'Proxy should import the Auto Gambler feature module');
-assert(autoGamblerModule.includes("const AUTOGAMBLER_TRIGGER_MESSAGE = '[I bet I can] - [Nah not right now]';"), 'Auto Gambler must watch the exact requested prompt');
-assert(autoGamblerModule.includes("const AUTOGAMBLER_COMMAND = '/wanttobet true';"), 'Auto Gambler must send the requested command');
-assert(/function parseFeatureConfig\(options = \{\}\) \{[\s\S]*options\.resetAutoGamblerSession[\s\S]*autoGamblerEnabled = false[\s\S]*saveFeatureSettings\(\{ \.\.\.features, autoGamblerEnabled: false \}\)/.test(bootstrapConfigModule), 'Auto Gambler should be forced off and persisted off when the proxy starts');
-assert(/loadFeatureConfig\(\{ resetAutoGamblerSession: true \}\);/.test(proxy), 'Initial proxy feature load should reset Auto Gambler off for the new session');
-assert(/function randomAutoGamblerDelaySeconds\(random = Math\.random\) \{[\s\S]*Number\(\(0\.5 \+ random\(\) \* 0\.5\)\.toFixed\(2\)\)/.test(autoGamblerModule), 'Auto Gambler delay should be 0.50-1.00s with two-decimal precision');
-assert(/const AUTOGAMBLER_TRIGGER_PATTERN = \/\\\[I\\s\+bet\\s\+I\\s\+can\\\]\\s\*-\\s\*\\\[Nah\\s\+not\\s\+right\\s\+now\\\]\//.test(autoGamblerModule), 'Auto Gambler should match the visible prompt even when spacing varies');
-assert(autoGamblerModule.includes("const AUTOGAMBLER_TRIGGER_SIGNATURE = 'ibeticannahnotrightnow';"), 'Auto Gambler should include a compact visible-text signature');
-assert(/const AUTOGAMBLER_RAW_CHAT_PACKET_NAMES = new Set\(\[[\s\S]*'player_chat'[\s\S]*'system_chat'[\s\S]*'profileless_chat'[\s\S]*'disguised_chat'/.test(autoGamblerModule), 'Auto Gambler should inspect modern raw chat packet names');
-const autoGamblerFlattenBlock = matchBlock(autoGamblerModule, /function flattenAutoGamblerChatPayload\(value, seen = new Set\(\)\)/, /function normalizeAutoGamblerChatText/);
-assert(autoGamblerFlattenBlock.includes('JSON.parse(trimmed)'), 'Auto Gambler should parse raw JSON chat strings before matching');
-assert(autoGamblerFlattenBlock.includes("['text', 'selector', 'keybind']"), 'Auto Gambler should flatten visible Minecraft chat component text');
-assert(autoGamblerFlattenBlock.includes("value.with.flatMap"), 'Auto Gambler should flatten translated chat component arguments');
-assert(autoGamblerFlattenBlock.includes("value.extra.flatMap"), 'Auto Gambler should flatten split extra chat components');
-const autoGamblerNormalizeBlock = matchBlock(autoGamblerModule, /function normalizeAutoGamblerChatText\(text = ''\)/, /function isAutoGamblerTriggerText/);
-assert(autoGamblerNormalizeBlock.includes(".normalize('NFKC')"), 'Auto Gambler should normalize unicode before matching');
-assert(autoGamblerNormalizeBlock.includes("replace(/\\x1B\\[[0-?]*[ -/]*[@-~]/g, '')"), 'Auto Gambler should strip ANSI formatting codes before matching');
-assert(autoGamblerNormalizeBlock.includes("replace(/(?:\\u00C2?\\u00A7|\\\\u00a7|\\\\u00A7|&)[0-9A-FK-OR]/gi, '')"), 'Auto Gambler should strip Minecraft formatting codes before matching');
-assert(autoGamblerNormalizeBlock.includes("replace(/[\\u200B-\\u200D\\uFEFF]/g, '')"), 'Auto Gambler should strip zero-width characters before matching');
-assert(/function isAutoGamblerTriggerText\(\.\.\.texts\) \{[\s\S]*flattenAutoGamblerChatPayload\(text\)[\s\S]*AUTOGAMBLER_TRIGGER_PATTERN\.test\(normalized\)[\s\S]*compactAutoGamblerChatText\(normalized\)\.includes\(AUTOGAMBLER_TRIGGER_SIGNATURE\)/.test(autoGamblerModule), 'Auto Gambler should trigger when the prompt appears in any flattened chat text variant');
-assert(!proxy.includes('AUTOGAMBLER_PLAYER_PROMPT_PATTERN'), 'Auto Gambler should no longer require a special player-chat prefix pattern');
-assert(/class AutoGamblerSession[\s\S]*this\.lastTriggerAt = 0;/.test(autoGamblerModule), 'Auto Gambler should dedupe duplicate packet/event observations inside its session module');
-assert(/createAutoGamblerSession\(\{[\s\S]*isEnabled: \(\) => autoGamblerEnabled[\s\S]*sendCommand: \(command\) => void sendHypixelCommand\(command, \{[\s\S]*dedupeKey: `auto-gambler:/.test(proxy), 'Proxy should route Auto Gambler commands through the Hypixel command queue');
-assert(/maybeSchedule\(\.\.\.texts\) \{[\s\S]*!isAutoGamblerTriggerText\(\.\.\.texts\)[\s\S]*now - this\.lastTriggerAt < this\.dedupeMs[\s\S]*this\.sendCommand\(AUTOGAMBLER_COMMAND\)/.test(autoGamblerModule), 'Auto Gambler should send /wanttobet true only after the accepted trigger matcher passes');
-assert(autoGamblerModule.includes("this.sendChat('\\u00a76\\u00a7lFury \\u00a78\\u00bb \\u00a7aQuest accepted!')"), 'Auto Gambler should confirm an accepted quest in-game');
-assert(/observeChatEvent\(packet = \{\}\) \{[\s\S]*packet\.plainMessage[\s\S]*packet\.formattedMessage[\s\S]*packet\.unsignedContent/.test(autoGamblerModule), 'Auto Gambler should inspect high-level protocol chat events');
-assert(/hypixelClient\.on\('playerChat', packet => autoGamblerSession\.observeChatEvent\(packet\)\);[\s\S]*hypixelClient\.on\('systemChat', packet => autoGamblerSession\.observeChatEvent\(packet\)\);/.test(proxy), 'Auto Gambler should listen to high-level player/system chat events');
-assert(/observeRawChatPacket\(data = \{\}, meta = \{\}\) \{[\s\S]*AUTOGAMBLER_RAW_CHAT_PACKET_NAMES\.has\(meta\.name\)[\s\S]*data\.plainMessage[\s\S]*data\.content/.test(autoGamblerModule), 'Auto Gambler should inspect modern raw chat packet fields');
-assert(/autoGamblerSession\.observeRawChatPacket\(data, meta\)/.test(proxy), 'Auto Gambler should be called from the raw server packet stream');
-assert(/autoGamblerSession\.maybeSchedule\(text, formattedText, message, data\.message\)/.test(proxy), 'Auto Gambler should inspect plain, formatted, parsed, and raw chat packet text');
-assert(/autoGamblerSession\.clearTimers\(\)/.test(proxy), 'Proxy should clear pending Auto Gambler timers during disconnect cleanup');
-assert(!proxy.includes('function flattenAutoGamblerChatPayload'), 'Auto Gambler chat flattening should live in the feature module');
-assert(!proxy.includes('class AutoGamblerSession'), 'Auto Gambler session state should live in the feature module');
+assert(!launcherHtml.includes('auto-gambler-enabled'), 'Retired Auto Gambler has no launcher control');
+assert(!proxy.includes('createAutoGamblerSession'), 'Retired automation has no runtime packet hooks');
+assert(proxy.includes('createGamblerGeorgeReminder'), 'George reminder remains available');
 assert(proxy.includes("require('./features/minecraft_chat.js')"), 'Proxy should import shared Minecraft chat utilities');
 assert(/function stripAnsi\(text\) \{[\s\S]*replace\(\/\\x1B\\\[\[0-\?\]\*\[ -\/\]\*\[@-~\]\/g, ''\)[\s\S]*replace\(\/\(\?:\\u00C2\?\\u00A7\|\\\\u00a7\|\\\\u00A7\)\[0-9A-FK-OR\]\/gi, ''\)/.test(minecraftChatModule), 'Shared stripAnsi should remove ANSI and Minecraft formatting codes');
 assert(/function extractText\(jsonMsg\)[\s\S]*component\.with[\s\S]*component\.extra[\s\S]*stripAnsi\(read\(jsonMsg\)\)/.test(minecraftChatModule), 'Minecraft chat utility module should flatten visible JSON chat text');
@@ -264,6 +228,5 @@ assert(!proxy.includes('function sendChat'), 'Minecraft chat sending should not 
 assert(!proxy.includes('showClickableChatInfo'), 'Proxy should not display clickable-message debug info in chat');
 assert(!proxy.includes('collectClickableChatEvents'), 'Proxy should not scan clickable chat events for debug display');
 assert(!proxy.includes('buildClickableChatInfoComponent'), 'Proxy should not build clickable debug chat components');
-assert(/else if \(cmd === '\/autogambler'\) \{[\s\S]*handleAutoGamblerCommand\(client, args, \{/.test(proxy), '/autogambler command should be handled locally by the proxy');
 
 console.log('command surface/static UI checks passed');

@@ -92,5 +92,21 @@ function namesFrom(messages) {
         assert.deepStrictEqual(namesFrom(messages), ['Kept'], 'grouped mode ignores onRow events');
     }
 
+    // A failed lookup neither sends a fake zero nor consumes the player's
+    // dedup slot; a successful result arriving later may still be shared.
+    for (const gameMode of ['BEDWARS', 'SKYWARS']) {
+        const messages = [];
+        const b = makeBroadcaster(baseState(), messages);
+        const stream = b.createStream({}, { gameMode, includeSet: ['threats'] });
+        const failed = { ...threat('RetryPlayer', 'GREEN', 0), gameMode, kdr: 0, lookupFailed: true };
+        stream.onTeam('GREEN', [failed]);
+        assert.deepStrictEqual(messages, [], 'Failed lookups never enter the outgoing queue');
+        stream.onTeam('GREEN', [{ ...failed, lookupFailed: false, fkdr: 5, kdr: 5 }]);
+        await stream.end();
+        assert.equal(messages.length, 1, 'A later successful threat is shared once');
+        assert(messages[0].includes('RetryPlayer') && messages[0].includes('5.00'));
+        assert(!messages[0].includes('0.00'));
+    }
+
     console.log('test_share_stream.js passed');
 })().catch(err => { console.error(err); process.exit(1); });

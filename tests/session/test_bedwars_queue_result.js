@@ -23,6 +23,8 @@ function checkScoreboardTransitions(proxy) {
         pregameLobbyIdForScoreboard, requeueCommandForScoreboard,
         lookingForTriggers: { isLobbyChange: () => false },
         autoDodger: { noteScoreboard() {} }, updateDuelsStateFromScoreboard: () => false,
+        queuePartyCoordinationUpdate() {},
+        syncBedwarsGeneratorClock() {},
         notePrivateSessionGame() {}, detectGamemodeFromText: () => 'BEDWARS',
         setCurrentGamemode: mode => { context.currentGamemode = mode; },
         detectLobbyFromScoreboard: () => null, updateLobbyStateFromScoreboard: () => false,

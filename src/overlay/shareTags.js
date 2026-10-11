@@ -316,8 +316,8 @@ function prestigeText(row = {}, gameMode = 'BEDWARS') {
     return `[${Math.round(stars)}✫]`;
 }
 
-function playerIdentity(row = {}, gameMode = 'BEDWARS') {
-    const prestige = prestigeText(row, gameMode);
+function playerIdentity(row = {}, gameMode = 'BEDWARS', includePrestige = true) {
+    const prestige = includePrestige ? prestigeText(row, gameMode) : '';
     const cleanName = cleanText(row.name || 'Unknown');
     return `${prestige ? `${prestige} ` : ''}${cleanName} ✔`;
 }
@@ -346,7 +346,7 @@ function formatTagDescriptor(row = {}) {
     return labels;
 }
 
-// fancy=false (default): plain lines with no star level or icon glyphs.
+// Compact threat lines include stars when stars contributed to the threat.
 // fancy=true: star level + checkmark + pipe separators, launcher-selectable.
 function formatLine(row, gameMode, includeSet, fancy = false) {
     const teamLabel = gameMode === 'SKYWARS' ? 'SOLO' : normalizeTeamLabel(row.team);
@@ -366,9 +366,11 @@ function formatLine(row, gameMode, includeSet, fancy = false) {
             ? `[${teamLabel}] ${playerIdentity({ ...row, name: displayName }, gameMode)} | ${statTextWithMonthly(row, gameMode, true)} | ${formatTagDescriptor(row)}`
             : `[${teamLabel}] ${displayName}: ${statTextWithMonthly(row, gameMode)} - ${formatTagDescriptor(row)}`;
     } else if (kind === 'threats') {
+        const includePrestige = gameMode !== 'BEDWARS' || row.starThreat === true;
+        const prestige = gameMode === 'BEDWARS' && includePrestige ? prestigeText(row, gameMode) : '';
         line = fancy
-            ? `[${teamLabel}] ${playerIdentity({ ...row, name: displayName }, gameMode)} | ${statTextWithMonthly(row, gameMode, true)}`
-            : `[${teamLabel}] ${displayName}: ${statTextWithMonthly(row, gameMode)}`;
+            ? `[${teamLabel}] ${playerIdentity({ ...row, name: displayName }, gameMode, includePrestige)} | ${statTextWithMonthly(row, gameMode, true)}`
+            : `[${teamLabel}] ${prestige ? `${prestige} ` : ''}${displayName}: ${statTextWithMonthly(row, gameMode)}`;
     } else {
         line = `[${teamLabel}] ${displayName}`;
     }
@@ -450,8 +452,8 @@ function nameSegments(displayName, row, nameColor = 'white') {
 }
 
 // Fancy identity: prestige + name + checkmark, matching playerIdentity().
-function identitySegments(row, displayName, gameMode, nameColor) {
-    const prestige = prestigeText(row, gameMode);
+function identitySegments(row, displayName, gameMode, nameColor, includePrestige = true) {
+    const prestige = includePrestige ? prestigeText(row, gameMode) : '';
     const nodes = [];
     if (prestige) nodes.push(seg(`${prestige} `, 'gold'));
     nodes.push(...nameSegments(cleanText(displayName), row, nameColor));
@@ -544,10 +546,13 @@ function formatLineComponent(row, gameMode, includeSet, fancy = false) {
             extra.push(seg(': ', 'gray'), ...statSegments(row, gameMode, fancy), seg(' - ', 'dark_gray'), ...tagDescriptorSegments(row));
         }
     } else if (kind === 'threats') {
+        const includePrestige = gameMode !== 'BEDWARS' || row.starThreat === true;
         if (fancy) {
-            extra.push(...identitySegments(row, displayName, gameMode, nameColor));
+            extra.push(...identitySegments(row, displayName, gameMode, nameColor, includePrestige));
             extra.push(seg(' | ', 'dark_gray'), ...statSegments(row, gameMode, fancy));
         } else {
+            const prestige = gameMode === 'BEDWARS' && includePrestige ? prestigeText(row, gameMode) : '';
+            if (prestige) extra.push(seg(`${prestige} `, 'gold'));
             extra.push(...nameSegments(displayName, row, nameColor));
             extra.push(seg(': ', 'gray'), ...statSegments(row, gameMode, fancy));
         }
@@ -633,6 +638,16 @@ const PREVIEW_ROWS = [
         note: 'Stat threat with monthly FKDR',
         gameMode: 'BEDWARS',
         row: { name: 'Grinder99', team: 'RED', isThreat: true, stars: 180, fkdr: 4.2, monthlyFkdr: 3.8 }
+    },
+    {
+        note: 'Stat threat (stars only)',
+        gameMode: 'BEDWARS',
+        row: { name: 'StarGrinder', team: 'BLUE', isThreat: true, starThreat: true, stars: 1200, fkdr: 1.2 }
+    },
+    {
+        note: 'Stat threat (stars and FKDR)',
+        gameMode: 'BEDWARS',
+        row: { name: 'StarSweat', team: 'GREEN', isThreat: true, starThreat: true, stars: 1500, fkdr: 6.7 }
     },
     {
         note: 'SkyWars stat threat (KDR)',
@@ -721,7 +736,9 @@ function createShareTagsBroadcaster(deps) {
     }
 
     function isEligible(row, includeSet) {
-        if (!row) return false;
+        // Lookup failures stay visible in /scan, but are not confirmed threats.
+        // Reject before streaming dedup so a later successful row can be shared.
+        if (!row || row.lookupFailed) return false;
         const localName = String(getLocalUsername() || '').toLowerCase();
         if (localName && String(row.name || '').toLowerCase() === localName) return false;
         // Never call out our own party members, on whichever team they landed:

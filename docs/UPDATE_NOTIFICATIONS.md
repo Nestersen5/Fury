@@ -1,5 +1,46 @@
 # Fury update notifications
 
+## Release experience added for 1.1.2
+
+The launcher now opens an internal **What's new** dialog from the update
+notification. It has New features, Improvements and Bug fixes sections,
+filtered to releases newer than the installed version and no newer than the
+offered version. Empty sections are omitted. The sidebar button reopens the
+dialog; collapsed sidebars show its outlined document icon with a tooltip and
+accessible label. Native dialog behavior provides focus containment and Escape.
+
+Both update-available and first-launch welcome notices provide **See what's
+new** and **Don't show again**. Either action acknowledges that release.
+Main persists the last launched version, the upgrade baseline and up to 50
+acknowledged versions in `launcher_data/release-notifications.json`, using
+atomic writes and the launcher shutdown persistence drain. Acknowledging an
+available release also suppresses its welcome after installation. Later versions
+can still notify. Closing a toast with its X only dismisses it for the session.
+Fresh installs show release highlights; subsequent upgrades show changes since
+the recorded previous version. Older Fury builds did not record that version,
+so the first launch of 1.1.2 cannot infer it and shows release highlights.
+
+`src/updates/releaseNotes.json` is the authoritative plain-text changelog and
+is explicitly packaged. Current release notes work offline. Unknown future
+release notes are loaded on demand from the fixed same-origin
+`/release-notes.json` endpoint, with a 64 KiB limit, 3-second timeout, no redirects
+and validated versions, sections and text. Failure retains bundled notes and
+the official download action. The original schema-1 `latest.json` contract and
+8 KiB manifest limit remain unchanged for compatibility with installed clients.
+
+The download website provides a matching changelog with a **Your version**
+selector for older clients whose update action opens the website. The site
+filters notes against its published download version, so unreleased notes are
+not presented as available. Publication staging copies the authoritative notes
+into `release-notes.json`; the checked-in website copy supports local previews.
+Update that copy when editing release notes. The site and new release still
+require the normal release workflow; implementing this feature publishes nothing.
+
+Run `node tests/release/test_release_experience.js` for persistence and filtering
+checks and `npm run test:updates` for the real Electron interaction suite.
+The historical description below documents the original notification service;
+its old single-button UI and session-only dismissal are superseded by this section.
+
 Fury tells a player that a newer public release exists and offers to open the
 official download page. It is not an updater. Fury never downloads, installs,
 replaces, restarts into or executes a release on the player's behalf, and the

@@ -17,13 +17,6 @@ const {
     compactOverlayTags,
     buildOverlayTagComponents
 } = require('./src/overlay/chat_overlay_annotation.js');
-const {
-    AUTOGAMBLER_TRIGGER_MESSAGE,
-    AUTOGAMBLER_COMMAND,
-    normalizeAutoGamblerToggle,
-    createAutoGamblerSession,
-    shouldHideAutoGamblerDialogue
-} = require('./features/auto_gambler.js');
 const { createQuickMathsSession } = require('./features/quick_maths.js');
 const { createEnderDustReminder } = require('./features/ender_dust_reminder.js');
 const { createReminderAccountStore } = require('./src/reminders/rememberedAccount');
@@ -161,6 +154,8 @@ const { createOwnIdentityTracker } = require('./src/net/session/ownIdentity.js')
 const { createProxyStatus } = require('./src/net/proxyStatus.js');
 const { createPartyTracker, isWithinReconnectGrace } = require('./src/net/session/partyTracking.js');
 const { createPartyArrivalCheck } = require('./src/party/arrivalCheck.js');
+const { createPartyCoordination } = require('./src/party/coordinationClient.js');
+const { networkKey: partyCoordinationNetworkKey } = require('./src/party/coordinationProtocol.js');
 const { createQueueTimeTracker } = require('./src/session/queueTime.js');
 const { classifyPartyOverview } = require('./src/party/overview.js');
 const { createEntityTracker } = require('./src/net/session/entityTracking.js');
@@ -227,6 +222,11 @@ const { createSessionTracker, gameForMode } = require('./src/session/sessionTrac
 const { createRecapDelivery } = require('./src/session/gameRecap.js');
 const { createBedwarsStatsDebug } = require('./src/session/bedwarsStatsDebug.js');
 const {
+    getBedwarsGeneratorStats,
+    appendGeneratorRowToFooter
+} = require('./src/session/bedwarsGeneratorSchedule.js');
+const { normalizeBedwarsTabSettings } = require('./src/session/bedwarsTabSettings.js');
+const {
     SESSION_BOUNDARY_MINUTES,
     SESSION_RETENTION_CHOICES,
     SESSION_RECAP_STYLES,
@@ -278,10 +278,8 @@ let lastMatchSnapshot = null;
 // /anticheat (alias /scafdetect) and the launcher share saved controls.
 let anticheatEnabled = true;
 let anticheatScaffoldEnabled = true;
-let anticheatAutoblockEnabled = false;
-let anticheatStasisEnabled = false;
-let anticheatPossibleAlertsEnabled = true;
 let anticheatTeamAlertsEnabled = false;
+let anticheatPartyBroadcastEnabled = true;
 const { notifyUrchinOutageOnce, resetOutageWarning: resetUrchinOutageWarning } = createUrchinOutageNotifier({
     getActiveUser: () => activeUser,
     sendChat
@@ -551,6 +549,7 @@ let nametagStarBracketsEnabled = true;
 let nametagTagDisplayMode = 'acronyms';
 let proxyHealthWarningsEnabled = true;
 let tabStatsBedwarsMode = 'auto';
+let bedwarsTabSettings = normalizeBedwarsTabSettings();
 let tabStatsSkywarsMode = 'auto';
 let tabStatsShowKillRatio = true;
 let tabStatsShowWinRatio = true;
@@ -881,10 +880,8 @@ function loadFeatureConfig(options = {}) {
     setChatPrefixAccent(features.chatPrefixAccentHex);
     anticheatEnabled = features.anticheatEnabled !== false;
     anticheatScaffoldEnabled = features.anticheatScaffoldEnabled !== false;
-    anticheatAutoblockEnabled = features.anticheatAutoblockEnabled === true;
-    anticheatStasisEnabled = features.anticheatStasisEnabled === true;
-    anticheatPossibleAlertsEnabled = features.anticheatPossibleAlertsEnabled !== false;
     anticheatTeamAlertsEnabled = features.anticheatTeamAlertsEnabled === true;
+    anticheatPartyBroadcastEnabled = features.anticheatPartyBroadcastEnabled !== false;
     tabStatsEnabled = features.tabStatsEnabled;
     autoScanOnGameStart = true;
     autoGamblerEnabled = features.autoGamblerEnabled;
@@ -936,6 +933,7 @@ function loadFeatureConfig(options = {}) {
     state.friendAliasShowRealIgn = features.friendAliasShowRealIgn;
     state.sessionTrackingEnabled = features.sessionTrackingEnabled;
     state.gameRecapEnabled = features.gameRecapEnabled;
+    state.sessionAverageGameTimeEnabled = features.sessionAverageGameTimeEnabled;
     state.replayDetailsEnabled = features.replayDetailsEnabled;
     state.sessionBoundaryMinutes = features.sessionBoundaryMinutes;
     state.sessionRetention = features.sessionRetention;
@@ -957,6 +955,7 @@ function loadFeatureConfig(options = {}) {
     state.shareTagsDestination = features.shareTagsDestination || 'party';
     state.shareTagsGroupByTeam = true;
     tabStatsBedwarsMode = features.tabStatsBedwarsMode || 'auto';
+    bedwarsTabSettings = normalizeBedwarsTabSettings(features);
     tabStatsSkywarsMode = features.tabStatsSkywarsMode || 'auto';
     tabStatsShowKillRatio = features.tabStatsShowKillRatio !== undefined ? features.tabStatsShowKillRatio : true;
     tabStatsShowWinRatio = features.tabStatsShowWinRatio !== undefined ? features.tabStatsShowWinRatio : true;
@@ -980,7 +979,6 @@ function loadFeatureConfig(options = {}) {
     nametagOthersSuffix = normalizeNametagStat(features.nametagOthersSuffix, 'kdr');
     nametagOthersSuffixFallback = normalizeNametagStat(features.nametagOthersSuffixFallback, 'none');
     console.log(`[FEATURES] Tab stats loaded: ${tabStatsEnabled ? 'ON' : 'OFF'}`);
-    console.log(`[FEATURES] Auto gambler loaded: ${autoGamblerEnabled ? 'ON' : 'OFF'}`);
 }
 
 function currentFeatureConfigSnapshot() {
@@ -988,10 +986,11 @@ function currentFeatureConfigSnapshot() {
         chatPrefixAccentHex: getChatPrefixAccent()?.sourceHex || '#e5b35d',
         anticheatEnabled,
         anticheatScaffoldEnabled,
-        anticheatAutoblockEnabled,
-        anticheatStasisEnabled,
-        anticheatPossibleAlertsEnabled,
+        anticheatAutoblockEnabled: false,
+        anticheatStasisEnabled: false,
+        anticheatPossibleAlertsEnabled: true,
         anticheatTeamAlertsEnabled,
+        anticheatPartyBroadcastEnabled,
         tabStatsEnabled,
         autoScanOnGameStart,
         autoGamblerEnabled,
@@ -1064,6 +1063,7 @@ function currentFeatureConfigSnapshot() {
         shareTagsDestination: state.shareTagsDestination,
         shareTagsGroupByTeam: state.shareTagsGroupByTeam,
         tabStatsBedwarsMode,
+        ...bedwarsTabSettings,
         tabStatsSkywarsMode,
         tabStatsShowKillRatio,
         tabStatsShowWinRatio,
@@ -1106,6 +1106,7 @@ const handleApiKillSwitchCommand = createApiKillSwitchCommandHandler({
     getEnabled: () => state.apiKillSwitchEnabled,
     setEnabled: (enabled) => {
         state.apiKillSwitchEnabled = Boolean(enabled);
+        activeUser?.refreshPartyCoordination?.();
         saveFeatureConfig();
     }
 });
@@ -1510,6 +1511,7 @@ const healthServer = createHealthServer({
         shareTagsDestination: state.shareTagsDestination,
         shareTagsGroupByTeam: state.shareTagsGroupByTeam,
         tabStatsBedwarsMode,
+        ...bedwarsTabSettings,
         tabStatsSkywarsMode,
         tabStatsShowKillRatio,
         tabStatsShowWinRatio,
@@ -1665,50 +1667,6 @@ serverConfigs.forEach(config => {
     createProxyServer(config.port, config.host, config.name, config);
 });
  
-function renderAutoGamblerController(client, context = {}) {
-    const pending = Math.max(0, Number(context.pendingCommandCount || 0));
-    const panel = createFeatureStatus({
-        client, sendChat, title: 'Auto Gambler', subtitle: 'AUTOMATION',
-        section: 'system', helpTopic: 'autogambler'
-    });
-
-    panel.open();
-    panel.section('Overview');
-    panel.toggleRow('Power', autoGamblerEnabled, '/autogambler on', '/autogambler off',
-        `Watch for "${AUTOGAMBLER_TRIGGER_MESSAGE}" and accept automatically.`);
-    panel.valueRow('Pending', pending > 0 ? `${pending} command${pending === 1 ? '' : 's'}` : 'none', {
-        color: pending > 0 ? panel.colors.value : panel.colors.quiet
-    });
-    panel.section('Rule');
-    panel.valueRow('When seen', AUTOGAMBLER_TRIGGER_MESSAGE, { color: 'white' });
-    panel.valueRow('Send', AUTOGAMBLER_COMMAND, { color: 'white' });
-    panel.close();
-}
-
-function handleAutoGamblerCommand(client, args, context = {}) {
-    const mode = normalizeAutoGamblerToggle(args[1]);
-    const subCmd = String(args[1] || 'status').toLowerCase();
-    const render = () => renderAutoGamblerController(client, {
-        pendingCommandCount: typeof context.getPendingCommandCount === 'function' ? context.getPendingCommandCount() : 0
-    });
-    if (mode === 'on') {
-        autoGamblerEnabled = true;
-        saveFeatureConfig();
-        render();
-        return;
-    }
-    if (mode === 'false') {
-        autoGamblerEnabled = false;
-        saveFeatureConfig();
-        render();
-        return;
-    }
-    if (subCmd === 'info') {
-        sendChat(client, `\u00a76[AutoGambler] \u00a77When enabled, the proxy sends \u00a7e${AUTOGAMBLER_COMMAND}\u00a77 after detecting the exact chat prompt.`);
-    }
-    render();
-}
-
 function handleChatTriggerCommand(client, args) {
     chatTriggerManager.handleCommand(client, args, sendChat);
 }
@@ -1998,6 +1956,11 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         let ownIdentity = null; // initialized below once nickKey/isValidPlayerName/normalizeUuid are reachable
         let myTeam = null;
         let gameStartTime = null;
+        let originalTabFooterPacket = null;
+        let lastGeneratorFooterSignature = '';
+        let generatorFooterRefreshTimer = null;
+        let generatorSidebarElapsedMs = null;
+        let generatorClockFallbackStartAt = null;
         let activeSessionGameEvents = [];
         let sessionGameFinalized = false;
         let activeSessionGameMetadata = null;
@@ -2015,6 +1978,9 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         // opponent IGNs. sessionId bumps on every enter/leave so stale async
         // scans self-cancel.
         let duelsState = { active: false, modeDef: null, modeName: '', opponents: [], sessionId: 0 };
+        // Bed Wars Duels can use a plain BED WARS sidebar. Keep the confirmed
+        // classification through partial packets and the post-game sidebar.
+        let bedwarsDuelConfirmed = false;
         let duelsAutoScanTimer = null;
         // Active live /share streaming sink, if a scan is currently feeding one.
         let activeShareStream = null;
@@ -2962,6 +2928,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 tabStatsEnabled = false;
                 saveFeatureConfig();
                 clearAllTabStatsDisplays({ restoreOriginalTeams: gameActive && currentGamemode === 'BEDWARS' });
+                refreshBedwarsGeneratorFooter();
                 renderTabStatsController();
                 return true;
             }
@@ -3002,7 +2969,10 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 else tabStatsSkywarsMode = value;
                 saveFeatureConfig();
                 if (isTabStatsActiveInGame()) refreshTabStatsImmediately();
-                else clearAllTabStatsDisplays({ restoreOriginalTeams: gameActive && currentGamemode === 'BEDWARS' });
+                else {
+                    clearAllTabStatsDisplays({ restoreOriginalTeams: gameActive && currentGamemode === 'BEDWARS' });
+                    refreshBedwarsGeneratorFooter();
+                }
                 renderTabStatsController();
                 return true;
             }
@@ -3224,6 +3194,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         enderDustReminder.start();
 
         const partyTracker = createPartyTracker({
+            onUpdate: () => queuePartyCoordinationUpdate(),
             stripFormatting: (text) => stripAnsi(text),
             getSelfName: () => client.username,
             requestPartyListCommand: () => {
@@ -3253,8 +3224,14 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         });
         const partyArrivalTabNames = new Map();
         let partyArrivalWorldStartedAt = Date.now();
+        let partyCoordination = null;
+        let partyCoordinationUpdateQueued = false;
+        let partyCoordinationWorld = 0;
+        let partyCoordinationWorldServerId = null;
         const partyArrivalCheck = createPartyArrivalCheck({
             enabled: partySplitWarningsEnabled,
+            getCoordination: name => partyCoordination?.evidence(name),
+            hasCoordination: () => partyCoordination?.getStatus() === 'connected',
             getVisibleNames: () => {
                 if (!bedwarsPregameActive || gameActive) return [];
                 const names = new Set();
@@ -3272,6 +3249,43 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             sendChat: message => sendChat(client, message),
             playSound: playSelfSound
         });
+        partyCoordination = createPartyCoordination({
+            network: partyCoordinationNetworkKey(targetHost, targetPort),
+            getSession: () => activeUser?.client === client && activeUser.upstreamReady
+                ? hypixelClient.session : null,
+            onChange: () => partyArrivalCheck.refresh()
+        });
+        function queuePartyCoordinationUpdate() {
+            if (partyCoordinationUpdateQueued || connectionTimersCleared) return;
+            partyCoordinationUpdateQueued = true;
+            queueMicrotask(() => {
+                partyCoordinationUpdateQueued = false;
+                if (connectionTimersCleared || !partyCoordination) return;
+                const members = partyTracker.hasUsableState() && partyTracker.isInParty()
+                    ? getConfirmedPartyMemberNames() : [];
+                const freshPregame = bedwarsPregameActive && !gameActive
+                    && bedwarsPregameLobbyId && partyCoordinationWorldServerId === bedwarsPregameLobbyId;
+                partyCoordination.update({
+                    enabled: partySplitWarningsEnabled && !state.apiKillSwitchEnabled,
+                    leader: partyTracker.getLeaderName(), members: members || [],
+                    phase: freshPregame ? 'pregame' : bedwarsPregameActive && !gameActive ? 'transfer' : 'other',
+                    serverId: freshPregame ? bedwarsPregameLobbyId : null,
+                    generation: `${partyCoordinationWorld}:${bedwarsPregameSessionId}`
+                });
+            });
+        }
+        function notePartyCoordinationServerId(text) {
+            // Only a server-ID-bearing packet received in this world can
+            // release the transfer gate; a lingering old sidebar cannot.
+            if (!/\d{1,2}\/\d{1,2}\/\d{2,4}/.test(text || '')) return;
+            const id = pregameLobbyIdForScoreboard(text);
+            if (id && id !== partyCoordinationWorldServerId) {
+                partyCoordinationWorldServerId = id;
+                queuePartyCoordinationUpdate();
+            }
+        }
+        hypixelClient.once('login', queuePartyCoordinationUpdate);
+        activeUser.refreshPartyCoordination = queuePartyCoordinationUpdate;
         // Isolated synthetic roster, using the exact same arrival/timer/output path.
         const partyArrivalPreview = createPartyArrivalCheck({
             getMembers: () => ['MissingMate1', 'MissingMate2'],
@@ -3306,6 +3320,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 partySplitWarningsEnabled = sub === 'on';
                 saveFeatureConfig();
                 partyArrivalCheck.setEnabled(partySplitWarningsEnabled);
+                queuePartyCoordinationUpdate();
                 if (!partySplitWarningsEnabled) partyArrivalPreview.stop();
                 sendChat(client, partySplitWarningsEnabled
                     ? '\u00a7aParty split warnings enabled. \u00a77Preference saved.'
@@ -3316,6 +3331,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 const panel = createFeatureStatus({ client, sendChat, title: 'Party split warnings', section: 'safety' });
                 panel.open();
                 panel.toggleRow('Warnings', partySplitWarningsEnabled, '/partycheck on', '/partycheck off', 'Save your warning preference.');
+                panel.valueRow('Coordination', partyCoordination.getStatus());
                 panel.row([
                     ...panel.action('Dismiss lobby', '/partycheck dismiss', 'Dismiss warnings for this lobby.', { locked: !bedwarsPregameActive || gameActive }),
                     chatController.text(' '), ...panel.action('Test', '/partycheck test', 'Preview missing teammates.', { locked: !bedwarsPregameActive || gameActive }),
@@ -4407,6 +4423,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                     renderGameRecap(client, recap, {
                         style: state.sessionRecapStyle,
                         fields: state.sessionRecapFields,
+                        averageGameTimeEnabled: state.sessionAverageGameTimeEnabled,
                         goals: { wins: state.sessionGoalWins, finals: state.sessionGoalFinals,
                             games: state.sessionGoalGames, minutes: state.sessionGoalMinutes }
                     });
@@ -5047,6 +5064,21 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             // /session history            -> list of past sessions
             // /session history 3          -> full card for the 3rd newest
             // /session history 3 bw solo  -> that session, narrowed to a mode
+            if (sub === 'games') {
+                const uuid = normalizeUuid(client.uuid);
+                if (!uuid) return;
+                const sessionId = String(args[3] || '');
+                const session = sessionId
+                    ? sessionStore.getSessions(uuid).find(entry => entry.id === sessionId)
+                    : sessionTracker.getActiveSession();
+                if (!session || session.uuid !== uuid) {
+                    sendChat(client, '§8[§bSession§8] §7No session found. §f/session history§7 lists saved sessions.');
+                    return;
+                }
+                renderSessionGames(client, session, { page: args[2] });
+                return;
+            }
+
             if (sub === 'history' || sub === 'past' || sub === 'log') {
                 await sessionTracker.ensureSession();
                 const entries = sessionTracker.getHistory();
@@ -5059,6 +5091,10 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 const entry = entries[Math.max(1, Math.round(position)) - 1];
                 if (!entry) {
                     sendChat(client, `§8[§bSession§8] §cNo session §f#${args[2]}§c. §7/session history`);
+                    return;
+                }
+                if (String(args[3] || '').toLowerCase() === 'games') {
+                    renderSessionGames(client, entry.session, { page: args[4] });
                     return;
                 }
                 renderLocalSession(client, entry.delta, {
@@ -5119,6 +5155,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             }, {
                 style: state.sessionRecapStyle,
                 fields: state.sessionRecapFields,
+                averageGameTimeEnabled: state.sessionAverageGameTimeEnabled,
                 goals: {
                     wins: state.sessionGoalWins,
                     finals: state.sessionGoalFinals,
@@ -5152,16 +5189,6 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                         isOn: () => autoDodgeEnabled,
                         hint: () => (autoDodgeEnabled ? `${autoDodgeDelaySeconds}s delay` : ''),
                         onCommand: '/dodge on', offCommand: '/dodge off', openCommand: '/dodge'
-                    },
-                    {
-                        key: 'gambler', tab: 'guard', label: 'Auto Gambler', short: 'gambler',
-                        doc: ['Auto-replies to the exact Hypixel', 'gambler chat prompt.'],
-                        isOn: () => autoGamblerEnabled,
-                        hint: () => {
-                            const pending = autoGamblerSession?.timers?.size || 0;
-                            return autoGamblerEnabled ? (pending > 0 ? `${pending} pending` : 'armed') : '';
-                        },
-                        onCommand: '/autogambler on', offCommand: '/autogambler off', openCommand: '/autogambler'
                     },
                     {
                         key: 'tabstats', tab: 'intel', label: 'Tab Stats', short: 'tab',
@@ -5278,17 +5305,35 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         });
 
         const { createScaffoldDetector } = require('./src/detect/scaffoldDetector.js');
-        const { createAutoblockDetector } = require('./src/detect/autoblockDetector.js');
-        const { createStasisDetector } = require('./src/detect/stasisDetector.js');
-        const { packetToRecord } = require('./src/detect/detectorShared.js');
         const isAnticheatInGame = () => gameActive
             && (currentGamemode === 'BEDWARS' || currentGamemode === 'SKYWARS');
+        function broadcastScaffoldFlag({ cheat, name, tier }) {
+            if (!anticheatPartyBroadcastEnabled || cheat !== 'Scaffold' || !isAnticheatInGame() || inReplayViewer
+                || !partyTracker.isInParty() || !isValidPlayerName(name) || isOwnPlayerName(name)) return;
+            const realName = getAutoDenickResult(name)?.realName || findKnownDenickByNick(name)?.realIGN;
+            if (partyTracker.isTrackedMember(name)
+                || (realName && (isOwnPlayerName(realName) || partyTracker.isTrackedMember(realName)))) return;
+            if (currentGamemode === 'BEDWARS') {
+                const ownTeam = clientBedwarsTeamName();
+                const actorTeam = resolveBedwarsTeamName(name);
+                // Unknown teams cannot safely be treated as opponents.
+                if (!ownTeam || !actorTeam || ownTeam === actorTeam || (realName && isSameTeamAsClient(realName))) return;
+            }
+            const identity = isValidPlayerName(realName) && realName.toLowerCase() !== name.toLowerCase()
+                ? `${name} (${realName})` : name;
+            const message = `[AC] ${identity} flagged Scaffold${tier === 'confirmed' ? ' (high confidence)' : ''}`;
+            void sendHypixelCommand(`/pc ${message}`, {
+                priority: 85,
+                dedupeKey: `anticheat-party:${name.toLowerCase()}:${tier}`,
+                dedupeMs: 5_000
+            });
+        }
         // One chat style for every detector: "[AC] Name » (Possibly) Cheat",
         // evidence in the hover, tagged by group, hard evidence in red.
         // Private, proxy-injected line - only this client sees it.
         function announceAnticheatFlag({ cheat, name, tier, evidence, weight }) {
+            broadcastScaffoldFlag({ cheat, name, tier });
             if (isOwnPlayerName(name)) return;
-            if (tier !== 'confirmed' && !anticheatPossibleAlertsEnabled) return;
             if (!anticheatTeamAlertsEnabled && currentGamemode === 'BEDWARS') {
                 const ownTeam = clientBedwarsTeamName();
                 const actorTeam = resolveBedwarsTeamName(name);
@@ -5342,25 +5387,8 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 })))
             })
         });
-        // Names come from the scaffold detector, which keeps tab/spawn name
-        // bookkeeping even while off (replay actors are named only once).
-        const autoblockDetector = createAutoblockDetector({
-            nameOf: (entityId) => scaffoldDetector.nameOf(entityId),
-            isEnabled: () => anticheatEnabled && anticheatAutoblockEnabled && (isAnticheatInGame() || inReplayViewer),
-            log: (line) => console.log(line),
-            onFlag: announceAnticheatFlag
-        });
-        // Live only: replays re-pace movement, which fakes freezes.
-        const stasisDetector = createStasisDetector({
-            nameOf: (entityId) => scaffoldDetector.nameOf(entityId),
-            isEnabled: () => anticheatEnabled && anticheatStasisEnabled && isAnticheatInGame() && !inReplayViewer,
-            log: (line) => console.log(line),
-            onFlag: announceAnticheatFlag
-        });
         function clearAnticheatDetectors() {
             scaffoldDetector.clear();
-            autoblockDetector.clear();
-            stasisDetector.clear();
         }
 
         // /menudebug: inventory-GUI packet monitor and driver. Tracks the
@@ -5370,7 +5398,10 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         // Recent Games (/replay) menu: append each game's tracked Victory/Defeat
         // (plus BedWars K/F/B, teammates and /clip moments) to its lore. Display-only; menuMonitor still sees Hypixel's items.
         const replayResults = require('./src/menu/replayResults.js').createReplayResultAnnotator({
-            getGames: () => sessionStore.getSessions().flatMap(session => session.games || []),
+            getGames: () => {
+                const uuid = normalizeUuid(client.uuid);
+                return uuid ? sessionStore.getSessions(uuid).flatMap(session => session.games || []) : [];
+            },
             getClipGames: () => clipStore.listGames(),
             resolvePlayer: resolveRankedPlayer,
             onMissingPlayers: names => lookupReplayTeammateRanks(names),
@@ -6025,6 +6056,8 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 });
             }
             if (variations.length) {
+                // Give a quiet, local cue before the clickable choices appear.
+                playSelfSound({ name: 'note.pling', volume: 0.65, pitch: 90 });
                 // One variation means the roster left exactly one way to
                 // assign the nicks - forced, but only as sound as the roster
                 // it was derived from, so say that rather than letting a lone
@@ -6539,7 +6572,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                     color: panel.colors.muted,
                     command: '/reminder george cooldown',
                     actionLabel: 'clear',
-                    hover: 'Drop the 24h post-loss cooldown and let Auto Gambler accept again.'
+                    hover: 'Drop the 24h post-loss cooldown for the George reminder.'
                 });
             }
 
@@ -6948,6 +6981,8 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         }
 
         function clearTrackedScoreboard() {
+            partyCoordinationWorldServerId = null;
+            queuePartyCoordinationUpdate();
             teamDebug.mark('scoreboard_reset', { gameSessionId, gameActive, currentGamemode });
             scoreboardLines.clear();
             scoreboardObjectiveTitles.clear();
@@ -6970,6 +7005,24 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             });
         }
 
+        function observeBedwarsDuelsIntro(text) {
+            const modeName = bedwarsDuelsIntroMode(text);
+            if (!modeName) return false;
+            if (gameActive && currentGamemode === 'BEDWARS') {
+                sessionTracker.excludeCurrentGame();
+                sessionGameFinalized = true;
+                bedwarsStatsDebug.discardCurrentGame();
+                resetMatchState({ clearPlayers: true, clearSnapshot: true });
+            }
+            if (bedwarsPregameActive) leaveBedwarsPregame({ preserveProfiles: false, reason: 'duel_start' });
+            bedwarsDuelConfirmed = true;
+            if (!duelsState.active) duelsState.sessionId += 1;
+            duelsState.active = true;
+            duelsState.modeName = modeName;
+            duelsState.modeDef = matchDuelsMode(modeName, DUELS_MODE_DEFS);
+            return true;
+        }
+
         function clearDuelsState(reason = 'clear') {
             finishLocalDuel();
             if (duelsAutoScanTimer) {
@@ -6987,12 +7040,24 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         function updateDuelsStateFromScoreboard() {
             const title = getCurrentScoreboardTitle();
             const lines = getScoreboardLineList();
+            const info = extractDuelsInfoFromScoreboard(lines);
+            const bedwarsDuelMode = bedwarsDuelsIntroMode(title) || bedwarsDuelsIntroMode(info.modeName);
+            if (bedwarsDuelMode) observeBedwarsDuelsIntro(bedwarsDuelMode);
+            const scoreboardText = `${title} ${lines.join(' ')}`;
+            if (bedwarsDuelConfirmed) {
+                const compactTitle = getCompactScoreboardText(title);
+                const newLobby = detectLobbyFromScoreboard(scoreboardText)
+                    || isBedwarsPregameScoreboard(scoreboardText);
+                const otherMode = compactTitle && !['BEDWARS', 'DUELS'].includes(compactTitle)
+                    && !/^BEDWARS(?:RUSH)?DUELS?$/.test(compactTitle);
+                if (newLobby || otherMode) bedwarsDuelConfirmed = false;
+                else if (!isDuelsScoreboard(title, lines)) return true;
+            }
             if (!isDuelsScoreboard(title, lines)) {
                 if (duelsState.active) clearDuelsState('left_duel');
                 return false;
             }
 
-            const info = extractDuelsInfoFromScoreboard(lines);
             const modeDef = info.modeName ? matchDuelsMode(info.modeName, DUELS_MODE_DEFS) : duelsState.modeDef;
             const enteringNew = !duelsState.active;
             const modeChanged = modeDef && duelsState.modeDef?.id !== modeDef.id;
@@ -7141,7 +7206,9 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             if (updateLobbyStateFromScoreboard(scoreboardText, lobbyMode)) return true;
             if (updateBedwarsPregameStateFromScoreboard(scoreboardText)) return true;
             noteActiveMatchServerId(scoreboardText);
-            return updateActiveGameStateFromScoreboard(scoreboardText, detectedMode);
+            const updated = updateActiveGameStateFromScoreboard(scoreboardText, detectedMode);
+            syncBedwarsGeneratorClock();
+            return updated;
         }
 
         // Keep the live game's server id up to date. Only while a game is
@@ -7267,6 +7334,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             bedwarsPregameLocalQueue = null;
             bedwarsPregameLocalUnsupported = false;
             if (wasActive) bedwarsPregameSessionId += 1;
+            queuePartyCoordinationUpdate();
             pregameChatLookupsInFlight.clear();
             clearManualOverlayPlayersBySource('pregame', 'BEDWARS', options.reason || 'pregame_end');
             if (!options.preserveProfiles) {
@@ -7340,6 +7408,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             partyArrivalCheck.enter();
             bedwarsPregameLobbyId = lobbyId || null;
             bedwarsPregameSessionId += 1;
+            queuePartyCoordinationUpdate();
             setCurrentGamemode('BEDWARS');
             // This is the first confirmed queue boundary. Starting here keeps
             // launcher/lobby idle time out of the session while including the
@@ -7381,6 +7450,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             if (/\b(dream|dreams|ultimate|voidless|castle|lucky|armed|rush|swap|underworld|private)\b/i.test(scoreboardText)) {
                 bedwarsPregameLocalUnsupported = true;
             }
+            queuePartyCoordinationUpdate();
             return true;
         }
 
@@ -8955,6 +9025,67 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             });
         }
 
+        function syncBedwarsGeneratorClock() {
+            // Follow the server's displayed whole-second clock. Private event
+            // modifiers are intentionally outside the fixed production schedule.
+            const elapsed = gameActive && currentGamemode === 'BEDWARS'
+                && !activeSessionGameMetadata?.privateGame
+                ? bedwarsElapsedFromSidebar(getScoreboardLineList()) : null;
+            if (elapsed === generatorSidebarElapsedMs) return;
+            if (elapsed !== null) generatorClockFallbackStartAt = Date.now() - elapsed;
+            else if (!gameActive || activeSessionGameMetadata?.privateGame) generatorClockFallbackStartAt = null;
+            generatorSidebarElapsedMs = elapsed;
+            refreshBedwarsGeneratorFooter();
+        }
+
+        function getBedwarsGeneratorElapsedMs() {
+            return generatorSidebarElapsedMs
+                ?? Math.max(0, Date.now() - (generatorClockFallbackStartAt ?? gameStartTime));
+        }
+
+        function isBedwarsTabFooterActive() {
+            return !proxyStopping && gameStartTime !== null && gameActive
+                && currentGamemode === 'BEDWARS' && !isProxyAutoThrottleActive()
+                && (bedwarsTabSettings.tabResourcesEnabled || bedwarsTabSettings.tabPhasesEnabled);
+        }
+
+        function refreshBedwarsGeneratorFooter(force = false) {
+            if (generatorFooterRefreshTimer) clearTimeout(generatorFooterRefreshTimer);
+            generatorFooterRefreshTimer = null;
+            if (!originalTabFooterPacket || client.state !== mc.states.PLAY) return false;
+            const shouldShow = isBedwarsTabFooterActive();
+            const elapsedMs = shouldShow ? getBedwarsGeneratorElapsedMs() : 0;
+            const packet = shouldShow
+                ? {
+                    ...originalTabFooterPacket,
+                    footer: appendGeneratorRowToFooter(
+                        originalTabFooterPacket.footer,
+                        getBedwarsGeneratorStats(elapsedMs),
+                        { settings: bedwarsTabSettings, elapsedMs }
+                    )
+                }
+                : originalTabFooterPacket;
+            if (shouldShow && generatorSidebarElapsedMs === null
+                && packet.footer !== originalTabFooterPacket.footer) {
+                queueBedwarsGeneratorFooterRefresh(1000 - elapsedMs % 1000);
+            }
+            const signature = JSON.stringify(packet);
+            if (!force && signature === lastGeneratorFooterSignature) return false;
+            client.write('playerlist_header', packet);
+            lastGeneratorFooterSignature = signature;
+            return true;
+        }
+
+        function queueBedwarsGeneratorFooterRefresh(delay) {
+            if (generatorFooterRefreshTimer) clearTimeout(generatorFooterRefreshTimer);
+            const sessionId = gameSessionId;
+            generatorFooterRefreshTimer = setTimeout(() => {
+                generatorFooterRefreshTimer = null;
+                if (sessionId !== gameSessionId) return;
+                refreshBedwarsGeneratorFooter();
+            }, delay);
+        }
+
         function saveCurrentMatchSnapshot(reason = 'update') {
             if (matchSnapshotTimer) clearTimeout(matchSnapshotTimer);
             matchSnapshotTimer = null;
@@ -9035,6 +9166,8 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 || null;
             myTeam = snapshot.myTeam || null;
             gameStartTime = snapshot.gameStartTime || Date.now();
+            generatorSidebarElapsedMs = null;
+            generatorClockFallbackStartAt = null;
             gameSessionId += 1;
             sessionGameFinalized = Boolean(snapshot.sessionGameFinalized);
             activeSessionGameEvents = Array.isArray(snapshot.sessionGameEvents)
@@ -9301,6 +9434,8 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 // id must never survive into this one's snapshots.
                 activeMatchServerId = pregameLobbyIdForScoreboard(getCurrentScoreboardText()) || null;
                 gameStartTime = Date.now();
+                generatorSidebarElapsedMs = null;
+                generatorClockFallbackStartAt = null;
                 gameSessionId += 1;
                 startSessionGameEventCapture(mode, { map: pregameMap });
                 if (startingNewGame) sessionTracker.onGameStart({
@@ -9333,6 +9468,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
 
             seedGameRoster();
             refreshTabStatsForRoster();
+            refreshBedwarsGeneratorFooter();
             refreshOverlayStatsForRoster();
             refreshNametagRosterStats();
             [1200, 3000].forEach(delay => {
@@ -9397,9 +9533,14 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 lastBedwarsGameSessionId = endingSessionId;
                 autoDenickGraceUntil = Date.now() + AUTO_DENICK_POST_GAME_GRACE_MS;
             }
+            if (generatorFooterRefreshTimer) clearTimeout(generatorFooterRefreshTimer);
+            generatorFooterRefreshTimer = null;
             gameActive = false;
             presentAtGameStart = false;
             gameStartTime = null;
+            generatorSidebarElapsedMs = null;
+            generatorClockFallbackStartAt = null;
+            refreshBedwarsGeneratorFooter();
             // The snapshot above already carries it; keeping it live would let
             // the finished game's id stamp the next one.
             activeMatchServerId = null;
@@ -9411,6 +9552,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             bedwarsPregameLobbyId = null;
             bedwarsPregameMap = null;
             bedwarsPregameSessionId += 1;
+            queuePartyCoordinationUpdate();
             pregameChatSeenPlayers.clear();
             pregameChatLookupsInFlight.clear();
             pregameChatLookupPromises.clear();
@@ -9630,10 +9772,14 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                     return;
                 }
 
+                // The registry groups all per-player teams of one color.
+                // Visibility and friendly-invisibility flags belong to the
+                // actual raw team, including on membership-only refreshes.
+                const playerTeamProperties = defaultTabSnapshot.teams.get(String(liveRawTeam || teamName || '')) || teamInfo;
                 const updates = {
                     activeScoreboardTeam: baseTeamName,
-                    friendlyFire: teamInfo.friendlyFire ?? 0,
-                    nameTagVisibility: teamInfo.nameTagVisibility || 'always',
+                    friendlyFire: playerTeamProperties.friendlyFire ?? 0,
+                    nameTagVisibility: playerTeamProperties.nameTagVisibility || 'always',
                     source: 'scoreboard_team'
                 };
 
@@ -9936,6 +10082,9 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
 
         function writeOriginalScoreboardTeamUpdate(rawTeamName, teamInfo, players = []) {
             if (!rawTeamName || !teamInfo) return;
+            // Restoring an annotation must not copy another same-color
+            // player's invisibility settings into this server team.
+            const teamProperties = defaultTabSnapshot.teams.get(String(rawTeamName)) || teamInfo;
             try {
                 writeScoreboardTeamPacket({
                     team: rawTeamName,
@@ -9943,8 +10092,8 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                     name: teamInfo.displayName || teamInfo.name || rawTeamName,
                     prefix: teamInfo.prefix || '',
                     suffix: teamInfo.suffix || '',
-                    friendlyFire: teamInfo.friendlyFire ?? 0,
-                    nameTagVisibility: teamInfo.nameTagVisibility || 'always',
+                    friendlyFire: teamProperties.friendlyFire ?? 0,
+                    nameTagVisibility: teamProperties.nameTagVisibility || 'always',
                     color: legacyColorToPacketColor(teamInfo.color),
                     players: []
                 }, { applySidebarTeamColors: true });
@@ -11259,6 +11408,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         function refreshTabStatsImmediately() {
             reapplyTabStatsFromCache();
             refreshTabStatsForRoster();
+            refreshBedwarsGeneratorFooter();
         }
 
         function queueTabStatsUpdate(name, delay = 0, options = {}) {
@@ -11361,6 +11511,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         applyLiveFeatureSettings = () => {
             if (!quickMathsEnabled) quickMathsSession.reset();
             partyArrivalCheck.setEnabled(partySplitWarningsEnabled);
+            queuePartyCoordinationUpdate();
             if (!partySplitWarningsEnabled) partyArrivalPreview.stop();
             // Name/skin reissues contain a fresh player_info ADD entry, which
             // resets its tab display name. Do them first, then repaint tab
@@ -11379,7 +11530,10 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 refreshTabStatsImmediately();
                 syncBedwarsClientTeams();
             }
-            else clearAllTabStatsDisplays({ restoreOriginalTeams: gameActive && currentGamemode === 'BEDWARS' });
+            else {
+                clearAllTabStatsDisplays({ restoreOriginalTeams: gameActive && currentGamemode === 'BEDWARS' });
+                refreshBedwarsGeneratorFooter();
+            }
 
             if (isNametagOverlayActive() || isNametagOverlayActiveDuels()) applyNametagConfigChange();
             else clearNametagTeams({ restoreOriginalTeams: gameActive && currentGamemode === 'BEDWARS' });
@@ -11401,39 +11555,27 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             sendCommand: (command, options) => sendHypixelCommand(command, options)
         });
 
-        const autoGamblerSession = createAutoGamblerSession({
-            isEnabled: () => autoGamblerEnabled,
-            isPlayState: () => hypixelClient.state === mc.states.PLAY,
-            sendChat: message => sendChat(client, message),
-            sendCommand: (command) => void sendHypixelCommand(command, {
-                priority: 35,
-                dedupeKey: `auto-gambler:${String(command || '').toLowerCase()}`,
-                dedupeMs: 1_000
-            }),
-            onCommandSent: command => gamblerGeorgeReminder.observeCommand(command, 'auto_gambler'),
-            canAccept: () => {
-                const cooldown = gamblerGeorgeReminder.getCooldownRemainingMs();
-                if (cooldown <= 0) return true;
-                sendChat(client, '§6§lGambler George §8» §cBet on cooldown after a loss '
-                    + `§7(§f${formatGeorgeCooldown(cooldown)} §7left). `
-                    + '§8Clear it with /reminder george cooldown.');
-                return false;
-            },
-            logger: console
-        });
-
         const autoDodger = createAutoDodger({
             sendChat: message => sendChat(client, message),
-            sendLeaveCommand: () => void sendHypixelCommand('/l', {
+            sendLeaveCommand: shouldSend => void sendHypixelCommand('/l', {
                 priority: 0,
                 dedupeKey: 'auto-dodge-leave',
-                dedupeMs: 1_000
+                dedupeMs: 1_000,
+                shouldSend
             }),
             isPregameActive: () => bedwarsPregameActive,
             isGameActive: () => gameActive,
             getPregameSessionId: () => bedwarsPregameSessionId,
             isEnabled: () => autoDodgeEnabled,
             isPartyMember: (name) => partyTracker.isTrackedMember(name),
+            isPartyRosterUsable: () => {
+                // A fresh tracker starts with inParty=false but an unknown
+                // roster. Only a confirmed solo/party state can permit a dodge.
+                if (partyTracker.hasUsableState()) return true;
+                partyTracker.requestPartyListRefresh();
+                return false;
+            },
+            getKnownDenick: name => getAutoDenickResult(name) || findKnownDenickByNick(name),
             getDelaySeconds: () => autoDodgeDelaySeconds,
             getDodgeSettings: () => ({
                 taggedPlayers: autoDodgeTaggedPlayers,
@@ -11476,8 +11618,6 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         });
         partyArrivalTracker.start();
 
-        hypixelClient.on('playerChat', packet => autoGamblerSession.observeChatEvent(packet));
-        hypixelClient.on('systemChat', packet => autoGamblerSession.observeChatEvent(packet));
 
         client.on('packet', (data, meta) => {
             if (proxyStopping) return;
@@ -11547,15 +11687,21 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 replayTabEntries.clear();
                 partyArrivalTabNames.clear();
                 partyArrivalWorldStartedAt = Date.now();
+                partyCoordinationWorld += 1;
+                partyCoordinationWorldServerId = null;
+                queuePartyCoordinationUpdate();
                 reminderLobbyBoundary += 1;
                 reminderLobbyTarget = null;
                 if (reminderLobbyTimer) clearTimeout(reminderLobbyTimer);
                 reminderLobbyTimer = null;
                 enderDustReminder.onLobbyLeave();
             }
+            if (meta.name === 'playerlist_header') {
+                originalTabFooterPacket = { ...data };
+                lastGeneratorFooterSignature = '';
+            }
             if (meta.name === 'position') rememberOwnPosition(data, data?.flags);
             quickMathsSession.observeServer(data, meta);
-            autoGamblerSession.observeRawChatPacket(data, meta);
 
             if (meta.name === 'keep_alive') {
                 client.write(meta.name, data);
@@ -11587,7 +11733,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             let forwardedToClient = false;
             // /lf owns the action bar while it is on; the packet is still parsed below.
             const hiddenByLookingFor = meta.name === 'chat' && Number(data.position) === 2 && lookingForTriggers.isActive();
-            const hiddenGeorgeDialogue = shouldHideAutoGamblerDialogue(data, meta, autoGamblerEnabled) || hiddenByLookingFor;
+            const hiddenGeorgeDialogue = hiddenByLookingFor;
             if (meta.name !== 'player_info' && !swallowedByMenuMonitor && !hiddenGeorgeDialogue) {
                 // Real-IGN rendering is display-only: the client gets a
                 // rewritten COPY, while `data` keeps Hypixel's nick for every
@@ -11596,11 +11742,31 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 // Hypixel adds team members by name, so a renamed player would
                 // otherwise fall out of their team and lose their colour.
                 const renamedForClient = denickDisplayNames.rewriteClientbound(meta.name, data);
-                const displayedToClient = meta.name === 'chat'
+                let displayedToClient = meta.name === 'chat'
                     ? rewriteBedwarsEventLabelsForClient(renamedForClient)
                     : meta.name === 'scoreboard_team'
                         ? rewriteBedwarsSidebarTeamColorsForClient(renamedForClient)
                         : replayResults.rewriteClientbound(meta.name, renamedForClient);
+                if (meta.name === 'playerlist_header') {
+                    if (isBedwarsTabFooterActive()) {
+                        displayedToClient = {
+                            ...displayedToClient,
+                            footer: appendGeneratorRowToFooter(
+                                originalTabFooterPacket?.footer ?? displayedToClient.footer,
+                                getBedwarsGeneratorStats(getBedwarsGeneratorElapsedMs()),
+                                { settings: bedwarsTabSettings, elapsedMs: getBedwarsGeneratorElapsedMs() }
+                            )
+                        };
+                    }
+                    lastGeneratorFooterSignature = JSON.stringify(displayedToClient);
+                    if (generatorFooterRefreshTimer) clearTimeout(generatorFooterRefreshTimer);
+                    generatorFooterRefreshTimer = null;
+                    if (isBedwarsTabFooterActive()
+                        && generatorSidebarElapsedMs === null
+                        && displayedToClient.footer !== originalTabFooterPacket.footer) {
+                        queueBedwarsGeneratorFooterRefresh(1000 - getBedwarsGeneratorElapsedMs() % 1000);
+                    }
+                }
                 client.write(meta.name, displayedToClient);
                 forwardedToClient = true;
             }
@@ -11610,15 +11776,6 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             // Scaffold detector: same post-forward position, so it adds zero
             // delivery latency; cheap no-op while off or outside BedWars/SkyWars.
             scaffoldDetector.observePacket(data, meta);
-            if (anticheatEnabled && (anticheatAutoblockEnabled || anticheatStasisEnabled)
-                && (isAnticheatInGame() || inReplayViewer)) {
-                const anticheatRecord = packetToRecord(meta.name, data, Date.now());
-                if (anticheatRecord) {
-                    if (anticheatAutoblockEnabled) autoblockDetector.observeRecord(anticheatRecord);
-                    if (anticheatStasisEnabled) stasisDetector.observeRecord(anticheatRecord);
-                }
-            }
-
             const entityObservation = observePlayerEntityPacket(data, meta);
             if ((isNametagOverlayActive() || isNametagOverlayActiveDuels())
                 && (entityObservation?.type === 'named_entity_spawn'
@@ -11759,6 +11916,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 const modeId = typeof mode === 'string'
                     ? SCOREBOARD_TEAM_MODES[mode]
                     : mode;
+                if (modeId === 0 || modeId === 2) notePartyCoordinationServerId(`${prefix || ''}${suffix || ''}`);
                 // updateRawScoreboardTeam drops the raw team on a delete, so
                 // read its membership before that happens.
                 const deletedTeamMembers = modeId === 1 ? rawScoreboardTeamMembers(team) : [];
@@ -11770,13 +11928,15 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
 
                 if (modeId === 0 || modeId === 2) {
                     const parsedTeam = buildScoreboardTeamInfo(team, teamNameDisplay, prefix, suffix, color, { friendlyFire, nameTagVisibility });
-                    const { teamInfo } = saveScoreboardTeamInfo(team, parsedTeam);
+                    saveScoreboardTeamInfo(team, parsedTeam);
                     if (modeId === 0) originalScoreboardTeamsOnClient.add(String(team || ''));
 
                     if (modeId === 0 && players && Array.isArray(players)) {
                         applyPlayersToScoreboardTeam(team, players, 350);
-                    } else if (modeId === 2 && teamInfo.players.size > 0) {
-                        applyPlayersToScoreboardTeam(team, Array.from(teamInfo.players), 150);
+                    } else if (modeId === 2) {
+                        // A property update speaks only for this raw team's
+                        // members, not every player in the normalized color.
+                        applyPlayersToScoreboardTeam(team, rawScoreboardTeamMembers(team), 150);
                     }
                 }
 
@@ -11858,6 +12018,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                         if (lineName === scoreName) scoreboardLines.delete(lineScore);
                     }
                 } else {
+                    notePartyCoordinationServerId(scoreName);
                     scoreboardLines.set(score, scoreName);
                 }
                 updateDetectedStateFromScoreboard(scoreName || '');
@@ -11898,8 +12059,8 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                     const formattedText = extractFormattedText(message);
                     const position = data.position || 0;
                     const isActionBar = position === 2;
-                    if (!isActionBar) autoGamblerSession.maybeSchedule(text, formattedText, message, data.message);
                     const cleanChatText = stripAnsi(text).toLowerCase();
+                    if (!isActionBar) observeBedwarsDuelsIntro(text);
                     if (!isActionBar && !killMessageLogger.isBusy()) observeKillMessagePreviewChat(client, text);
                     if (!isActionBar) observeOwnNickChat(text);
                     if (!isActionBar) observeAutoDenickChat(text);
@@ -11936,6 +12097,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                             || cleanChatText.includes("teleporting")
                         )));
                     if (lobbyTransferMessage) {
+                        bedwarsDuelConfirmed = false;
                         quickMathsSession.reset();
                         leaveBedwarsPregame({ preserveProfiles: false, reason: 'lobby_transfer' });
                         resetMatchState({ clearPlayers: true });
@@ -11979,7 +12141,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                     // "protect your bed..." start message as real Bedwars. Suppress
                     // the Bedwars/SkyWars game activation while a duel is active.
                     let gameStartMode = null;
-                    if (duelsState.active) {
+                    if (duelsState.active || bedwarsDuelConfirmed) {
                         gameStartMode = null;
                     } else if (cleanChatText.includes("protect your bed and destroy the enemy beds")) {
                         gameStartMode = 'BEDWARS';
@@ -11994,7 +12156,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                     }
                     // Each packet is already forwarded above; publish only after
                     // the introduction's final divider, not its first instruction.
-                    if (!isActionBar && !duelsState.active) {
+                    if (!isActionBar && !duelsState.active && !bedwarsDuelConfirmed) {
                         queueTimeTracker.observeStartChat(text);
                     }
                      
@@ -12012,6 +12174,8 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         });
 
         function clearConnectionTimers() {
+            if (generatorFooterRefreshTimer) clearTimeout(generatorFooterRefreshTimer);
+            generatorFooterRefreshTimer = null;
             recapDelivery.clear();
             if (connectionTimersCleared) return;
             connectionTimersCleared = true;
@@ -12023,6 +12187,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             nickRoll.dispose();
             menuMonitor.dispose();
             partyTracker.stop();
+            partyCoordination.close();
             queueTimeTracker.reset();
             partyArrivalCheck.stop();
             partyArrivalPreview.stop();
@@ -12036,7 +12201,6 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             clearOverlayStatsTimers();
             tabStatsTimers.forEach(timer => clearTimeout(timer));
             tabStatsTimers.clear();
-            autoGamblerSession.clearTimers();
             quickMathsSession.reset();
             enderDustReminder.stop();
             hypixelKeyReminder.stop();
@@ -12378,17 +12542,13 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 if (sub === 'on' || sub === 'off') {
                     anticheatEnabled = sub === 'on';
                     saveFeatureConfig();
-                    sendChat(client, `§8[§c§lAC§8] §7Anticheat (Scaffold, Autoblock, Stasis): ${anticheatEnabled ? '§aON' : '§cOFF'}`);
+                    sendChat(client, `§8[§c§lAC§8] §7Anticheat (Scaffold): ${anticheatEnabled ? '§aON' : '§cOFF'}`);
                 } else {
                     const rows = scaffoldDetector.getStatus();
-                    const otherRows = [...autoblockDetector.getStatus(), ...stasisDetector.getStatus()];
                     const panel = createFeatureStatus({ client, sendChat, title: 'Anticheat', section: 'safety' });
                     panel.open();
                     panel.toggleRow('Power', anticheatEnabled, '/anticheat on', '/anticheat off');
-                    otherRows.forEach(row => {
-                        sendChat(client, `§8[§c§lAC§8] §c${row.name} §7- ${row.cheat}: §f${row.detail}${row.tier === 'confirmed' ? ` §c(${row.cheat.toUpperCase()})` : row.tier === 'possible' ? ' §e(POSSIBLY)' : ''}`);
-                    });
-                    if (rows.length === 0 && otherRows.length === 0) {
+                    if (rows.length === 0) {
                         sendChat(client, '§8[§c§lAC§8] §7No anticheat evidence this game.');
                     } else {
                         rows.forEach(row => {
@@ -12634,11 +12794,6 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             }
             else if (cmd === '/fury' || cmd === '/nester' || cmd === '/proxy') {
                 handleFuryCommand(args);
-            }
-            else if (cmd === '/autogambler') {
-                handleAutoGamblerCommand(client, args, {
-                    getPendingCommandCount: () => autoGamblerSession.timers?.size || 0
-                });
             }
             else if (cmd === '/chattrigger' || cmd === '/chattriggers' || cmd === '/ctriggers') {
                 handleChatTriggerCommand(client, args);
@@ -13102,7 +13257,8 @@ const {
     matchDuelsMode,
     parseOpponentsFromLabeledLine,
     extractDuelsInfoFromScoreboard,
-    isDuelsScoreboard
+    isDuelsScoreboard,
+    bedwarsDuelsIntroMode
 } = require('./src/net/session/duelsMatch.js');
 const { createAutoDodger } = require('./src/dodge/autoDodge.js');
 const {
@@ -14146,6 +14302,7 @@ const {
     renderLocalSession,
     renderGameRecap,
     renderSessionHistory,
+    renderSessionGames,
     formatSessionStamp
 } = createSessionRender({
     helpers: {
@@ -14155,7 +14312,8 @@ const {
         statPair,
         cardDivider,
         navButton,
-        sendStatRow
+        sendStatRow,
+        sendUrchinSection
     },
     deps: {
         collectBedwarsStats,
@@ -14449,6 +14607,7 @@ function detectGamemodeFromText(value) {
     const clean = stripAnsi(displayValueToString(value)).toUpperCase();
     const compact = clean.replace(/[^A-Z]/g, '');
     if (!compact) return null;
+    if (/\bDUELS?\b/.test(clean)) return null;
     if (compact.includes('BEDWARS')) return 'BEDWARS';
     if (compact.includes('SKYWARS')) return 'SKYWARS';
     return null;
