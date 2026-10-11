@@ -178,9 +178,20 @@ require(${JSON.stringify(path.join(root, 'src/stats/fetch.js'))}).createStatsFet
             assert.strictEqual(clientTeamFor(restoredName)?.nameTagVisibility, 'always', 'Membership refresh keeps independent visibility');
             // Removing an annotation restores the exact original properties,
             // even while another raw team of the same color is hidden.
+            const restoreStart = downstreamPackets.length;
             player.write('chat', { message: '/nametags clear' });
-            await eventually(async () => assert.strictEqual(clientTeamFor(restoredName)?.team, restoredRawTeam), 'Restoring original team');
-            assert.strictEqual(clientTeamFor(restoredName).nameTagVisibility, 'always', 'Restoration must not copy invisibility from another player');
+            // A pending roster/stat refresh can reapply the annotation before
+            // the polling interval observes the original team. Verify the
+            // actual handover packets, including the restored properties.
+            await eventually(async () => {
+                const packets = downstreamPackets.slice(restoreStart);
+                const membership = packets.findIndex(packet => packet.team === restoredRawTeam
+                    && packet.mode === 3 && packet.players.includes(restoredName));
+                assert(membership >= 0, 'Player must be restored to their own raw team');
+                const properties = packets.slice(0, membership).filter(packet => packet.team === restoredRawTeam
+                    && packet.mode === 2).at(-1);
+                assert.strictEqual(properties?.nameTagVisibility, 'always', 'Restoration must not copy invisibility from another player');
+            }, 'Restoring original team');
             assert.strictEqual(clientTeamFor(affectedName)?.nameTagVisibility, 'never', 'Restoration preserves the affected player visibility');
             player.write('chat', { message: '/nametags refresh' });
             await eventually(async () => {
