@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 
 // Launch the real app with two isolated accounts, no credentials and no external
 // network. Exercise existing event handlers, IPC and PNG exports, then inspect
@@ -231,7 +231,13 @@ const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
         await page.screenshot({path:path.join(output,'auto-dodge-timing-open.png')});
         await click(timingMenu+' [data-value="before_start"]');await waitSaved('autoDodgeLeaveMode','before_start');
         assert.strictEqual(await page.$eval(timingTrigger,el=>el.textContent.trim()),'Before game starts');
-        await page.focus(timingTrigger);await page.keyboard.press('Enter');await page.keyboard.press('Home');await page.keyboard.press('Enter');await waitSaved('autoDodgeLeaveMode','instant');
+        await page.focus(timingTrigger);await page.keyboard.press('Enter');
+        // Opening schedules option focus for the next frame; wait before sending
+        // navigation keys so native Mac runners exercise the option handler.
+        await page.waitForFunction(selector=>document.activeElement?.matches(selector+' [data-value="before_start"]'),{},timingMenu);
+        await page.keyboard.press('Home');
+        assert(await page.$eval(timingMenu+' [data-value="instant"]',el=>el===document.activeElement));
+        await page.keyboard.press('Enter');await waitSaved('autoDodgeLeaveMode','instant');
         await page.keyboard.press('Enter');await page.keyboard.press('Escape');
         assert.strictEqual(await page.$eval(timingTrigger,el=>el.getAttribute('aria-expanded')),'false');
         record('Auto Dodge styled timing menu saves both choices and supports keyboard selection and Escape');
