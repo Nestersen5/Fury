@@ -32,7 +32,7 @@ const PRESET_SETTING_KEYS = {
         // General scanning and display
         'tabStatsEnabled', 'autoScanOnGameStart',
         // Auto dodge
-        'autoDodgeEnabled', 'autoDodgeDelaySeconds', 'autoDodgeTaggedPlayers',
+        'autoDodgeEnabled', 'autoDodgeLeaveMode', 'autoDodgeTaggedPlayers',
         'autoDodgeNickedPlayers', 'autoDodgeStatThreats', 'autoDodgeIncludePreset',
         'autoDodgeMinFkdr', 'autoDodgeMinStars',
         // Reminders
@@ -128,7 +128,7 @@ const PROFILE_SETTING_LABELS = {
     minSkywarsKdr: 'Minimum SkyWars KDR',
     minSkywarsWlr: 'Minimum SkyWars WLR',
     minSkywarsLevel: 'Minimum SkyWars level',
-    autoDodgeDelaySeconds: 'Dodge delay',
+    autoDodgeLeaveMode: 'Dodge timing',
     autoDodgeMinFkdr: 'Dodge FKDR threshold',
     autoDodgeMinStars: 'Dodge stars threshold',
     nametagScope: 'Name tag scope',

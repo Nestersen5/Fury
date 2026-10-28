@@ -16,6 +16,53 @@ module.exports = async function verify({ page, output, profile }) {
     assert(await page.$eval('#hypixel-key-snooze', el => el.disabled));
     assert((await readText('#hypixel-key-reminder-status')).includes('Add a Hypixel'));
 
+    // Copy uses the existing clipboard path without exposing or changing keys.
+    assert.strictEqual(await page.$$eval('[data-key-replace]', els => els.length), 0);
+    await page.evaluate(() => {
+        window.originalKeyClipboardWrite = clipboard.writeText;
+        clipboard.writeText = value => { window.copiedApiKey = value; };
+    });
+    try {
+        for (const [provider, id] of [['hypixel', 'key-hypixel'], ['urchin', 'key-urchin'], ['urchinadmin', 'key-urchin-admin'], ['aurora', 'key-aurora']]) {
+            await page.evaluate((provider, id) => {
+                const card = document.querySelector(`[data-api-card="${provider}"]`);
+                if (provider === 'urchinadmin') document.querySelector('[data-api-card="urchin"]').open = true;
+                card.open = true;
+                const input = document.getElementById(id);
+                input.value = `fixture-${provider}`;
+                input.type = 'password';
+            }, provider, id);
+            const selector = `[data-key-copy="${provider}"]`;
+            assert(await page.$eval(selector, el => el.checkVisibility()));
+            await page.focus(selector);
+            await page.keyboard.press('Enter');
+            await page.waitForFunction('document.querySelector(".fury-notification-success .notification-title")?.textContent === "API key copied to clipboard"');
+            assert.strictEqual(await page.evaluate('window.copiedApiKey'), `fixture-${provider}`);
+            assert.strictEqual(await page.$eval(`#${id}`, el => el.type), 'password');
+            assert.strictEqual(await page.$eval(`#${id}`, el => el.value), `fixture-${provider}`);
+        }
+        await page.screenshot({ path: path.join(output, 'api-key-copy-notification.png') });
+        await page.evaluate(() => {
+            document.getElementById('key-aurora').value = '';
+            document.querySelector('[data-key-copy="aurora"]').click();
+        });
+        await page.waitForFunction('document.querySelector(".fury-notification-warning .notification-title")?.textContent === "No API key to copy"');
+        assert.strictEqual(await page.evaluate('window.copiedApiKey'), 'fixture-aurora');
+        await page.evaluate(() => {
+            clipboard.writeText = () => { throw new Error('Fixture clipboard failure'); };
+            document.getElementById('key-aurora').value = 'fixture-aurora';
+            document.querySelector('[data-key-copy="aurora"]').click();
+        });
+        await page.waitForFunction('document.querySelector(".fury-notification-error .notification-title")?.textContent === "Could not copy API key. Try again."');
+    } finally {
+        await page.evaluate(() => {
+            clipboard.writeText = window.originalKeyClipboardWrite;
+            for (const id of ['key-hypixel', 'key-urchin', 'key-urchin-admin', 'key-aurora']) document.getElementById(id).value = '';
+            window.FuryNotifications.dismissAll();
+        });
+    }
+    console.log('PASS All four API key Copy buttons, keyboard activation, masked values, success, empty and clipboard failure notifications');
+
     // Exercise the normal auto-save path, not a renderer-only fixture.
     async function enterKey(value) {
         await page.$eval('#key-hypixel', (el, key) => {

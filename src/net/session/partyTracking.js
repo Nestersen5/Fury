@@ -64,6 +64,8 @@ function createPartyTracker(deps) {
     let tickHandle = null;
     let hasNotifiedConnect = false;
 
+    const disconnectedMembers = new Set();
+    let revision = 0;
     let inParty = false;
     let leaderName = null;
     let moderators = new Set();
@@ -166,6 +168,8 @@ function createPartyTracker(deps) {
     }
 
     function touchUpdate(fullRefresh) {
+        revision++;
+        if (!inParty) disconnectedMembers.clear();
         lastStateUpdateTime = Date.now();
         if (fullRefresh) lastFullRefreshTime = lastStateUpdateTime;
         deps.onUpdate?.();
@@ -471,6 +475,7 @@ function createPartyTracker(deps) {
         const leaderDisconnected = stripped.match(PARTY_LEADER_DISCONNECTED_PATTERN);
         if (leaderDisconnected) {
             const player = normalizePlayerName(leaderDisconnected[1]);
+            if (player) disconnectedMembers.add(player.toLowerCase());
             if (player) {
                 inParty = true;
                 initialized = true;
@@ -487,6 +492,7 @@ function createPartyTracker(deps) {
         const disconnected = stripped.match(PARTY_DISCONNECTED_PATTERN);
         if (disconnected) {
             const player = normalizePlayerName(disconnected[1]);
+            if (player) disconnectedMembers.add(player.toLowerCase());
             if (player) {
                 inParty = true;
                 initialized = true;
@@ -500,6 +506,7 @@ function createPartyTracker(deps) {
         const leaderRejoined = stripped.match(PARTY_LEADER_REJOINED_PATTERN);
         if (leaderRejoined) {
             const player = normalizePlayerName(leaderRejoined[1]);
+            if (player) disconnectedMembers.delete(player.toLowerCase());
             if (player) {
                 inParty = true;
                 initialized = true;
@@ -516,6 +523,7 @@ function createPartyTracker(deps) {
         const rejoined = stripped.match(PARTY_REJOINED_PATTERN);
         if (rejoined) {
             const player = normalizePlayerName(rejoined[1]);
+            if (player) disconnectedMembers.delete(player.toLowerCase());
             if (player) {
                 inParty = true;
                 initialized = true;
@@ -598,7 +606,9 @@ function createPartyTracker(deps) {
             members: getMembers(),
             uncertain,
             initialized,
-            lastFullRefreshTime
+            lastFullRefreshTime,
+            revision,
+            disconnectedMembers: [...disconnectedMembers].filter(isTrackedMember)
         };
     }
 

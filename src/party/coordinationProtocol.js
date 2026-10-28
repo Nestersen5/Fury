@@ -35,6 +35,15 @@ function observation(value) {
     return { phase: value.phase, serverId, generation: value.generation, seq: value.seq,
         stableMs: Math.floor(value.stableMs) };
 }
+// Optional v1 extension. Claims identify only the sender's own current nickname.
+function nicknameState(value) {
+    if (!value || typeof value.receive !== 'boolean'
+        || typeof value.serverId !== 'string' || !/^[A-Za-z0-9]{2,16}$/.test(value.serverId)
+        || typeof value.mode !== 'string' || !/^[A-Z0-9_]{1,32}$/.test(value.mode)) return null;
+    if (value.nick !== null && (!nameKey(value.nick) || !/^[a-f0-9]{24}$/.test(value.id))) return null;
+    return { nick: value.nick, id: value.nick === null ? null : value.id,
+        serverId: value.serverId, mode: value.mode, receive: value.receive };
+}
 function relayUrl(env = process.env) {
     const value = env.FURY_PARTY_RELAY_URL === undefined ? DEFAULT_RELAY_URL : env.FURY_PARTY_RELAY_URL;
     try {
@@ -46,4 +55,4 @@ function relayUrl(env = process.env) {
     } catch { return null; }
 }
 module.exports = { VERSION, MAX_MEMBERS, MAX_MESSAGE_BYTES, SETTLE_MS, DISCOVERY_MS,
-    HEARTBEAT_MS, LEASE_MS, DEFAULT_RELAY_URL, nameKey, uuidKey, networkKey, rosterKeys, observation, relayUrl };
+    HEARTBEAT_MS, LEASE_MS, DEFAULT_RELAY_URL, nameKey, uuidKey, networkKey, rosterKeys, observation, nicknameState, relayUrl };

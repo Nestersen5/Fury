@@ -301,6 +301,16 @@ function makeRenamer({ enabled = true, map = { nickyboi: 'RealDude' }, resolve =
     assert.strictEqual(message.clickEvent.value, '/msg NickyBoi ', 'chat interaction metadata remains untouched');
     assert.strictEqual(JSON.parse(packet.message).text, 'NickyBoi: ', 'internal chat processing keeps the original server message');
 
+    for (const announcement of [
+        { text: 'Party > [MVP++] Sender: [Denick] RealDude is nicked as NickyBoi | 825★ FKDR 7.43 WLR 1.90 WS 0' },
+        { text: '§9Party > ', extra: [{ text: '[MVP++] Sender: ' }, { text: '[Denick] RealDude is nicked as ' }, { text: 'NickyBoi' }, { text: ' | 825★ FKDR 7.43 WLR 1.90 WS 0' }] }
+    ]) {
+        const broadcast = { message: JSON.stringify(announcement), position: 0 };
+        assert.strictEqual(renamer.rewriteChatPacket(broadcast), broadcast, 'automatic denick party broadcasts preserve the original nickname');
+    }
+    const ordinaryParty = { message: JSON.stringify({ text: 'Party > Sender: Hello NickyBoi' }) };
+    assert.strictEqual(JSON.parse(renamer.rewriteChatPacket(ordinaryParty).message).text, 'Party > Sender: Hello RealDude', 'ordinary party chat still replaces nicknames');
+
     chatEnabled = false;
     assert.strictEqual(renamer.rewriteClientbound('chat', packet), packet, 'the chat setting controls the rewrite independently');
     assert.strictEqual(renamer.rewriteChatPacket({ message: 'not json' }).message, 'not json', 'malformed chat packets pass through');

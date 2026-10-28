@@ -18,7 +18,7 @@ function profilePanel(client, title) {
 // "Auto Dodge: on -> off" rather than "autoDodgeEnabled: true -> false".
 const SETTING_LABELS = {
     autoDodgeEnabled: 'Auto Dodge',
-    autoDodgeDelaySeconds: 'Dodge Delay',
+    autoDodgeLeaveMode: 'Dodge Timing',
     autoDodgeTaggedPlayers: 'Dodge Tagged',
     autoDodgeNickedPlayers: 'Dodge Nicked',
     autoDodgeStatThreats: 'Dodge Stat Threats',
@@ -96,6 +96,8 @@ function settingLabel(key) {
 }
 
 function formatValue(value) {
+    if (value === 'instant') return '§fInstantly';
+    if (value === 'before_start') return '§fBefore game starts';
     if (value === true) return '§aon';
     if (value === false) return '§coff';
     if (value === undefined || value === null) return '§8unset';

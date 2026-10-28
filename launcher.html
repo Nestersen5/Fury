@@ -3236,6 +3236,8 @@
                                         <option value="manual">Manual</option>
                                         <option value="skin_manual">Manual skin</option>
                                         <option value="party_variation">Party Variation</option>
+                                        <option value="own_nick">Your nickname</option>
+                                        <option value="party_shared">Fury teammate</option>
                                         <option value="unknown">Unknown</option>
                                     </select></label>
                                     <label>Time<select id="denick-time-filter">
@@ -3685,14 +3687,14 @@
                                             <section class="auto-dodge-section auto-dodge-timing-section">
                                                 <div class="auto-dodge-section-heading">
                                                     <span class="auto-dodge-step">3</span>
-                                                    <div><h4>Timing</h4><p>Choose how long you have to decide whether to stay.</p></div>
+                                                    <div><h4>Timing</h4><p>Choose when Fury leaves the lobby.</p></div>
                                                 </div>
                                                 <div class="auto-dodge-timing-layout">
-                                                    <label class="auto-dodge-number settings-search-item" for="auto-dodge-delay-seconds">
-                                                        <span>Leave delay</span><small>Decision window before Fury sends /l</small>
-                                                        <div class="auto-dodge-input-unit"><input id="auto-dodge-delay-seconds" type="number" min="0" max="15" step="1" value="10"><b>sec</b></div>
+                                                    <label class="auto-dodge-number settings-search-item" for="auto-dodge-leave-mode">
+                                                        <span>Leave timing</span><small>When to leave</small>
+                                                        <select id="auto-dodge-leave-mode"><option value="instant">Instantly</option><option value="before_start" selected>Before game starts</option></select>
                                                     </label>
-                                                    <div class="auto-dodge-timing-warning" role="note"><span aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M10 4v8"></path><circle cx="10" cy="16" r="1"></circle></svg></span><div><strong>Game-start safety overrides this delay</strong><p>The leave delay is your time to decide whether to stay. If the game-start countdown gets close to zero, Fury leaves early enough to keep you out of the match no matter how much of the delay remains.</p></div></div>
+                                                    <div class="auto-dodge-timing-warning" role="note"><span aria-hidden="true"><svg viewBox="0 0 20 20"><path d="M10 4v8"></path><circle cx="10" cy="16" r="1"></circle></svg></span><div><strong>Cancel before leaving</strong><p>Wait until just before the game starts. Click Cancel in chat to stay. Instantly leaves as soon as a player matches your rules.</p></div></div>
                                                 </div>
                                             </section>
                                         </div>
@@ -3776,7 +3778,8 @@
                                             <div class="denick-settings-heading denick-stage-heading denick-stage-heading-compact"><span class="denick-stage-number">1</span><div><span class="denick-workflow-eyebrow" id="denick-detection-title">Detection</span></div></div>
                                             <div class="denick-method-grid">
                                                 <article class="denick-setting-card denick-method-skin"><span class="denick-method-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3a7 7 0 0 0-7 7v2M12 3a7 7 0 0 1 7 7v2M8 11c0-2.7 1.4-4.2 4-4.2s4 1.5 4 4.2M7 15c1.2 4 8.8 4 10 0M9 12h.01M15 12h.01"></path></svg></span><div><span class="denick-card-kicker">Works in every game</span><h4>Match by skin</h4><small>Compares skin and cosmetic data with known accounts. Confirmed matches are saved automatically.</small></div><div class="feature-toggle"><label class="switch"><input id="auto-skin-denick-enabled" type="checkbox"><span class="switch-track"></span><span class="switch-thumb"></span><span class="switch-label">OFF</span></label></div></article>
-                                                <article class="denick-setting-card denick-method-stats"><span class="denick-method-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 19V5M4 19h16M7 15l3-4 3 2 4-6"></path><path d="m15 7 2-.2.2 2"></path></svg></span><div><span class="denick-card-kicker">Bed Wars only</span><h4>Match from Bed Wars stats</h4><small>Searches the final-kill and bed values captured during a Bed Wars game for a matching account.</small></div><div class="feature-toggle"><label class="switch"><input id="auto-stats-denick-enabled" type="checkbox"><span class="switch-track"></span><span class="switch-thumb"></span><span class="switch-label">OFF</span></label></div></article>
+                                                <article class="denick-setting-card denick-method-stats"><span class="denick-method-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 19V5M4 19h16M7 15l3-4 3 2 4-6"></path><path d="m15 7 2-.2.2 2"></path></svg></span><div><span class="denick-card-kicker">Bed Wars only</span><h4>Match from Bed Wars stats</h4><small>Find possible matches from finals or beds in chat, then confirm with both.</small></div><div class="feature-toggle"><label class="switch"><input id="auto-stats-denick-enabled" type="checkbox"><span class="switch-track"></span><span class="switch-thumb"></span><span class="switch-label">OFF</span></label></div></article>
+                                                <article class="denick-setting-card"><div><h4>Share my nickname with Fury party members</h4><small>After the game starts, shares your nickname only when you are nicked and the other Fury player is in the same party.</small></div><div class="feature-toggle"><label class="switch"><input id="share-own-nickname-enabled" type="checkbox"><span class="switch-track"></span><span class="switch-thumb"></span><span class="switch-label">OFF</span></label></div></article>
                                             </div>
                                             <aside class="denick-saved-explainer">
                                                 <span class="denick-saved-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 4h11l3 3v13H5V4Z"></path><path d="M8 4v6h8V4M8 16h8"></path></svg></span>
@@ -4080,7 +4083,7 @@
                                     <div class="api-service-grid">
                                         <details class="api-key-card settings-search-item" data-api-card="hypixel" open>
                                             <summary class="api-key-card-head"><span class="api-provider-icon">H</span><span class="api-key-card-copy"><strong>Hypixel</strong><small id="hypixel-key-reminder-summary">Stats, guilds, status, and scans</small></span><span class="api-card-status" data-api-status="hypixel">Checking</span><span class="api-key-chevron" aria-hidden="true"></span></summary>
-                                            <div class="api-key-card-body"><div class="api-key-input"><input id="key-hypixel" type="password" placeholder="Paste API key"><button data-key-toggle="hypixel">Show</button></div><div class="api-key-actions"><button data-key-copy="hypixel">Copy</button><button data-key-replace="hypixel">Replace</button><button class="primary" data-api-test="hypixel">Test Connection</button></div><div class="api-key-result"><span data-api-detail="hypixel">Waiting for status</span><small data-api-last="hypixel">Never successfully tested</small></div><div id="key-hypixel-meta" class="note">Updated: Not tracked yet</div>
+                                            <div class="api-key-card-body"><div class="api-key-input"><input id="key-hypixel" type="password" placeholder="Paste API key"><button data-key-toggle="hypixel">Show</button></div><div class="api-key-actions"><button data-key-copy="hypixel">Copy</button><button class="primary" data-api-test="hypixel">Test Connection</button></div><div class="api-key-result"><span data-api-detail="hypixel">Waiting for status</span><small data-api-last="hypixel">Never successfully tested</small></div><div id="key-hypixel-meta" class="note">Updated: Not tracked yet</div>
                                                 <div class="api-key-result" id="hypixel-key-reminder" role="status"><span id="hypixel-key-reminder-status">Add a key to enable expiry reminders.</span><small id="hypixel-key-reminder-expiry">Expiry is counted 48 hours from saving a new key.</small></div>
                                                 <div class="api-key-actions"><button id="hypixel-key-dashboard">Open Hypixel dashboard</button><button id="hypixel-key-snooze" disabled>Snooze 24 hours</button></div>
                                             </div>
@@ -4088,9 +4091,9 @@
                                     </div>
                                 </section>
                                 <section class="api-service-module"><div class="api-service-module-head"><div><span class="eyebrow">Player Intelligence</span><h3>Intelligence Providers</h3><p>Optional services for tags, denicking, and external threat signals.</p></div><span class="api-module-optional">Optional</span></div><div class="api-service-grid">
-                                    <details class="api-key-card settings-search-item" data-api-card="urchin"><summary class="api-key-card-head"><span class="api-provider-icon api-icon-tag">◇</span><span class="api-key-card-copy"><strong>Urchin</strong><small>Player tags and session statistics</small></span><span class="api-card-status" data-api-status="urchin">Checking</span><span class="api-key-chevron" aria-hidden="true"></span></summary><div class="api-key-card-body"><div class="api-key-input"><input id="key-urchin" type="password" placeholder="Paste Urchin key"><button data-key-toggle="urchin">Show</button></div><div class="api-key-actions"><button data-key-copy="urchin">Copy</button><button data-key-replace="urchin">Replace</button><button class="primary" data-api-test="urchin">Test Connection</button></div><div class="api-key-result"><span data-api-detail="urchin">Waiting for status</span><small data-api-last="urchin">Never successfully tested</small></div></div></details>
-                                    <details class="api-key-card settings-search-item" data-api-card="urchinadmin"><summary class="api-key-card-head"><span class="api-provider-icon api-icon-tag">U+</span><span class="api-key-card-copy"><strong>Urchin Admin</strong><small>Write and remove player tags</small></span><span class="api-card-status" data-api-status="urchinadmin">Checking</span><span class="api-key-chevron" aria-hidden="true"></span></summary><div class="api-key-card-body"><div class="api-key-input"><input id="key-urchin-admin" type="password" placeholder="Paste Urchin admin key"><button data-key-toggle="urchinadmin">Show</button></div><div class="api-key-actions"><button data-key-copy="urchinadmin">Copy</button><button data-key-replace="urchinadmin">Replace</button><button class="primary" data-api-test="urchinadmin">Test Connection</button></div><div class="api-key-result"><span data-api-detail="urchinadmin">Waiting for status</span><small data-api-last="urchinadmin">Never successfully tested</small></div></div></details>
-                                    <details class="api-key-card settings-search-item" data-api-card="aurora"><summary class="api-key-card-head"><span class="api-provider-icon">A</span><span class="api-key-card-copy"><strong>Aurora</strong><small>Ping and stats-based denick evidence</small></span><span class="api-card-status" data-api-status="aurora">Checking</span><span class="api-key-chevron" aria-hidden="true"></span></summary><div class="api-key-card-body"><div class="api-key-input"><input id="key-aurora" type="password" placeholder="Paste Aurora key"><button data-key-toggle="aurora">Show</button></div><div class="api-key-actions"><button data-key-copy="aurora">Copy</button><button data-key-replace="aurora">Replace</button><button class="primary" data-api-test="aurora">Test Connection</button></div><div class="api-key-result"><span data-api-detail="aurora">Waiting for status</span><small data-api-last="aurora">Never successfully tested</small></div></div></details>
+                                    <details class="api-key-card settings-search-item" data-api-card="urchin"><summary class="api-key-card-head"><span class="api-provider-icon api-icon-tag">◇</span><span class="api-key-card-copy"><strong>Urchin</strong><small>Player tags and session statistics</small></span><span class="api-card-status" data-api-status="urchin">Checking</span><span class="api-key-chevron" aria-hidden="true"></span></summary><div class="api-key-card-body"><div class="api-key-input"><input id="key-urchin" type="password" placeholder="Paste Urchin key"><button data-key-toggle="urchin">Show</button></div><div class="api-key-actions"><button data-key-copy="urchin">Copy</button><button class="primary" data-api-test="urchin">Test Connection</button></div><div class="api-key-result"><span data-api-detail="urchin">Waiting for status</span><small data-api-last="urchin">Never successfully tested</small></div></div></details>
+                                    <details class="api-key-card settings-search-item" data-api-card="urchinadmin"><summary class="api-key-card-head"><span class="api-provider-icon api-icon-tag">U+</span><span class="api-key-card-copy"><strong>Urchin Admin</strong><small>Write and remove player tags</small></span><span class="api-card-status" data-api-status="urchinadmin">Checking</span><span class="api-key-chevron" aria-hidden="true"></span></summary><div class="api-key-card-body"><div class="api-key-input"><input id="key-urchin-admin" type="password" placeholder="Paste Urchin admin key"><button data-key-toggle="urchinadmin">Show</button></div><div class="api-key-actions"><button data-key-copy="urchinadmin">Copy</button><button class="primary" data-api-test="urchinadmin">Test Connection</button></div><div class="api-key-result"><span data-api-detail="urchinadmin">Waiting for status</span><small data-api-last="urchinadmin">Never successfully tested</small></div></div></details>
+                                    <details class="api-key-card settings-search-item" data-api-card="aurora"><summary class="api-key-card-head"><span class="api-provider-icon">A</span><span class="api-key-card-copy"><strong>Aurora</strong><small>Ping and stats-based denick evidence</small></span><span class="api-card-status" data-api-status="aurora">Checking</span><span class="api-key-chevron" aria-hidden="true"></span></summary><div class="api-key-card-body"><div class="api-key-input"><input id="key-aurora" type="password" placeholder="Paste Aurora key"><button data-key-toggle="aurora">Show</button></div><div class="api-key-actions"><button data-key-copy="aurora">Copy</button><button class="primary" data-api-test="aurora">Test Connection</button></div><div class="api-key-result"><span data-api-detail="aurora">Waiting for status</span><small data-api-last="aurora">Never successfully tested</small></div></div></details>
                                 </div></section>
                             </div>
                         </div>
@@ -4497,7 +4500,7 @@
                     }
                 });
             };
-            decorateLabel('label[for="auto-dodge-delay-seconds"]', 'countdown');
+            decorateLabel('label[for="auto-dodge-leave-mode"]', 'countdown');
             decorateLabel('label[for="auto-dodge-min-fkdr"], label[for="auto-dodge-min-stars"]', 'statThreat');
 
             const customContentLabel = document.querySelector('.session-field-section > span:first-child');
@@ -4602,7 +4605,7 @@
             shareTagsIncludeThreats: document.getElementById('share-tags-include-threats'),
             quickMathsEnabled: document.getElementById('quick-maths-enabled'),
             autoDodgeEnabled: document.getElementById('auto-dodge-enabled'),
-            autoDodgeDelaySeconds: document.getElementById('auto-dodge-delay-seconds'),
+            autoDodgeLeaveMode: document.getElementById('auto-dodge-leave-mode'),
             autoDodgeTaggedPlayers: document.getElementById('auto-dodge-tagged-players'),
             autoDodgeNickedPlayers: document.getElementById('auto-dodge-nicked-players'),
             autoDodgeStatThreats: document.getElementById('auto-dodge-stat-threats'),
@@ -4613,6 +4616,7 @@
             gamblerGeorgeReminderEnabled: document.getElementById('gambler-george-reminder-enabled'),
             autoSkinDenickEnabled: document.getElementById('auto-skin-denick-enabled'),
             autoStatsDenickEnabled: document.getElementById('auto-stats-denick-enabled'),
+            shareOwnNicknameEnabled: document.getElementById('share-own-nickname-enabled'),
             denickChatAnnouncementsEnabled: document.getElementById('denick-chat-announcements-enabled'),
             lobbyChatStatsEnabled: document.getElementById('lobby-chat-stats-enabled'),
             lobbyChatStatsMentionEnabled: document.getElementById('lobby-chat-stats-mention-enabled'),
@@ -4689,7 +4693,7 @@
             'shareTagsIncludeThreats',
             'quickMathsEnabled',
             'autoDodgeEnabled',
-            'autoDodgeDelaySeconds',
+            'autoDodgeLeaveMode',
             'autoDodgeTaggedPlayers',
             'autoDodgeNickedPlayers',
             'autoDodgeStatThreats',
@@ -4701,6 +4705,7 @@
             'partyOverviewEnabled',
             'autoSkinDenickEnabled',
             'autoStatsDenickEnabled',
+            'shareOwnNicknameEnabled',
             'denickChatAnnouncementsEnabled',
             'lobbyChatStatsEnabled',
             'lobbyChatStatsMentionEnabled',
@@ -5583,7 +5588,7 @@
             const rankSelect = select.id === 'nickroll-rank';
             const nickrollSelect = rankSelect || select.id === 'nickroll-skinMode';
             const nickrollLabel = rankSelect ? 'Nickname rank' : 'Skin';
-            const searchable = !nickrollSelect && !['tab-stats-preset', 'tab-stats-label-style', 'nametag-tag-display-mode'].includes(select.id);
+            const searchable = !nickrollSelect && !['tab-stats-preset', 'tab-stats-label-style', 'nametag-tag-display-mode', 'auto-dodge-leave-mode'].includes(select.id);
             const optionMarkup = option => {
                 const label = option?.textContent || 'Choose a stat';
                 if (!rankSelect) return escapeHtml(label);
@@ -5608,6 +5613,7 @@
             trigger.setAttribute('aria-expanded', 'false');
             trigger.setAttribute('aria-controls', popoverId);
             if (nickrollSelect) trigger.setAttribute('aria-label', nickrollLabel);
+            if (select.id === 'auto-dodge-leave-mode') trigger.setAttribute('aria-label', 'Leave timing');
             trigger.innerHTML = '<span class="stat-select-value"></span><span class="stat-select-trigger-icon" aria-hidden="true"></span>';
             shell.appendChild(trigger);
 
@@ -5623,6 +5629,7 @@
             const empty = popover.querySelector('.stat-select-empty');
             if (!searchable) { search.parentElement.hidden = true; list.setAttribute('aria-label', select.id === 'tab-stats-preset' ? 'Preset' : select.id === 'tab-stats-label-style' ? 'Stat labels' : 'Tag display'); }
             if (nickrollSelect) list.setAttribute('aria-label', nickrollLabel);
+            if (select.id === 'auto-dodge-leave-mode') list.setAttribute('aria-label', 'Leave timing');
             const controller = { select, shell, trigger, popover, search, list, empty, open: false, rebuild: null };
 
             controller.rebuild = () => {
@@ -5740,6 +5747,7 @@
         }
 
         NAMETAG_PRIMARY_FALLBACK_PAIRS.flat().forEach(createCustomStatSelect);
+        createCustomStatSelect(ids.autoDodgeLeaveMode);
         document.addEventListener('pointerdown', (event) => {
             if (!openCustomStatSelect) return;
             if (openCustomStatSelect.shell.contains(event.target) || openCustomStatSelect.popover.contains(event.target)) return;
@@ -6396,7 +6404,7 @@
                     shareTagsIncludeThreats: ids.shareTagsIncludeThreats.checked,
                     quickMathsEnabled: ids.quickMathsEnabled.checked,
                     autoDodgeEnabled: ids.autoDodgeEnabled.checked,
-                    autoDodgeDelaySeconds: Number(ids.autoDodgeDelaySeconds.value),
+                    autoDodgeLeaveMode: ids.autoDodgeLeaveMode.value,
                     autoDodgeTaggedPlayers: ids.autoDodgeTaggedPlayers.checked,
                     autoDodgeNickedPlayers: ids.autoDodgeNickedPlayers.checked,
                     autoDodgeStatThreats: ids.autoDodgeStatThreats.checked,
@@ -6409,6 +6417,7 @@
                     partyOverviewEnabled: true,
                     autoSkinDenickEnabled: ids.autoSkinDenickEnabled.checked,
                     autoStatsDenickEnabled: ids.autoStatsDenickEnabled.checked,
+                    shareOwnNicknameEnabled: ids.shareOwnNicknameEnabled.checked,
                     denickChatAnnouncementsEnabled: ids.denickChatAnnouncementsEnabled.checked,
                     lobbyChatStatsEnabled: ids.lobbyChatStatsEnabled.checked,
                     lobbyChatStatsMentionEnabled: ids.lobbyChatStatsMentionEnabled.checked,
@@ -6554,7 +6563,7 @@
             ids.shareTagsIncludeThreats,
             ids.quickMathsEnabled,
             ids.autoDodgeEnabled,
-            ids.autoDodgeDelaySeconds,
+            ids.autoDodgeLeaveMode,
             ids.autoDodgeTaggedPlayers,
             ids.autoDodgeNickedPlayers,
             ids.autoDodgeStatThreats,
@@ -6565,6 +6574,7 @@
             ids.gamblerGeorgeReminderEnabled,
             ids.autoSkinDenickEnabled,
             ids.autoStatsDenickEnabled,
+            ids.shareOwnNicknameEnabled,
             ids.denickChatAnnouncementsEnabled,
             ids.lobbyChatStatsEnabled,
             ids.lobbyChatStatsMentionEnabled,
@@ -7780,9 +7790,8 @@
             renderPartySharePreview();
             ids.quickMathsEnabled.checked = featureOn('quickMathsEnabled', false);
             ids.autoDodgeEnabled.checked = featureOn('autoDodgeEnabled', false);
-            ids.autoDodgeDelaySeconds.value = Number.isFinite(Number(features.autoDodgeDelaySeconds))
-                ? Number(features.autoDodgeDelaySeconds)
-                : 10;
+            ids.autoDodgeLeaveMode.value = features.autoDodgeLeaveMode === 'instant' ? 'instant' : 'before_start';
+            refreshCustomStatSelect(ids.autoDodgeLeaveMode);
             ids.autoDodgeTaggedPlayers.checked = featureOn('autoDodgeTaggedPlayers', true);
             ids.autoDodgeNickedPlayers.checked = featureOn('autoDodgeNickedPlayers', false);
             ids.autoDodgeStatThreats.checked = featureOn('autoDodgeStatThreats', false);
@@ -7799,6 +7808,7 @@
             ids.gamblerGeorgeReminderEnabled.checked = featureOn('gamblerGeorgeReminderEnabled', true);
             ids.autoSkinDenickEnabled.checked = featureOn('autoSkinDenickEnabled', true);
             ids.autoStatsDenickEnabled.checked = featureOn('autoStatsDenickEnabled', true);
+            ids.shareOwnNicknameEnabled.checked = featureOn('shareOwnNicknameEnabled', true);
             ids.denickChatAnnouncementsEnabled.checked = featureOn('denickChatAnnouncementsEnabled', true);
             ids.lobbyChatStatsEnabled.checked = featureOn('lobbyChatStatsEnabled', true);
             ids.lobbyChatStatsMentionEnabled.checked = featureOn('lobbyChatStatsMentionEnabled', true);
@@ -8161,6 +8171,8 @@
             if (value === 'manual') return 'Manual';
             if (value === 'skin_manual') return 'Manual Skin';
             if (value === 'party_variation') return 'Party Variation';
+            if (value === 'own_nick') return 'Your nickname';
+            if (value === 'party_shared') return 'Fury teammate';
             if (value === 'skin') return 'Skin';
             if (value === 'stats') return 'Stats';
             return value.replace(/_/g, ' ') || 'Unknown';
@@ -10503,7 +10515,7 @@
                     shareTagsIncludeThreats: ids.shareTagsIncludeThreats.checked,
                     quickMathsEnabled: ids.quickMathsEnabled.checked,
                     autoDodgeEnabled: ids.autoDodgeEnabled.checked,
-                    autoDodgeDelaySeconds: Number(ids.autoDodgeDelaySeconds.value),
+                    autoDodgeLeaveMode: ids.autoDodgeLeaveMode.value,
                     autoDodgeTaggedPlayers: ids.autoDodgeTaggedPlayers.checked,
                     autoDodgeNickedPlayers: ids.autoDodgeNickedPlayers.checked,
                     autoDodgeStatThreats: ids.autoDodgeStatThreats.checked,
@@ -10516,6 +10528,7 @@
                     partyOverviewEnabled: true,
                     autoSkinDenickEnabled: ids.autoSkinDenickEnabled.checked,
                     autoStatsDenickEnabled: ids.autoStatsDenickEnabled.checked,
+                    shareOwnNicknameEnabled: ids.shareOwnNicknameEnabled.checked,
                     denickChatAnnouncementsEnabled: ids.denickChatAnnouncementsEnabled.checked,
                     lobbyChatStatsEnabled: ids.lobbyChatStatsEnabled.checked,
                     lobbyChatStatsMentionEnabled: ids.lobbyChatStatsMentionEnabled.checked,
@@ -10656,13 +10669,15 @@
             button.addEventListener('click', () => {
                 const input = ids[button.dataset.keyCopy];
                 if (!input || !input.value) {
-                    document.getElementById('save-status').textContent = 'No key to copy';
-                    setTimeout(() => document.getElementById('save-status').textContent = 'Ready', 1400);
+                    setLauncherStatus('No API key to copy', 'warning');
                     return;
                 }
-                clipboard.writeText(input.value);
-                document.getElementById('save-status').textContent = 'Copied key';
-                setTimeout(() => document.getElementById('save-status').textContent = 'Ready', 1400);
+                try {
+                    clipboard.writeText(input.value);
+                    setLauncherStatus('API key copied to clipboard', 'success');
+                } catch (error) {
+                    setLauncherStatus('Could not copy API key. Try again.', 'error');
+                }
             });
         });
         const hypixelKeyReminderView = require('./src/launcher/renderer/launcher_hypixel_key_reminder').mount({
@@ -10671,15 +10686,6 @@
             openExternal: url => shell.openExternal(url),
             refresh,
             setStatus: setLauncherStatus
-        });
-        document.querySelectorAll('[data-key-replace]').forEach((button) => {
-            button.addEventListener('click', () => {
-                const input = ids[button.dataset.keyReplace];
-                if (!input) return;
-                input.type = 'text';
-                input.focus();
-                input.select();
-            });
         });
         document.querySelectorAll('[data-api-test]').forEach((button) => {
             button.addEventListener('click', async () => {

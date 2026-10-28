@@ -2,6 +2,7 @@
 
 const { mergeTextureProperties } = require('./skinTextures.js');
 const { rewriteChatRanks } = require('./chatRanks.js');
+const { extractText, stripAnsi } = require('../../features/minecraft_chat');
 
 // Render a known nicked player under their REAL IGN in-game.
 //
@@ -640,6 +641,11 @@ function createDenickDisplayNames({
             } catch (error) {
                 return data;
             }
+
+            // Keep both identities in the automatic party announcement: replacing
+            // its nick would make it say the real player is nicked as themselves.
+            const visibleText = stripAnsi(extractText(message));
+            if (/^Party > .*?: \[Denick\] [A-Za-z0-9_]{3,16} is nicked as [A-Za-z0-9_]{3,16} \| \d+★ FKDR [\d.]+ WLR [\d.]+ WS \d+$/.test(visibleText)) return data;
 
             const replaceNames = (text) => String(text).replace(/[A-Za-z0-9_]{3,16}/g, (name) => {
                 let real = null;

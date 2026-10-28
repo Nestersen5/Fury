@@ -21,7 +21,7 @@ const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
     if(!packaged)env.NODE_BINARY=process.execPath;
     if(packaged)require('./verify_packaged_sources').verifySources(root,packaged.appRoot);
     const defaults=require('../src/session/settings').SESSION_DEFAULTS;
-    fs.writeFileSync(path.join(profile,'features_config.json'),JSON.stringify({...defaults,apiKillSwitchEnabled:true,gameRecapEnabled:true,sessionGoalWins:10,sessionRecapStyle:'compact',friendAliasEnabled:true}));
+    fs.writeFileSync(path.join(profile,'features_config.json'),JSON.stringify({...defaults,...(options['--focus'] === 'teammate-nicks' ? {autoSaveTeammateNicknames:false,shareOwnNicknameEnabled:false,autoSaveSharedNicknamesEnabled:false} : {}),apiKillSwitchEnabled:true,gameRecapEnabled:true,sessionGoalWins:10,sessionRecapStyle:'compact',friendAliasEnabled:true}));
     fs.writeFileSync(path.join(profile,'server_config.json'),JSON.stringify({proxyDirectPort:directPort,proxyFailoverPort:failoverPort,healthPort,proxyDirectHost:'mc.hypixel.net',proxyFailoverHost:'hypixel.fast'}));
     const accounts=[{uuid:'a'.repeat(32),name:'Nestersen'},{uuid:'b'.repeat(32),name:'SecondAccount'}];
     const store=require('../src/reminders/rememberedAccount').createReminderAccountStore(path.join(profile,'launcher_data','reminders'));
@@ -52,6 +52,11 @@ const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
             await require('./verify_launcher_key_reminder')({page,output,profile});
             assert.deepStrictEqual(errors,[]);
             record('Hypixel key reminders, 24-hour snooze, replacement and responsive API settings passed');
+            return;
+        }
+        if(options['--focus']==='teammate-nicks'){
+            await require('./verify_teammate_nick_settings')({page,output,profile});
+            assert.deepStrictEqual(errors,[]);
             return;
         }
         if(options['--focus']==='overlay-chat'){
@@ -186,11 +191,14 @@ const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
             const before=await page.evaluate('collectFeatureSettings()');const value=!before.features[key];await change(id,value);await waitSaved(key,value);before.features[key]=value;assert.deepStrictEqual(await page.evaluate('collectFeatureSettings()'),before);
         }
         assert.strictEqual(await page.$$eval('[id^="friend-alias"], .fury-alias-panel', nodes=>nodes.length),0);
-        await change('auto-dodge-delay-seconds-slider',6,'input');await waitSaved('autoDodgeDelaySeconds',6);assert.strictEqual(await page.evaluate('ids.autoDodgeDelaySeconds.value'),'6');
-        await change('ender-dust-reminder-threshold',271);await waitSaved('enderDustReminderThreshold',271);assert.strictEqual(await page.evaluate('document.getElementById("ender-dust-reminder-threshold-slider").value'),'271');
-        await change('auto-dodge-delay-seconds',50);await waitSaved('autoDodgeDelaySeconds',15);await change('ender-dust-reminder-threshold',0);await waitSaved('enderDustReminderThreshold',1);
-        await page.evaluate(`ipcRenderer.invoke('settings:save-features',{features:{...state.settings.features,autoDodgeDelaySeconds:9,enderDustReminderThreshold:250}}).then(()=>refresh())`);
-        await page.waitForFunction(`document.getElementById('auto-dodge-delay-seconds-slider').value==='9' && document.getElementById('ender-dust-reminder-threshold-slider').value==='250'`);
+        await change('auto-dodge-leave-mode','instant');await waitSaved('autoDodgeLeaveMode','instant');
+        await page.evaluate('refresh()');assert.strictEqual(await page.evaluate('ids.autoDodgeLeaveMode.value'),'instant');
+        await change('auto-dodge-leave-mode','before_start');await waitSaved('autoDodgeLeaveMode','before_start');
+        assert.strictEqual(await page.$('#auto-dodge-delay-seconds'),null);
+        await change('ender-dust-reminder-threshold',271);await waitSaved('enderDustReminderThreshold',271);
+        await change('ender-dust-reminder-threshold',0);await waitSaved('enderDustReminderThreshold',1);
+        await page.evaluate(`ipcRenderer.invoke('settings:save-features',{features:{...state.settings.features,autoDodgeLeaveMode:'instant',enderDustReminderThreshold:250}}).then(()=>refresh())`);
+        await page.waitForFunction(`ids.autoDodgeLeaveMode.value==='instant' && document.getElementById('ender-dust-reminder-threshold-slider').value==='250'`);
         record('Custom names are removed; color options remain independent; sliders synchronize, clamp and persist');
         await page.evaluate("activatePage('settings');activateSettingsSubpage('overlay',false)");
         await require('./verify_overlay_chat_settings')({page,output,profile});
@@ -208,19 +216,25 @@ const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
             await page.setViewport({width,height:900,deviceScaleFactor:1});
             const centers=await page.evaluate(()=>{
                 const rect=selector=>document.querySelector(selector).getBoundingClientRect();
-                const left=rect('.fury-number-control:has(#auto-dodge-min-fkdr)'),right=rect('.fury-number-control:has(#auto-dodge-min-stars)'),or=rect('.auto-dodge-threshold-or'),delay=rect('.fury-number-control:has(#auto-dodge-delay-seconds)');
+                const left=rect('.fury-number-control:has(#auto-dodge-min-fkdr)'),right=rect('.fury-number-control:has(#auto-dodge-min-stars)'),or=rect('.auto-dodge-threshold-or'),delay=rect('.stat-select-shell:has(#auto-dodge-leave-mode)');
                 return {delayY:delay.left>right.right ? Math.abs(delay.top-left.top) : 0,delayHeight:Math.abs(delay.height-left.height),x:Math.abs((or.left+or.right)/2-(left.right+right.left)/2),y:Math.abs((or.top+or.bottom)/2-(left.top+left.bottom)/2)};
             });
-            assert(centers.x<1 && centers.y<1 && centers.delayY<1 && centers.delayHeight<1,JSON.stringify({width,...centers}));
+            assert(centers.x<1 && centers.y<1 && centers.delayY<1,JSON.stringify({width,...centers}));
         }
         await page.setViewport({width:1440,height:900,deviceScaleFactor:1});
-        record('Auto Dodge advanced controls removed and OR centered and Leave delay aligned with threshold inputs');
-        const stepper='.fury-number-control:has(#auto-dodge-delay-seconds)';
-        await click(stepper+' button:last-child');await waitSaved('autoDodgeDelaySeconds',10);
-        await click(stepper+' button:first-child');await waitSaved('autoDodgeDelaySeconds',9);
-        await change('auto-dodge-delay-seconds',15);await waitSaved('autoDodgeDelaySeconds',15);
-        assert(await page.$eval(stepper+' button:last-child',e=>e.disabled));
-        record('Selection tiles support mouse and keyboard; explicit Off/On states and numeric steppers save correctly and respect limits');
+        record('Auto Dodge OR centered and Leave timing aligned with threshold inputs');
+        const timingTrigger='.stat-select-shell:has(#auto-dodge-leave-mode) .stat-select-trigger';
+        const timingMenu='[data-stat-select-for="auto-dodge-leave-mode"]';
+        await click(timingTrigger);
+        assert.strictEqual(await page.$eval(timingMenu+' input', el=>el.parentElement.hidden),true);
+        assert.deepStrictEqual(await page.$$eval(timingMenu+' [role="option"]',els=>els.map(el=>el.textContent.trim())),['Instantly','Before game starts']);
+        await page.screenshot({path:path.join(output,'auto-dodge-timing-open.png')});
+        await click(timingMenu+' [data-value="before_start"]');await waitSaved('autoDodgeLeaveMode','before_start');
+        assert.strictEqual(await page.$eval(timingTrigger,el=>el.textContent.trim()),'Before game starts');
+        await page.focus(timingTrigger);await page.keyboard.press('Enter');await page.keyboard.press('Home');await page.keyboard.press('Enter');await waitSaved('autoDodgeLeaveMode','instant');
+        await page.keyboard.press('Enter');await page.keyboard.press('Escape');
+        assert.strictEqual(await page.$eval(timingTrigger,el=>el.getAttribute('aria-expanded')),'false');
+        record('Auto Dodge styled timing menu saves both choices and supports keyboard selection and Escape');
         assert(await page.evaluate(`ipcRenderer.invoke('fury-hud:open').then(()=>false,()=>true)`));
         assert.strictEqual(await page.evaluate('document.querySelectorAll("#desktop-hud-controls,#overlay-floating-window,#overlay-preview-mode").length'),0);
         await page.evaluate("activatePage('cosmetics')");assert.strictEqual(await page.evaluate('activePageName()'),'dashboard');

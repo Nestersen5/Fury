@@ -12,16 +12,15 @@ const { createFeatureStatus } = require('../../features/feature_panel.js');
 // separate stat threshold), schedule a /l (leave) so we dodge before the game
 // starts.
 //
-// The delay doubles as a cancel window, but it is also countdown-aware: when the
-// game is about to start the leave fires "as late as safely possible" (a small
-// buffer before the start) so a tag found late in the countdown still dodges. We
-// never send /l once the game has actually started.
+// Leave instantly or wait until the countdown reaches the safe pre-start
+// boundary, allowing cancellation while waiting. Never leave an active game.
 //
 // All collaborators are injected. Per-connection state (pendingDodge,
 // pregameCountdown) lives inside the instance, so create one per connection
 // (mirrors createAutoGamblerSession in proxy.js).
 
-const SAFETY_BUFFER_SECONDS = 1; // leave this many seconds before the game starts
+// Leave enough room for the shared command lane's pacing and network delay.
+const SAFETY_BUFFER_SECONDS = 2;
 const DODGE_INCLUDE_PRESETS = new Set(['all_on', 'custom']);
 
 function createAutoDodger(deps) {
@@ -32,7 +31,7 @@ function createAutoDodger(deps) {
         isGameActive,
         getPregameSessionId,
         isEnabled,
-        getDelaySeconds,
+        getLeaveMode = () => 'before_start',
         getDodgeSettings,
         applyConfig,
         compactTagName,
@@ -163,19 +162,18 @@ function createAutoDodger(deps) {
     }
 
     function noteScoreboard(scoreboardText) {
-        pregameCountdown.note(scoreboardText);
-        if (!pendingDodge) return;
-        const delaySeconds = effectiveDelaySeconds();
-        const nextDueAt = now() + delaySeconds * 1000;
-        // A countdown can appear after the player match was evaluated. Pull an
-        // existing decision window forward so the configured delay can never
-        // carry the leave past the safe pre-start boundary.
-        if (!Number.isFinite(pendingDodge.dueAt) || nextDueAt + 25 < pendingDodge.dueAt) {
-            const plan = pendingDodge;
-            clearTimeout(plan.timer);
-            plan.dueAt = nextDueAt;
-            plan.timer = setTimeout(() => executeDodge(plan), delaySeconds * 1000);
-        }
+        if (pregameCountdown.note(scoreboardText)) refreshPendingDodge();
+    }
+
+    function noteChat(text) {
+        if (pregameCountdown.noteChat(text)) refreshPendingDodge();
+    }
+
+    function refreshPendingDodge() {
+        if (!pendingDodge || getLeaveMode() === 'instant') return;
+        const plan = pendingDodge;
+        clearTimeout(plan.timer);
+        schedulePlan(plan);
     }
 
     function estimateSecondsRemaining() {
@@ -183,11 +181,15 @@ function createAutoDodger(deps) {
     }
 
     function effectiveDelaySeconds() {
-        const configured = getDelaySeconds();
+        if (getLeaveMode() === 'instant') return 0;
         const remaining = estimateSecondsRemaining();
-        if (remaining === null) return configured;
-        const latest = Math.floor(remaining) - SAFETY_BUFFER_SECONDS;
-        return Math.max(0, Math.min(configured, latest));
+        return remaining === null ? null : Math.max(0, remaining - SAFETY_BUFFER_SECONDS);
+    }
+
+    function schedulePlan(plan) {
+        const delaySeconds = effectiveDelaySeconds();
+        plan.dueAt = delaySeconds === null ? null : now() + delaySeconds * 1000;
+        plan.timer = delaySeconds === null ? null : setTimeout(() => executeDodge(plan), delaySeconds * 1000);
     }
 
     function canExecuteDodge(plan) {
@@ -200,6 +202,7 @@ function createAutoDodger(deps) {
     }
 
     function executeDodge(plan) {
+        if (pendingDodge !== plan) return;
         pendingDodge = null;
         if (!canExecuteDodge(plan)) return;
         sendChat(`§b§lDodge §8» §cLeaving lobby §7— §f${plan.player} §7matched auto-dodge (${plan.reason}§7).`);
@@ -255,19 +258,14 @@ function createAutoDodger(deps) {
             reason,
             sessionId: getPregameSessionId(),
             timer: null,
-            dueAt: now() + delaySeconds * 1000
+            dueAt: null
         };
-        plan.timer = setTimeout(() => executeDodge(plan), delaySeconds * 1000);
         pendingDodge = plan;
+        schedulePlan(plan);
 
-        if (delaySeconds <= 0) return; // executeDodge will announce on the next tick
+        if (delaySeconds === 0) return; // immediate leave announces on the next tick
 
-        const shortened = delaySeconds < getDelaySeconds();
-        if (shortened) {
-            sendChat(`§b§lDodge §8» §e${name} §7matched auto-dodge (${reason}§7). §6Game starting §7— leaving in §f${delaySeconds}s§7.`);
-        } else {
-            sendChat(`§b§lDodge §8» §e${name} §7matched auto-dodge (${reason}§7). Leaving in §f${delaySeconds}s§7.`);
-        }
+        sendChat(`§b§lDodge §8» §e${name} §7matched auto-dodge (${reason}§7). Leaving just before the game starts.`);
         sendChat({
             text: '',
             extra: [
@@ -291,7 +289,7 @@ function createAutoDodger(deps) {
 
     function onGameStart() {
         if (!pendingDodge) return;
-        sendChat(`§b§lDodge §8» §cGame started before dodge fired §7(§f${pendingDodge.player}§7). Consider a shorter §e/dodge delay§7.`);
+        sendChat(`§b§lDodge §8» §cThe game started before Fury could leave §7(§f${pendingDodge.player}§7). Use §e/dodge timing instant §7to leave as soon as a player matches.`);
         cancel('game started', { announce: false });
     }
 
@@ -384,7 +382,7 @@ function createAutoDodger(deps) {
     function sendController() {
         const settings = getSettings();
         const enabled = isEnabled();
-        const delaySeconds = getDelaySeconds();
+        const leaveMode = getLeaveMode();
         const includeLocked = settings.includePreset !== 'custom';
         const pending = pendingDodge ? pendingDodge.player : null;
         const lockedHover = includeLocked
@@ -398,8 +396,6 @@ function createAutoDodger(deps) {
         const fkdrUp = Number((fkdr + 0.5).toFixed(2));
         const starsDown = Math.max(0, stars - 50);
         const starsUp = stars + 50;
-        const delayDown = Math.max(0, delaySeconds - 1);
-        const delayUp = Math.min(15, delaySeconds + 1);
 
         panel.open();
         panel.section('Overview');
@@ -435,9 +431,7 @@ function createAutoDodger(deps) {
         ]);
 
         panel.section('Timing');
-        renderAdjustRow(panel, 'Delay', `${delaySeconds}s`,
-            `/dodge delay ${delayDown}`, `/dodge delay ${delayUp}`, '/dodge delay ',
-            delaySeconds > 0, delaySeconds < 15, 'delay');
+        panel.valueRow('Leave timing', leaveMode === 'instant' ? 'Instantly' : 'Before game starts');
 
         panel.section('Threat rules');
         renderAdjustRow(panel, 'FKDR >=', `${getFkdrColor(fkdr)}${fkdr.toFixed(2)}`,
@@ -476,14 +470,21 @@ function createAutoDodger(deps) {
             cancel('disabled', { announce: false });
             settingsLine();
         }
-        else if (subCmd === 'delay') {
-            if (args[2] === undefined) {
-                settingsLine();
-                sendChat('§7Tip: click §e[ Edit ]§7 or type §e/dodge delay <0-15>§7.');
-            } else {
-                applyConfig({ delaySeconds: args[2] });
-                settingsLine();
+        else if (subCmd === 'timing') {
+            const mode = String(args[2] || '').toLowerCase();
+            if (!['instant', 'before_start'].includes(mode)) {
+                sendChat('§b§lDodge §8» §7Usage: §e/dodge timing instant|before_start');
+                return;
             }
+            applyConfig({ leaveMode: mode });
+            if (pendingDodge) {
+                clearTimeout(pendingDodge.timer);
+                schedulePlan(pendingDodge);
+            }
+            settingsLine();
+        }
+        else if (subCmd === 'delay') {
+            sendChat('§b§lDodge §8» §7Leave delay has been replaced. Use §e/dodge timing instant|before_start§7.');
         }
         else if (subCmd === 'include') {
             const includeName = normalizeDodgeIncludeName(args[2]);
@@ -548,7 +549,7 @@ function createAutoDodger(deps) {
             settingsLine();
         }
         else {
-            sendChat('§cUsage: /dodge on|off|preset <all|custom>|delay <s>|include <tagged|nicks|threats|all> on|off|threat fkdr/stars <n>|cancel|status');
+            sendChat('§cUsage: /dodge on|off|preset <all|custom>|timing instant|before_start|include <tagged|nicks|threats|all> on|off|threat fkdr/stars <n>|cancel|status');
         }
     }
 
@@ -556,7 +557,7 @@ function createAutoDodger(deps) {
         const remaining = estimateSecondsRemaining();
         const settings = getSettings();
         return {
-            autoDodge: isEnabled() ? `on/${getDelaySeconds()}s` : 'off',
+            autoDodge: isEnabled() ? `on/${getLeaveMode()}` : 'off',
             autoDodgeFilters: [
                 settings.taggedPlayers && 'tagged',
                 settings.nickedPlayers && 'nicks',
@@ -573,6 +574,7 @@ function createAutoDodger(deps) {
         cancel,
         reset,
         noteScoreboard,
+        noteChat,
         onGameStart,
         handleCommand,
         getDebugState

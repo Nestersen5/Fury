@@ -84,7 +84,10 @@ function mount({document,node,button}){
     const nicknameSections=[
         ['denick-detection-title','Identify players using',[
             ['auto-skin-denick-enabled','Skin','Only works when player is using his real skin while nicked'],
-            ['auto-stats-denick-enabled','Bedwars Stats','Only works when player has kill messages including finals and bed counters']
+            ['auto-stats-denick-enabled','Bedwars Stats','Find possible matches from finals or beds in chat, then confirm with both.']
+        ]],
+        ['denick-sharing-title','Party nicknames',[
+            ['share-own-nickname-enabled','Share my nickname with Fury party members','After the game starts, shares your nickname only when you are nicked and the other Fury player is in the same party.']
         ]],
         ['denick-results-title','Show real names in',[
             ['show-denicked-real-ign','Overlay & Tab Stats','Only visible to you'],

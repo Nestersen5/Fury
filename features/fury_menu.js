@@ -59,7 +59,7 @@ const FURY_HELP_TOPICS = Object.freeze({
         title: 'Safety',
         description: 'Pregame protection, nick resolution, and party checks.',
         entries: [
-            { label: 'Auto Dodge', command: '/dodge', description: 'Leave risky BedWars pregames using your selected rules.', examples: ['/dodge delay 10', '/dodge include tagged on'] },
+            { label: 'Auto Dodge', command: '/dodge', description: 'Leave risky BedWars pregames using your selected rules.', examples: ['/dodge timing before_start', '/dodge include tagged on'] },
             { label: 'Nick Reroller', command: '/nickroll', description: 'Roll until name filters match, then choose Use Name.', examples: ['/nickroll start', '/nickroll stop', '/nickroll status', '/nickroll words'] },
             { label: 'Denick', command: '/denick', description: 'Automatic and manual nickname resolution.', examples: ['/denick autoskin on', '/denick party'] },
             { label: 'Party overview', command: '/po status', description: 'Run local-only checks for current party members.', examples: ['/po', '/po status'] }
@@ -158,7 +158,7 @@ const FURY_HELP_TOPICS = Object.freeze({
         entries: [
             { label: 'Power', command: '/dodge', description: 'Enable or disable automatic pregame leaving.', examples: ['/dodge on', '/dodge off'] },
             { label: 'Players', command: '/dodge', description: 'Use the All preset or independently include tags, nicks, and stat threats.', examples: ['/dodge preset custom', '/dodge include nicks on'] },
-            { label: 'Delay', command: '/dodge', description: 'Wait 0-15 seconds before leaving so you can cancel.', examples: ['/dodge delay 8', '/dodge cancel'] },
+            { label: 'Leave timing', command: '/dodge', description: 'Leave instantly or just before the game starts. Cancel in chat while waiting.', examples: ['/dodge timing instant', '/dodge cancel'] },
             { label: 'Threat rules', command: '/dodge', description: 'Set the FKDR and star thresholds for stat threats.', examples: ['/dodge threat fkdr 5', '/dodge threat stars 700'] }
         ]
     },

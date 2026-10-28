@@ -134,6 +134,9 @@ const defaults = {
         quickMathsEnabled: false,
         autoSkinDenickEnabled: true,
         autoStatsDenickEnabled: true,
+        autoSaveTeammateNicknames: true,
+        shareOwnNicknameEnabled: true,
+        autoSaveSharedNicknamesEnabled: true,
         denickChatAnnouncementsEnabled: true,
         denickPartyAnnounceEnabled: true,
         lobbyChatStatsEnabled: true,
@@ -146,6 +149,7 @@ const defaults = {
         partySplitWarningsEnabled: true,
         autoDodgeEnabled: true,
         autoDodgeDelaySeconds: 10,
+        autoDodgeLeaveMode: 'before_start',
         autoDodgeTaggedPlayers: true,
         autoDodgeNickedPlayers: false,
         autoDodgeStatThreats: false,
@@ -396,7 +400,10 @@ function loadFeatureSettings() {
     const savedFeatures = readJson(paths.features, defaults.features);
     const features = {
         ...defaults.features,
-        ...savedFeatures
+        ...savedFeatures,
+        // Party nickname features are automatic; ignore legacy off preferences.
+        autoSaveTeammateNicknames: true,
+        autoSaveSharedNicknamesEnabled: true
     };
     delete features.nametagSourcePriority;
     // Overlay additions follow launcher visibility; ignore retired switches.
@@ -414,6 +421,7 @@ function loadFeatureSettings() {
     if (savedFeatures.bedwarsSidebarTeamColorsEnabled === undefined) {
         features.bedwarsSidebarTeamColorsEnabled = Boolean(features.accentBedwarsEventLabelsEnabled);
     }
+    features.autoDodgeLeaveMode = features.autoDodgeLeaveMode === 'instant' ? 'instant' : 'before_start';
     features.autoDodgeDelaySeconds = normalizeDodgeDelaySeconds(
         features.autoDodgeDelaySeconds,
         defaults.features.autoDodgeDelaySeconds
@@ -498,6 +506,9 @@ function saveFeatureSettings(features) {
         autoGamblerEnabled: false, // Retired; ignore legacy saved values.
         autoSkinDenickEnabled: Boolean(next.autoSkinDenickEnabled),
         autoStatsDenickEnabled: Boolean(next.autoStatsDenickEnabled),
+        autoSaveTeammateNicknames: true,
+        shareOwnNicknameEnabled: next.shareOwnNicknameEnabled !== false,
+        autoSaveSharedNicknamesEnabled: true,
         denickChatAnnouncementsEnabled: Boolean(next.denickChatAnnouncementsEnabled),
         denickPartyAnnounceEnabled: Boolean(next.denickPartyAnnounceEnabled),
         lobbyChatStatsEnabled: Boolean(next.lobbyChatStatsEnabled),
@@ -513,6 +524,7 @@ function saveFeatureSettings(features) {
         autoDodgeEnabled: next.autoDodgeEnabled !== undefined
             ? Boolean(next.autoDodgeEnabled)
             : defaults.features.autoDodgeEnabled,
+        autoDodgeLeaveMode: next.autoDodgeLeaveMode === 'instant' ? 'instant' : 'before_start',
         autoDodgeDelaySeconds: normalizeDodgeDelaySeconds(
             next.autoDodgeDelaySeconds,
             defaults.features.autoDodgeDelaySeconds

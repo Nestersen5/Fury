@@ -37,10 +37,10 @@ const { bundled, validateNotes, summarizeNotes } = require('../../src/updates/re
         assert.equal(await current.check(), null, 'Dismissal survives upgrading to that release');
         assert.equal((await current.notes()).fromVersion, '1.1.1');
         current.dispose();
-        current = service('1.1.2', { version: '1.1.3' }, { read: async () => ({ schemaVersion: 1, releases: [
-            { version: '1.1.3', features: ['Future release feature.'], improvements: [], fixes: [] }
+        current = service('1.1.2', { version: '9.9.8' }, { read: async () => ({ schemaVersion: 1, releases: [
+            { version: '9.9.8', features: ['Future release feature.'], improvements: [], fixes: [] }
         ] }) });
-        assert.equal((await current.check()).version, '1.1.3', 'New releases still notify');
+        assert.equal((await current.check()).version, '9.9.8', 'New releases still notify');
         assert.deepEqual((await current.notes()).sections.features, ['Future release feature.']);
         current.dispose();
         current = service('1.1.2', { version: '1.1.4' }, { read: async () => { throw Error('Offline'); } });

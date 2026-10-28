@@ -38,7 +38,8 @@ require(${JSON.stringify(require.resolve('axios'))}).defaults.adapter = async ()
     const upstream = mc.createServer({ host: '127.0.0.1', port: upstreamPort,
         'online-mode': false, version: '1.8.9', keepAlive: false });
     const relay = new WebSocketServer({ host: '127.0.0.1', port: relayPort });
-    const publications = [], messages = [], errors = [];
+    const publications = [], messages = [], errors = [], nicknamePublications = [];
+    let lastNickname = null;
     let peerSequence = 0, child, player, serverClient, positioned = false;
     relay.on('connection', ws => {
         ws.on('error', error => errors.push(error.message));
@@ -46,12 +47,19 @@ require(${JSON.stringify(require.resolve('axios'))}).defaults.adapter = async ()
         ws.on('message', raw => {
             const message = JSON.parse(String(raw));
             assert(!String(raw).includes('synthetic'), 'credentials must never reach relay');
-            if (message.type === 'authenticate') ws.send(JSON.stringify({ v: 1, type: 'ready' }));
-            if (message.type === 'state') publications.push(message.observation);
+            if (message.type === 'authenticate') ws.send(JSON.stringify({ v: 1, type: 'ready', capabilities: ['nicknames-v1'] }));
+            if (message.type === 'state') {
+                publications.push(message.observation); lastNickname = message.nickname;
+                if (message.nickname?.nick) {
+                    nicknamePublications.push(message.nickname);
+                    ws.send(JSON.stringify({ v: 1, type: 'nick_saved', id: message.nickname.id, name: 'Bob', uuid: 'b'.repeat(32) }));
+                }
+            }
             if (message.type === 'probe' && message.names.includes('bob')) ws.send(JSON.stringify({
                 v: 1, type: 'peer', id: message.id, name: 'Bob', uuid: 'b'.repeat(32),
-                observation: { phase: 'pregame', serverId: 'mini2A', generation: '1:1',
-                    seq: ++peerSequence, stableMs: 1500 }
+                observation: { phase: lastNickname ? 'other' : 'pregame', serverId: lastNickname ? null : 'mini2A', generation: '1:1',
+                    seq: ++peerSequence, stableMs: 1500 },
+                ...(lastNickname ? { nickname: { nick: 'BobNick', id: '2'.repeat(24), serverId: lastNickname.serverId, mode: lastNickname.mode, receive: true } } : {})
             }));
         });
     });
@@ -75,6 +83,8 @@ require(${JSON.stringify(require.resolve('axios'))}).defaults.adapter = async ()
         player.on('position', () => { positioned = true; });
         player.on('chat', data => messages.push(data.message));
         await eventually(async () => { assertRunning(child); assert(positioned); }, 'Connecting player');
+        player.write('chat', { message: '/denick self' });
+        await eventually(async () => assert(messages.some(text => text.includes('Not checked yet.'))), 'Diagnostic before any own tab observation');
         chat('Party Leader: Alice'); chat('Party Members: Bob');
         await eventually(async () => { assertRunning(child); assert(publications.length); }, 'Confirming roster and relay authentication');
         serverClient.write('scoreboard_objective', { name: 'bedwars', action: 0, displayText: 'BED WARS', type: 'integer' });
@@ -96,10 +106,64 @@ require(${JSON.stringify(require.resolve('axios'))}).defaults.adapter = async ()
         score('Waiting...', 1);
         await new Promise(resolve => setTimeout(resolve, 100));
         assert(!publications.slice(boundary).some(x => x.phase === 'pregame'));
+        serverClient.write('scoreboard_team', { team: 'date', mode: 2, name: 'date',
+            prefix: '10/07/26 ', suffix: 'mini1A', friendlyFire: 0, nameTagVisibility: 'always', color: -1 });
+        score('\u{1F525}', 5);
+        serverClient.write('player_info', { action: 'add_player', data: [
+            { uuid: 'a'.repeat(32), name: 'AliceNick', properties: [], gamemode: 0, ping: 0, displayName: null },
+            { uuid: 'd'.repeat(32), name: 'BobNick', properties: [], gamemode: 0, ping: 0, displayName: null }
+        ] });
+        serverClient.write('scoreboard_team', { team: 'red', mode: 0, name: 'red', prefix: '§cR ', suffix: '',
+            friendlyFire: 0, nameTagVisibility: 'always', color: 12, players: ['AliceNick', 'BobNick'] });
+        chat('Protect your bed and destroy the enemy beds.');
+        await eventually(async () => {
+            assertRunning(child);
+            assert(nicknamePublications.some(entry => entry.nick === 'AliceNick'));
+            assert(messages.some(text => text.includes('Shared your nickname') && text.includes('Bob')));
+            assert(messages.some(text => text.includes('Received') && text.includes('BobNick') && text.includes('saved it')));
+        }, 'Own nickname sharing and received nickname saving');
+        const savedNicks = JSON.parse(fs.readFileSync(path.join(directory, 'denicked.json')));
+        assert(savedNicks.find(entry => entry.realIGN === 'Alice')?.nicks.includes('AliceNick'));
+        assert(savedNicks.find(entry => entry.realIGN.toLowerCase() === 'bob')?.nicks.includes('BobNick'));
+        const diagnosticStart = messages.length;
+        player.write('chat', { message: '/denick self' });
+        await eventually(async () => {
+            const report = messages.slice(diagnosticStart);
+            assert(report.some(text => text.includes('Current nickname:') && text.includes('AliceNick')));
+            assert(report.some(text => text.includes('Saved nickname history:')));
+            assert(report.some(text => text.includes('AliceNick') && !text.includes('BobNick')));
+        }, 'Diagnostic after game detection shows own nickname and history');
+        const notice = JSON.parse(messages.find(text => text.includes('Received') && text.includes('BobNick')));
+        const undo = notice.extra.find(part => part.clickEvent?.value.includes('party undo')).clickEvent.value;
+        player.write('chat', { message: undo });
+        await eventually(async () => assert(messages.some(text => text.includes('Removed the saved match for'))), 'Shared nickname Undo');
+        for (const command of ['autoteammates', 'sharednicks']) {
+            player.write('chat', { message: `/denick ${command} off` });
+        }
+        await eventually(async () => {
+            assert.equal(messages.filter(text => text.includes('always enabled')).length, 2);
+            assert(messages.some(text => text.includes('[Turn off sharing]')));
+        }, 'Legacy commands cannot disable nickname features');
+        player.write('chat', { message: '/denick sharenick off' });
+        await eventually(async () => assert.equal(JSON.parse(fs.readFileSync(path.join(directory, 'features_config.json'))).shareOwnNicknameEnabled, false), 'Chat sharing button persists off');
+        serverClient.write('player_info', { action: 'add_player', data: [
+            { uuid: 'a'.repeat(32), name: 'NewAliceNick', properties: [], gamemode: 0, ping: 0, displayName: null }
+        ] });
+        await eventually(async () => {
+            const history = JSON.parse(fs.readFileSync(path.join(directory, 'denicked.json')));
+            const self = history.find(entry => entry.realIGN === 'Alice');
+            assert(self.nicks.includes('AliceNick') && self.nicks.includes('NewAliceNick'));
+        }, 'Own nickname changes retain old names with sharing always enabled');
+        assert(!nicknamePublications.some(entry => entry.nick === 'NewAliceNick'));
+        player.write('chat', { message: '/denick sharenick on' });
+        await eventually(async () => assert(nicknamePublications.some(entry => entry.nick === 'NewAliceNick')), 'Sharing resumes when enabled');
         player.write('chat', { message: '/apikill on' });
         await eventually(async () => assert.equal(relay.clients.size, 0), 'API kill switch closes relay');
         assert.deepEqual(errors, []);
-        console.log('Production proxy roster, sidebar-ID gate, split warning, transfer and kill switch passed.');
+        console.log('Production proxy split checks, private nickname history, sharing notices, received saving, Undo, always-on behavior and kill switch passed.');
+    } catch (error) {
+        console.error('Nickname fixture state:', { nicknamePublications, lastNickname, publications: publications.slice(-4), messages: messages.slice(-5), proxyOutput: child?.output });
+        throw error;
     } finally {
         player?.end(); serverClient?.end(); player?.socket?.destroy(); serverClient?.socket?.destroy();
         if (child) await stopChild(child);

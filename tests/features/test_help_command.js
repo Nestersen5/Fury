@@ -8,6 +8,8 @@ const {
 
 assert(HELP_SECTIONS.some(section => section.title === 'Stats & Sessions'), 'Help should include the current stats and sessions section');
 assert(HELP_SECTIONS.some(section => section.entries.some(entry => entry.label === '/tabstats')), 'Help should include /tabstats');
+assert(HELP_SECTIONS.some(section => section.entries.some(entry => entry.label === '/wdr'
+    && entry.variations.includes('/wdr cancel'))), 'Help documents background reports and cancellation');
 assert(!HELP_SECTIONS.some(section => section.entries.some(entry => entry.label === '/autogambler')), 'Help excludes the retired command');
 assert(HELP_SECTIONS.some(section => section.entries.some(entry => entry.label === '/apikill')), 'Help should include /apikill');
 assert(HELP_SECTIONS.some(section => section.entries.some(entry => entry.label === '/po' && entry.variations.includes('/po test'))), 'Help should document the Party Overview preview command');

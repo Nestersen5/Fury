@@ -1,6 +1,6 @@
 import protocol from '../../src/party/coordinationProtocol.js';
 const { VERSION, MAX_MEMBERS, MAX_MESSAGE_BYTES, LEASE_MS, nameKey, uuidKey,
-    rosterKeys, observation } = protocol;
+    rosterKeys, observation, nicknameState } = protocol;
 const AUTH_MS = 12000;
 const ID_RE = /^[a-f0-9]{24}$/;
 
@@ -79,8 +79,8 @@ export class PartyRoom {
         } catch { this.remove(ws); return; }
         if (this.now() - a.rateAt >= 1000) { a.rateAt = this.now(); a.count = a.controlCount = 0; }
         // Large parties may answer one query from every member in a burst.
-        if (++a.count > MAX_MEMBERS * 3 + 16
-            || (message.type !== 'reply' && ++a.controlCount > 8)) { this.remove(ws); return; }
+        if (++a.count > MAX_MEMBERS * 4 + 16
+            || (!['reply', 'nick_saved'].includes(message.type) && ++a.controlCount > 8)) { this.remove(ws); return; }
         this.save(ws, a);
         if (!a.authenticated) {
             if (message.type !== 'authenticate' || a.verifying || this.now() - a.openedAt >= AUTH_MS
@@ -96,21 +96,25 @@ export class PartyRoom {
             a = { leader: a.leader, name: nameKey(message.name), uuid: uuidKey(message.uuid),
                 authenticated: true, members: [], observation: null, seenAt: this.now(),
                 rateAt: this.now(), count: 0, controlCount: 0 };
-            this.save(ws, a); this.send(ws, { type: 'ready' }); return;
+            this.save(ws, a); this.send(ws, { type: 'ready', capabilities: ['nicknames-v1'] }); return;
         }
         if (!this.live(a)) { this.remove(ws); return; }
         if (message.type === 'state') {
             const members = rosterKeys(message.members), data = observation(message.observation);
+            const nickname = message.nickname == null ? null : nicknameState(message.nickname);
             if (!members || members.includes(a.name) || !data
+                || (message.nickname != null && !nickname)
+                || (nickname?.nick && nameKey(nickname.nick) === a.name)
                 || (a.leader !== a.name && !members.includes(a.leader))
                 || (a.observation && data.seq <= a.observation.seq)) { this.remove(ws); return; }
             const before = { ...a };
-            a.members = members; a.observation = data; a.seenAt = this.now(); this.save(ws, a);
+            a.members = members; a.observation = data; a.nickname = nickname; a.seenAt = this.now(); this.save(ws, a);
             for (const peer of this.sockets()) {
                 if (peer === ws) continue;
                 const b = this.attachment(peer);
                 if (this.live(b) && this.mutual(a, b)) {
-                    this.send(peer, { type: 'peer', name: a.name, uuid: a.uuid, observation: data });
+                    this.send(peer, { type: 'peer', name: a.name, uuid: a.uuid, observation: data,
+                        ...(b.nickname ? { nickname } : {}) });
                     // A previously unavailable peer can now answer the latest
                     // lobby-scoped query without waiting for another heartbeat.
                     if (b.probeId && b.probeNames?.includes(a.name) && !this.mutual(before, b)) this.send(ws, { type: 'query',
@@ -128,13 +132,26 @@ export class PartyRoom {
             }
         } else if (message.type === 'reply' && ID_RE.test(message.id) && uuidKey(message.to)) {
             const data = observation(message.observation);
-            if (!data || (a.observation && data.seq <= a.observation.seq)) { this.remove(ws); return; }
-            a.observation = data; this.save(ws, a);
+            const nickname = message.nickname == null ? null : nicknameState(message.nickname);
+            if (!data || (message.nickname != null && !nickname)
+                || (nickname?.nick && nameKey(nickname.nick) === a.name)
+                || (a.observation && data.seq <= a.observation.seq)) { this.remove(ws); return; }
+            a.observation = data; a.nickname = nickname; this.save(ws, a);
             for (const peer of this.sockets()) {
                 const b = this.attachment(peer);
                 if (this.live(b) && b.uuid === uuidKey(message.to) && b.probeId === message.id
                     && b.probeNames?.includes(a.name) && this.mutual(a, b)) {
-                    this.send(peer, { type: 'peer', id: message.id, name: a.name, uuid: a.uuid, observation: data });
+                    this.send(peer, { type: 'peer', id: message.id, name: a.name, uuid: a.uuid, observation: data,
+                        ...(b.nickname ? { nickname } : {}) });
+                }
+            }
+        } else if (message.type === 'nick_saved' && ID_RE.test(message.id) && uuidKey(message.to)) {
+            for (const peer of this.sockets()) {
+                const b = this.attachment(peer);
+                if (this.live(b) && b.uuid === uuidKey(message.to) && this.mutual(a, b)
+                    && a.nickname?.receive && b.nickname?.nick && b.nickname.id === message.id
+                    && a.nickname.serverId === b.nickname.serverId && a.nickname.mode === b.nickname.mode) {
+                    this.send(peer, { type: 'nick_saved', id: message.id, name: a.name, uuid: a.uuid });
                 }
             }
         } else { this.remove(ws); }

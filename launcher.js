@@ -1329,9 +1329,9 @@ function settingChanges(before, after) {
     add('Session games goal', before.features?.sessionGoalGames ?? 0, after.features?.sessionGoalGames ?? 0);
     add('Session minutes goal', before.features?.sessionGoalMinutes ?? 0, after.features?.sessionGoalMinutes ?? 0);
     add(
-        'Auto dodge delay',
-        before.features?.autoDodgeDelaySeconds ?? 10,
-        after.features?.autoDodgeDelaySeconds ?? 10
+        'Auto dodge timing',
+        before.features?.autoDodgeLeaveMode === 'instant' ? 'Instantly' : 'Before game starts',
+        after.features?.autoDodgeLeaveMode === 'instant' ? 'Instantly' : 'Before game starts'
     );
     add(
         'Dodge threat FKDR',
@@ -1990,6 +1990,7 @@ handleLauncherRequest('settings:save-features', async (event, settings) => {
         shareTagsIncludeThreats: settings?.features?.shareTagsIncludeThreats ?? before.features?.shareTagsIncludeThreats,
         quickMathsEnabled: settings?.features?.quickMathsEnabled ?? before.features?.quickMathsEnabled,
         autoDodgeEnabled: settings?.features?.autoDodgeEnabled ?? before.features?.autoDodgeEnabled,
+        autoDodgeLeaveMode: settings?.features?.autoDodgeLeaveMode ?? before.features?.autoDodgeLeaveMode,
         autoDodgeDelaySeconds: settings?.features?.autoDodgeDelaySeconds ?? before.features?.autoDodgeDelaySeconds,
         autoDodgeTaggedPlayers: settings?.features?.autoDodgeTaggedPlayers ?? before.features?.autoDodgeTaggedPlayers,
         autoDodgeNickedPlayers: settings?.features?.autoDodgeNickedPlayers ?? before.features?.autoDodgeNickedPlayers,
@@ -2006,6 +2007,9 @@ handleLauncherRequest('settings:save-features', async (event, settings) => {
         gamblerGeorgeReminderState: before.features?.gamblerGeorgeReminderState,
         autoSkinDenickEnabled: settings?.features?.autoSkinDenickEnabled ?? before.features?.autoSkinDenickEnabled,
         autoStatsDenickEnabled: settings?.features?.autoStatsDenickEnabled ?? before.features?.autoStatsDenickEnabled,
+        autoSaveTeammateNicknames: true,
+        shareOwnNicknameEnabled: settings?.features?.shareOwnNicknameEnabled ?? before.features?.shareOwnNicknameEnabled,
+        autoSaveSharedNicknamesEnabled: true,
         denickChatAnnouncementsEnabled: settings?.features?.denickChatAnnouncementsEnabled ?? before.features?.denickChatAnnouncementsEnabled,
         denickPartyAnnounceEnabled: settings?.features?.denickPartyAnnounceEnabled ?? before.features?.denickPartyAnnounceEnabled,
         lobbyChatStatsEnabled: settings?.features?.lobbyChatStatsEnabled ?? before.features?.lobbyChatStatsEnabled,

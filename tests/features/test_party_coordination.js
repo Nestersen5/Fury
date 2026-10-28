@@ -47,9 +47,9 @@ function fixture(options = {}) {
     const receive = async (message, socket = sockets.at(-1)) => {
         socket.emit('message', Buffer.from(JSON.stringify({ v: 1, ...message })), false); await flush();
     };
-    async function ready() {
+    async function ready(capabilities) {
         await receive({ type: 'challenge', challenge: '1'.repeat(40) });
-        await receive({ type: 'ready' });
+        await receive({ type: 'ready', capabilities });
     }
     const probe = () => sent.filter(x => x.type === 'probe').at(-1).id;
     const peer = async (seq, serverId, extra = {}) => receive({ type: 'peer', id: probe(),
@@ -60,6 +60,41 @@ function fixture(options = {}) {
 }
 
 (async () => {
+    {
+        const shared = [];
+        const f = fixture({ onNicknameShared: value => shared.push(value) });
+        const claim = { nick: 'AliceNick', id: '1'.repeat(24), serverId: 'mini1A', mode: 'SKYWARS', receive: true };
+        const state = { ...f.state, phase: 'other', serverId: null, nickname: claim };
+        f.client.update(state); await f.ready(['nicknames-v1']);
+        assert.deepEqual(f.sent.find(x => x.type === 'state').nickname, claim);
+        await f.receive({ type: 'peer', id: f.probe(), name: 'Bob', uuid: bob,
+            observation: { phase: 'other', serverId: null, generation: 'bob:1', seq: 1, stableMs: 1500 },
+            nickname: { ...claim, nick: 'BobNick', id: '2'.repeat(24) } });
+        await f.time.advance(1500);
+        const peer = f.client.nicknameEvidence()[0];
+        assert.equal(peer.nick, 'BobNick');
+        assert(f.client.acknowledgeNickname(peer));
+        assert.equal(f.sent.at(-1).type, 'nick_saved');
+        await f.receive({ type: 'nick_saved', id: claim.id, name: 'Bob', uuid: bob });
+        await f.receive({ type: 'nick_saved', id: claim.id, name: 'Bob', uuid: bob });
+        assert.equal(shared.length, 1, 'sender notice only once per accepted claim and peer');
+        f.client.update({ ...state, nickname: { ...claim, nick: 'NewNick', id: '3'.repeat(24) } });
+        await f.receive({ type: 'nick_saved', id: claim.id, name: 'Charlie', uuid: 'c'.repeat(32) });
+        assert.equal(shared.length, 1, 'old nickname acknowledgement ignored');
+        f.client.update({ ...state, nickname: { ...claim, receive: false } });
+        assert.deepEqual(f.client.nicknameEvidence(), [], 'receive toggle gates all received claims');
+        f.client.update({ ...state, generation: 'new-world', nickname: { ...claim, serverId: 'mini9A' } });
+        assert.deepEqual(f.client.nicknameEvidence(), [], 'world changes invalidate claims');
+        f.client.close();
+    }
+    {
+        const f = fixture();
+        f.client.update({ ...f.state, nickname: { nick: 'AliceNick', id: '1'.repeat(24), serverId: 'mini1A', mode: 'BEDWARS', receive: true } });
+        await f.ready();
+        assert(!('nickname' in f.sent.find(x => x.type === 'state')), 'old relays receive the original wire format');
+        assert.deepEqual(f.client.nicknameEvidence(), []);
+        f.client.close();
+    }
     const originalFetch = global.fetch;
     const requests = [];
     try {

@@ -20,7 +20,7 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
     }));
     fs.writeFileSync(path.join(directory, 'features_config.json'), JSON.stringify({
         apiKillSwitchEnabled: true, autoSkinDenickEnabled: false, autoStatsDenickEnabled: false,
-        autoDodgeEnabled: true, autoDodgeDelaySeconds: 1, autoDodgeTaggedPlayers: true,
+        autoDodgeEnabled: true, autoDodgeLeaveMode: 'before_start', autoDodgeTaggedPlayers: true,
         pregameChatStatsEnabled: true, queueTimePartyChatEnabled: false
     }));
     const preload = path.join(directory, 'offline-fixture.js');
@@ -83,14 +83,34 @@ require(${JSON.stringify(path.join(root, 'src/stats/fetch.js'))}).createStatsFet
         chat('[MVP++] LateMate: hello');
         await eventually(async () => assert(messages.some(message => message.includes('matched auto-dodge') && message.includes('LateMate'))), 'Scheduling a current non-party player');
         chat('[MVP++] LateMate joined the party.');
+        upstreamClient.write('scoreboard_score', { itemName: 'Starting in 2s', action: 0, scoreName: 'bedwars', value: 4 });
         await delay(1400);
         assert.strictEqual(leaves(), 0, 'A member joining during the dodge delay must cancel the leave');
 
+        upstreamClient.write('scoreboard_score', { itemName: 'Starting in 2s', action: 0, scoreName: 'bedwars', value: 4 });
         chat('[MVP++] Opponent: hello');
         await eventually(async () => assert.strictEqual(leaves(), 1), 'Dodging a tagged opponent with a confirmed roster');
         assert(messages.some(message => message.includes('Leaving lobby') && message.includes('Opponent')));
+
+        // No transfer is simulated after /l, so reuse this waiting room to
+        // reproduce a missing sidebar countdown and the one-second chat race.
+        upstreamClient.write('scoreboard_score', { itemName: 'Starting in 2s', action: 1, scoreName: 'bedwars', value: 0 });
+        await delay(1100); // outside the previous leave command's dedupe window
+        chat('[MVP++] ChatFallback: hello');
+        await eventually(async () => assert(messages.some(message => message.includes('matched auto-dodge') && message.includes('ChatFallback'))), 'Waiting for a missing countdown');
+        player.write('chat', { message: '/pc timing-check' });
+        await eventually(async () => assert(commands.includes('/pc timing-check')), 'Occupying the paced command lane');
+        chat('The game starts in 1 second!');
+        await eventually(async () => assert.strictEqual(leaves(), 2), 'Sending the queued leave during the final countdown second');
+        assert(!messages.some(message => /before dodge fired|before Fury could leave/.test(message)), 'the countdown warning must not cancel the dodge');
+
+        chat('Protect your bed and destroy the enemy beds.');
+        chat('[MVP++] AfterStart: hello');
+        await delay(600);
+        assert.strictEqual(leaves(), 2, 'actual game-start evidence still prevents further pregame dodges');
+        assert(!messages.some(message => message.includes('Dodge') && message.includes('AfterStart')), 'a running game cannot schedule another dodge');
         assert.deepStrictEqual(errors, []);
-        console.log('Auto-dodge party integration passed: unknown roster, tagged teammate, late party join, and tagged opponent.');
+        console.log('Auto-dodge integration passed: party guards, tagged opponent, chat countdown fallback, paced final-second leave, and actual game start.');
     } finally {
         player?.end();
         upstreamClient?.end();

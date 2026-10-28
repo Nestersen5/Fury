@@ -32,7 +32,7 @@ function mount({document,node,button,escape}) {
     const rowHeight=68,overscan=6;
     const dates=new Intl.DateTimeFormat('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'});
     const date=value=>{const d=new Date(value);return value&&Number.isFinite(d.getTime())?dates.format(d):'Unknown';};
-    const method=value=>({skin:'Skin',stats:'Stats',manual:'Manual',skin_manual:'Manual skin',party_variation:'Party variation'}[value]||'Unknown');
+    const method=value=>({skin:'Skin',stats:'Stats',manual:'Manual',skin_manual:'Manual skin',party_variation:'Party variation',own_nick:'Your nickname',party_shared:'Fury teammate'}[value]||'Unknown');
     const latest=player=>(player.events||[]).reduce((best,event)=>!best||Date.parse(event.at)>Date.parse(best.at)?event:best,null)||{};
     const avatar=(player,size)=>`<span class="fury-nick-avatar" style="--avatar-size:${size}px"><span>${escape((player.realIGN||'?')[0])}</span><img loading="lazy" decoding="async" src="https://mc-heads.net/avatar/${encodeURIComponent(player.uuid||player.realIGN)}/${size}" alt="" onerror="this.hidden=true"></span>`;
     let selectedName='',players=[],start=-1,end=-1,focusedIndex=0,frame=null,destroyed=false;

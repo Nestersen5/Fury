@@ -40,13 +40,15 @@ const { createPartyCoordination } = require('../../src/party/coordinationClient'
         await entry.room.open(ws, leader);
     });
     function player(name, party, id) {
+        const shared = [];
         const client = createPartyCoordination({ network: 'mc.hypixel.net:25565',
+            onNicknameShared: value => shared.push(value),
             endpoint: new URL(`ws://127.0.0.1:${server.address().port}/party/connect`),
             getSession: () => ({ accessToken: 'synthetic', selectedProfile: { name, id: identities.get(name) } }),
             authenticate: async () => {} });
         const state = { enabled: true, leader: party[0], members: party.filter(member => member !== name),
             phase: 'pregame', serverId: id, generation: '1:1' };
-        clients.push(client); client.update(state); return { client, state };
+        clients.push(client); client.update(state); return { client, state, shared };
     }
     const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
     async function eventually(check) {
@@ -74,6 +76,19 @@ const { createPartyCoordination } = require('../../src/party/coordinationClient'
         a[1].client.close();
         await eventually(() => assert.equal(a[0].client.evidence('Bob'), null));
         assert.equal(b[0].client.evidence('Frank')?.status, 'same', 'another party works independently');
+        for (const [index, mode] of ['BEDWARS', 'SKYWARS', 'DUELS'].entries()) {
+            for (const [i, peer] of b.entries()) {
+                peer.client.update({ ...peer.state, phase: 'other', serverId: null, generation: `game:${index}`,
+                    nickname: { nick: `${partyB[i]}Nick`, id: String(index * 4 + i + 1).padStart(24, '0'),
+                        mode, serverId: 'mini9A', receive: true } });
+            }
+            await eventually(() => assert.equal(b[0].client.nicknameEvidence().length, 3));
+            const frank = b[0].client.nicknameEvidence().find(peer => peer.name === 'frank');
+            assert(b[0].client.acknowledgeNickname(frank));
+            await eventually(() => assert.equal(b[1].shared.length, index + 1));
+            assert.equal(b[1].shared.at(-1).name, 'ella');
+            assert.deepEqual(a[0].client.nicknameEvidence(), [], 'nickname exchange stays within its authenticated party');
+        }
         for (const ws of rooms.get('alice').sockets) ws.terminate();
         await eventually(() => assert.equal(a[0].client.evidence('Charlie'), null));
         console.log(`Two independent parties coordinated over real WebSockets: ${wire.messages} messages, ${wire.bytes} payload bytes during connect, checks and transfer.`);

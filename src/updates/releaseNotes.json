@@ -3,21 +3,89 @@
   "releases": [
     {
       "version": "1.1.0",
-      "features": ["Automatically roll for nicknames that match your preferred name, rank or skin.", "Get alerts when a player may be using Scaffold, with settings to control alerts.", "Choose whether Fury answers Quick Maths for you.", "Get reminders when your Hypixel API key is getting old, with an option to remind you later.", "See a summary of your results after each game."],
-      "improvements": ["Easier-to-use launcher menus, settings and game summary previews.", "More reliable saved nicknames and real player names.", "More accurate tracking of broken beds and game results in Bed Wars.", "Removed Seraph support and the Slumber daily-rewards reminder."],
-      "fixes": ["Private Bed Wars games no longer count toward your public stats.", "Missing stats no longer appear as zero.", "Stats from several games are no longer counted as one game's results.", "Fixed issues with session results, stats appearing under the wrong account and games being checked twice."]
+      "features": [
+        "Automatically roll for nicknames that match your preferred name, rank or skin.",
+        "Get alerts when a player may be using Scaffold, with settings to control alerts.",
+        "Choose whether Fury answers Quick Maths for you.",
+        "Get reminders when your Hypixel API key is getting old, with an option to remind you later.",
+        "See a summary of your results after each game."
+      ],
+      "improvements": [
+        "Easier-to-use launcher menus, settings and game summary previews.",
+        "More reliable saved nicknames and real player names.",
+        "More accurate tracking of broken beds and game results in Bed Wars.",
+        "Removed Seraph support and the Slumber daily-rewards reminder."
+      ],
+      "fixes": [
+        "Private Bed Wars games no longer count toward your public stats.",
+        "Missing stats no longer appear as zero.",
+        "Stats from several games are no longer counted as one game's results.",
+        "Fixed issues with session results, stats appearing under the wrong account and games being checked twice."
+      ]
     },
     {
       "version": "1.1.1",
-      "features": ["See your average game length in the summary after a game."],
-      "improvements": ["Hear a sound when Fury asks you to match nicknames to your party members."],
-      "fixes": ["Your session totals stay visible even when some game stats are missing.", "Your session FKDR can still be shown when Fury has enough game stats.", "Auto Dodge waits until Fury knows who is in your party, helping avoid leaving because of a teammate."]
+      "features": [
+        "See your average game length in the summary after a game."
+      ],
+      "improvements": [
+        "Hear a sound when Fury asks you to match nicknames to your party members."
+      ],
+      "fixes": [
+        "Your session totals stay visible even when some game stats are missing.",
+        "Your session FKDR can still be shown when Fury has enough game stats.",
+        "Auto Dodge waits until Fury knows who is in your party, helping avoid leaving because of a teammate."
+      ]
     },
     {
       "version": "1.1.2",
-      "features": ["Share Scaffold alerts in party chat without reporting teammates.", "Turn party cheat alerts on or off in AntiCheat settings.", "See spawned diamond and emerald totals, next-spawn timers and upcoming Bed Wars events in Tab.", "See session totals and per-game averages for final kills and broken beds in game summaries.", "Browse your recorded games with /session games.", "See what's new when an update is available or you launch a new version."],
-      "improvements": ["Clearer session stats and replay details.", "Choose whether game summaries show your average game length.", "Legacy nick matching now looks for names with up to eight characters.", "Simpler AntiCheat settings, with AutoBlock and Stasis turned off.", "Removed automatic quest acceptance from Gambler George.", "Choose Don't show again to hide a release's notification, even after restarting Fury."],
-      "fixes": ["Auto Dodge checks again before leaving so newly identified teammates won't trigger it.", "Bed Wars Duels no longer count as regular Bed Wars games.", "Game stats stay attached to the right match when Hypixel updates them late.", "Session final kills and broken beds remain counted when older game details are removed.", "Replay stats can still appear when the game's win or loss is unknown.", "Players whose stats couldn't be loaded are no longer shared as confirmed threats."]
+      "features": [
+        "Share Scaffold alerts in party chat without reporting teammates.",
+        "Turn party cheat alerts on or off in AntiCheat settings.",
+        "See spawned diamond and emerald totals, next-spawn timers and upcoming Bed Wars events in Tab.",
+        "See session totals and per-game averages for final kills and broken beds in game summaries.",
+        "Browse your recorded games with /session games.",
+        "See what's new when an update is available or you launch a new version."
+      ],
+      "improvements": [
+        "Clearer session stats and replay details.",
+        "Choose whether game summaries show your average game length.",
+        "Legacy nick matching now looks for names with up to eight characters.",
+        "Simpler AntiCheat settings, with AutoBlock and Stasis turned off.",
+        "Removed automatic quest acceptance from Gambler George.",
+        "Choose Don't show again to hide a release's notification, even after restarting Fury."
+      ],
+      "fixes": [
+        "Auto Dodge checks again before leaving so newly identified teammates won't trigger it.",
+        "Bed Wars Duels no longer count as regular Bed Wars games.",
+        "Game stats stay attached to the right match when Hypixel updates them late.",
+        "Session final kills and broken beds remain counted when older game details are removed.",
+        "Replay stats can still appear when the game's win or loss is unknown.",
+        "Players whose stats couldn't be loaded are no longer shared as confirmed threats.",
+        "Nametags no longer disappear for an entire team when one player drinks an invisibility potion."
+      ]
+    },
+    {
+      "version": "1.1.3",
+      "features": [
+        "AutoDenick can suggest a possible match from a final or bed count before checking both to confirm.",
+        "Report up to eight players with /wdr and get one summary of the results.",
+        "Automatically save a teammate's nickname when only one party member can match, with Undo.",
+        "Share your current nickname while nicked with Fury players in your party and automatically save nicknames they share.",
+        "Use /denick self to see your checked nickname and saved nickname history."
+      ],
+      "improvements": [
+        "AutoDenick uses a tighter stats match and shows confirmed players with their stats on one line.",
+        "Choose whether Auto Dodge leaves instantly or just before the game starts.",
+        "Copy any API key with a Copy button and a confirmation popup.",
+        "Keep your older nicknames saved while checking your current nickname each game.",
+        "Turn sharing your own nickname on or off in Nicknames settings."
+      ],
+      "fixes": [
+        "AutoDenick stops repeating count messages and retries failed searches only when an error occurs.",
+        "Auto Dodge no longer cancels a planned leave during the final Bed Wars countdown warning.",
+        "Automatic skin and stats denicks no longer reveal party members in party chat."
+      ]
     }
   ]
 }

@@ -10,8 +10,16 @@ const COUNTDOWN_STALE_MS = 3000; // ignore a countdown sample older than this
 function createPregameCountdown({ isPregameActive = () => true, now = Date.now } = {}) {
     let sample = null; // { seconds, at }
 
+    function recordSample(seconds) {
+        // Scoreboard packets often re-read an unchanged countdown line. Its
+        // original timestamp must survive those reads so the deadline cannot drift.
+        if (sample?.seconds === seconds) return false;
+        sample = { seconds, at: now() };
+        return true;
+    }
+
     function note(scoreboardText) {
-        if (!isPregameActive()) return;
+        if (!isPregameActive()) return false;
         // Strip Minecraft color codes; the Bedwars pregame scoreboard shows
         // "Starting in 6s" (occasionally rendered "M:SS"), often colored.
         const clean = String(scoreboardText || '').replace(/Â?§[0-9A-FK-OR]/gi, '');
@@ -23,8 +31,22 @@ function createPregameCountdown({ isPregameActive = () => true, now = Date.now }
             const secs = clean.match(/starting in\s*(\d+)\s*s\b/i);
             if (secs) seconds = parseInt(secs[1], 10);
         }
-        if (seconds === null || !Number.isFinite(seconds)) return;
-        sample = { seconds, at: now() };
+        if (seconds !== null && Number.isFinite(seconds)) return recordSample(seconds);
+        // An explicit return to waiting cancels the countdown; a partial
+        // sidebar update without a countdown does not invalidate its deadline.
+        if (sample && /\bwaiting(?:\.{3}| for players\b)/i.test(clean)) {
+            reset();
+            return true;
+        }
+        return false;
+    }
+
+    function noteChat(text) {
+        if (!isPregameActive()) return false;
+        const clean = String(text || '').replace(/Â?§[0-9A-FK-OR]/gi, '').trim();
+        // Only the server countdown, never a player's quoted chat message.
+        const match = clean.match(/^The game starts in (\d+) seconds?[!.]?$/i);
+        return match ? recordSample(Number(match[1])) : false;
     }
 
     function estimateSecondsRemaining() {
@@ -38,7 +60,7 @@ function createPregameCountdown({ isPregameActive = () => true, now = Date.now }
         sample = null;
     }
 
-    return { note, estimateSecondsRemaining, reset };
+    return { note, noteChat, estimateSecondsRemaining, reset };
 }
 
 module.exports = { createPregameCountdown, COUNTDOWN_STALE_MS };

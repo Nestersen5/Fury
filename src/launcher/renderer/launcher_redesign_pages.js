@@ -38,7 +38,7 @@ function mount({ document, node, button, getState, openManager, validateNetwork 
     urchin.querySelector('.api-key-card-body').append(admin);admin.querySelector('strong').textContent='Admin key (advanced)';
     for(const card of apiCards) {
         const body=card.querySelector('.api-key-card-body'),input=card.querySelector('.api-key-input'),actions=card.querySelector('.api-key-actions');
-        [...actions.children].filter(el=>!el.dataset.keyCopy).forEach(el=>input.append(el));actions.hidden=true;
+        [...actions.children].forEach(el=>input.append(el));actions.hidden=true;
         if(card.dataset.apiCard==='urchin')card.open=true;
     }
     api.querySelector('.api-service-workspace')?.classList.add('fury-removed');

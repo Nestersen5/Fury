@@ -1,5 +1,7 @@
 'use strict';
 
+const { getBedwarsScanStats, formatBedwarsScanLine } = require('../stats/scanLine');
+
 // Scan runner extracted from proxy.js. Performs the per-game /scan workflow:
 // collect candidate names from the lobby/roster, bulk-fetch Hypixel + Urchin
 // stats, classify threats per state.threatConfig, and print results to chat.
@@ -31,11 +33,9 @@ function createScanRunner(deps) {
         inferTeamFromColor,
         getTabNameColor,
         extractDisplayColor,
-        getFkdrColor,
         getKdrColor,
         getWlrColor,
         getWsColor,
-        formatBedwarsPrestige,
         getInteractiveTags,
         setLastScanSummary,
         setLastScanResults
@@ -290,16 +290,13 @@ function createScanRunner(deps) {
                             || tagThreat
                             || nickedThreat;
                     } else {
-                        const bw = p.stats?.Bedwars || {};
-                        const stars = p.achievements?.bedwars_level || 0;
-                        const fkdr = (bw.final_kills_bedwars || 0) / Math.max(bw.final_deaths_bedwars || 1, 1);
-                        const wlr = (bw.wins_bedwars || 0) / Math.max(bw.losses_bedwars || 1, 1);
+                        const { stars, fkdr, wlr, ws } = getBedwarsScanStats(p);
                         stats = {
                             stars,
                             starThreat: stars >= state.threatConfig.minStars,
                             fkdr,
                             wlr,
-                            ws: bw.winstreak || 0,
+                            ws,
                             sortValue: fkdr
                         };
                         isThreat = lookupFailed || fkdr >= state.threatConfig.minFkdr || tagThreat || nickedThreat || stars >= state.threatConfig.minStars;
@@ -396,10 +393,6 @@ function createScanRunner(deps) {
             sendChat(client, `${headingColor}§l${title}§r`);
 
             members.forEach(m => {
-                const fkColor = getFkdrColor(m.fkdr || 0);
-                const kdrColor = getKdrColor(m.kdr || 0);
-                const wColor = getWlrColor(m.wlr);
-                const wsColor = getWsColor(m.ws);
                 const nameColor = m.color || "§7";
                 const statName = `${m.isNicked ? '§c[NICKED] ' : ''}${nameColor}${m.name}${m.denickedAs ? ` §8(§a${m.denickedAs}§8)` : ''}`;
 
@@ -416,9 +409,12 @@ function createScanRunner(deps) {
                 } else if (m.lookupFailed) {
                     playerLine.extra.push({ text: `§6[FAIL] ${nameColor}${m.name} §7- §c${m.lookupErrorMessage || 'Hypixel API lookup failed'}` });
                 } else if (scanGameMode === 'SKYWARS') {
+                    const kdrColor = getKdrColor(m.kdr || 0);
+                    const wColor = getWlrColor(m.wlr);
+                    const wsColor = getWsColor(m.ws);
                     playerLine.extra.push({ text: `${m.skyLevel} ${statName}§r §a✔ §7| §fWLR: ${wColor}${m.wlr.toFixed(2)}§r §7| §fKDR: ${kdrColor}${m.kdr.toFixed(2)}§r §7| §fWS: ${wsColor}${m.ws}§r` });
                 } else {
-                    playerLine.extra.push({ text: `${formatBedwarsPrestige(m.stars || 0)} ${statName}§r §a✔ §7| §fFKDR: ${fkColor}${m.fkdr.toFixed(2)}§r §7| §fWLR: ${wColor}${m.wlr.toFixed(2)}§r §7| §fWS: ${wsColor}${m.ws}§r` });
+                    playerLine.extra.push({ text: formatBedwarsScanLine(m, statName) });
                 }
 
                 if ((!m.isNicked || m.hasDenickedStats) && !m.lookupFailed) {

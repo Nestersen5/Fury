@@ -127,7 +127,6 @@ function mount({ document, icon, navigate, invoke }) {
         syncers.push(sync);
         sync();
     };
-    slider('auto-dodge-delay-seconds', 'Leave delay');
     slider('ender-dust-reminder-threshold', 'Ender Dust alert target');
 
     // Copy changes use the original description slots, without altering their styling.

@@ -1,6 +1,7 @@
 'use strict';
 
 const { createUsage } = require('../../features/chat_controller');
+const { getBedwarsScanStats } = require('../stats/scanLine');
 
 // /denick + /denickskin command handlers extracted from proxy.js. Owns the
 // Bordic stat lookup, the cosmetic-search HTTP call, and the in-game chat
@@ -257,12 +258,13 @@ function createDenickCommands({
     async function findDenickCandidatesByStats(targets = {}, options = {}) {
         const keys = getKeys();
         if (!keys.aurora || !hasHypixelApiKeyConfigured()) {
-            return { error: 'Set Hypixel and Aurora API keys first.', candidates: [] };
+            return { error: 'Set Hypixel and Aurora API keys first.', retryable: false, candidates: [] };
         }
 
         const lookupRange = Number.isFinite(Number(options.lookupRange)) ? Number(options.lookupRange) : 800;
         const verifyRange = Number.isFinite(Number(options.verifyRange)) ? Number(options.verifyRange) : DENICK_RANGE;
         const verifyLimit = Number.isFinite(Number(options.verifyLimit)) ? Number(options.verifyLimit) : 15;
+        const isCurrent = options.isCurrent || (() => true);
         const normalizedTargets = {};
         ['finals', 'beds'].forEach(type => {
             const value = parseStatCount(targets[type]);
@@ -275,14 +277,17 @@ function createDenickCommands({
         }
 
         const lookupResults = [];
+        let complete = true;
         for (const [type, value] of targetEntries) {
-            const res = await axios.get(`https://bordic.xyz/api/v2/resources/lookup/${type}?value=${value}&range=${lookupRange}&max=100&key=${keys.aurora}`);
-            if (res.data?.success) {
-                lookupResults.push(res.data.data.map(item => String(item.name || '').toLowerCase()).filter(Boolean));
+            if (!isCurrent()) return { cancelled: true, candidates: [] };
+            const res = await axios.get(`https://bordic.xyz/api/v2/resources/lookup/${type}?value=${value}&range=${lookupRange}&max=100&key=${keys.aurora}`, { timeout: 10000 });
+            if (!isCurrent()) return { cancelled: true, candidates: [] };
+            if (!res.data?.success || !Array.isArray(res.data.data)) {
+                return { error: 'Stats search is unavailable right now.', candidates: [] };
             }
+            if (res.data.data.length >= 100) complete = false;
+            lookupResults.push([...new Set(res.data.data.map(item => String(item.name || '').toLowerCase()).filter(Boolean))]);
         }
-
-        if (lookupResults.length === 0) return { candidates: [] };
 
         let names = lookupResults[0];
         for (let i = 1; i < lookupResults.length; i++) {
@@ -291,9 +296,15 @@ function createDenickCommands({
         }
 
         const candidates = [];
+        if (names.length > verifyLimit) complete = false;
         for (const name of names.slice(0, verifyLimit)) {
-            const profile = await getPlayerData(name);
-            if (!profile) continue;
+            if (!isCurrent()) return { cancelled: true, candidates: [] };
+            const profile = await getPlayerData(name, { includeErrors: true });
+            if (!isCurrent()) return { cancelled: true, candidates: [] };
+            if (profile?.error && ['player_not_found', 'hypixel_player_missing'].includes(profile.errorType)) continue;
+            if (profile?.error || !profile?.data?.player || profile.data.lookupFailed) {
+                return { error: 'Could not verify player stats right now.', candidates: [] };
+            }
             const bw = profile.data.player.stats?.Bedwars || {};
             const finals = bw.final_kills_bedwars || 0;
             const beds = bw.beds_broken_bedwars || 0;
@@ -307,12 +318,13 @@ function createDenickCommands({
                 finals,
                 beds,
                 fromCache: profile.fromCache,
-                score: Math.abs(finals - (normalizedTargets.finals ?? finals)) + Math.abs(beds - (normalizedTargets.beds ?? beds))
+                score: Math.abs(finals - (normalizedTargets.finals ?? finals)) + Math.abs(beds - (normalizedTargets.beds ?? beds)),
+                ...(options.includeScanStats ? { scanStats: getBedwarsScanStats(profile.data.player) } : {})
             });
         }
 
         candidates.sort((a, b) => a.score - b.score);
-        return { candidates };
+        return { candidates, complete };
     }
 
     return {

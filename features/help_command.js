@@ -121,6 +121,12 @@ const HELP_SECTIONS = [
         title: 'Game & Overlay',
         entries: [
             {
+                label: '/wdr',
+                command: '/wdr ',
+                description: 'Confirm cheating reports for up to 8 players without opening the menu.',
+                variations: ['/wdr <player> [player ...]', '/wdr status', '/wdr cancel']
+            },
+            {
                 label: '/scan',
                 command: '/scan',
                 description: 'Analyze current game players.',
@@ -218,7 +224,7 @@ const HELP_SECTIONS = [
                 label: '/denick',
                 command: '/denick ',
                 description: 'Manual, automatic party, stat, and exact-match denick lookup. Party choices appear after a BedWars game starts.',
-                variations: ['/denick party', '/denick party test', '/denick party confirm', '/denick party choose <#>', '/denick add <nick> <realIGN>', '/denick finals <#> beds <#>', '/denick finalkill <name> beddestroy <name>'],
+                variations: ['/denick self', '/denick party', '/denick party test', '/denick party confirm', '/denick party choose <#>', '/denick add <nick> <realIGN>', '/denick finals <#> beds <#>', '/denick finalkill <name> beddestroy <name>'],
                 startup: 'Nick mappings and party denick'
             },
             {

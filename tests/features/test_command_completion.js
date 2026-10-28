@@ -118,6 +118,13 @@ const completer = createProxyTabCompleter({
 
 assert(!PROXY_COMMANDS.includes('/autogambler'), 'Retired command is absent');
 assert(PROXY_COMMANDS.includes('/nickroll'));
+assert(PROXY_COMMANDS.includes('/wdr'));
+assert(completer('/wd').includes('/wdr'));
+assert.deepStrictEqual(completer('/wdr sta'), ['status']);
+assert.deepStrictEqual(completer('/wdr DemoPlayer_ Ne'), ['Nestersen']);
+assert(!completer('/wdr demoplayer_ ').includes('DemoPlayer_'), 'Already typed names are not suggested again');
+assert.deepStrictEqual(completer('/wdr A B C D E F G H '), [], 'No ninth player suggestion');
+assert.strictEqual(completer('/watchdogreport DemoPlayer_ fly'), null, 'Original server command stays server-controlled');
 assert.deepStrictEqual(completer('/nickroll st'), ['start', 'stop', 'status']);
 assert.deepStrictEqual(completer('/nickroll filter digits e'), []);
 assert.deepStrictEqual(completer('/nickroll skin a'), []);

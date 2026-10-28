@@ -64,7 +64,7 @@ assert(block('function replayPlayerNames()', '\n        }\n').includes('replayPl
 assert(proxy.includes('const roster = new Set(players.map(player => player.name));'), 'replay /scan lists the same players as /who');
 assert(proxy.includes('await performReplayScan(client, replayLobby, localNicks, null, {'), 'replay /scan uses its own player map, not the live one');
 assert(/isOwnPlayer: \(\) => false,\s*getCachedPlayerProfile/.test(run), 'your own row is scanned when you played in that game');
-assert(/partyArrivalTracker\.observePlayerInfo\(data, action\);\s*observeReplayTabEntries\(data, action\);\s*const filteredPlayerInfo/.test(proxy), 'the tab copy sees every entry before any filtering');
+assert(/partyArrivalTracker\.observePlayerInfo\(data, action\);\s*(?:nicknameSharing\.request\(\);\s*)?observeReplayTabEntries\(data, action\);\s*const filteredPlayerInfo/.test(proxy), 'the tab copy sees every entry before any filtering');
 const worldChange = block("if (meta.name === 'login' || meta.name === 'respawn') {", '\n            }');
 assert(worldChange.includes('replayTabEntries.clear();'), 'the tab copy starts afresh on each world change');
 
