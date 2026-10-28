@@ -79,7 +79,14 @@ require(${JSON.stringify(path.join(root, 'src/stats/fetch.js'))}).createStatsFet
         assert(commands.includes('/p list'), 'Unknown party state requests confirmation through the existing command queue');
 
         roster();
-        await delay(700); // complete the tracker's multipart /p list response
+        // The parser settles after a 400 ms line gap on a 300 ms tick. A
+        // fixed 700 ms sleep can race that tick plus socket delivery on CI.
+        await eventually(async () => {
+            const start = messages.length;
+            player.write('chat', { message: '/partyy status' });
+            await delay(100);
+            assert(messages.slice(start).some(message => message.includes('State:') && message.includes('Confirmed')));
+        }, 'Confirming the multipart party response before testing an opponent');
         chat('[MVP++] LateMate: hello');
         await eventually(async () => assert(messages.some(message => message.includes('matched auto-dodge') && message.includes('LateMate'))), 'Scheduling a current non-party player');
         chat('[MVP++] LateMate joined the party.');
