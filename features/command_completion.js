@@ -11,7 +11,7 @@ const PROXY_COMMANDS = [
     '/session', '/ses', '/recap', '/clip', '/recordcheat', '/rc',
     '/profile', '/profiles', '/preset', '/presets',
     '/info', '/general', '/ping', '/urchin', '/sw', '/duels',
-    '/scan', '/share', '/wdr', '/anticheat', '/scafdetect', '/scaffolddetect',
+    '/scan', '/share', '/anticheat', '/scafdetect', '/scaffolddetect',
     '/ol', '/chattrigger', '/chattriggers', '/ctriggers',
     '/chatstats', '/lobbychatstats', '/lf',
     '/autododge', '/dodge', '/cancel', '/c', '/autododgetest',
@@ -386,13 +386,6 @@ function createProxyTabCompleter(options = {}) {
         const visibleProxyCommand = PROXY_COMMANDS.includes(cmd);
         const hiddenProxyCommand = HIDDEN_PROXY_COMMANDS.includes(cmd);
         if (!visibleProxyCommand && !hiddenProxyCommand) return null;
-
-        if (cmd === '/wdr') {
-            if (args.length > 9 || args.length > 2 && ['help', 'status', 'cancel'].includes(args[1].toLowerCase())) return [];
-            const used = new Set(args.slice(1, -1).map(name => name.toLowerCase()));
-            const players = completePlayers(args[args.length - 1] || '').filter(name => !used.has(name.toLowerCase()));
-            return args.length === 2 ? uniqueTabMatches([...completeFromList(['help', 'status', 'cancel'], args[1] || ''), ...players]) : players;
-        }
 
         if (cmd === '/activecosmetics') return args.length === 2 ? completePlayers(args[1] || '') : [];
         if (cmd === '/hotkeydebug') {

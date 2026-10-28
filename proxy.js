@@ -5623,7 +5623,6 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         });
         const rawQuickBuyTransport = hypixelClient.write.bind(hypixelClient);
         let layoutPreview = null;
-        let watchdogReport = null;
         const quickBuyTransport = (name, data, origin = 'quickbuy-automation') => {
             if (layoutPreview && !layoutPreview.allowOutbound(name, data)) return;
             const result = rawQuickBuyTransport(name, data);
@@ -5649,7 +5648,6 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             sendChat: message => sendChat(client, message),
             disconnect: reason => { client.end(reason); hypixelClient.end(reason); },
             canStart: () => {
-                if (watchdogReport?.isBusy()) return 'Wait for reports to finish or use /wdr cancel';
                 if (layoutPreview?.isBusy()) return 'Close the layout preview first';
                 if (gameActive || bedwarsPregameActive || currentGamemode !== 'BEDWARS') {
                     return 'Quick Buy editing is available only in a Bed Wars lobby';
@@ -5673,7 +5671,6 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             sendChat: message => sendChat(client, message),
             disconnect: reason => { client.end(reason); hypixelClient.end(reason); },
             canStart: () => {
-                if (watchdogReport?.isBusy()) return 'Wait for reports to finish or use /wdr cancel.';
                 if (quickBuy.isBusy()) return 'Wait for layout editing to finish.';
                 if (hypixelClient.state !== mc.states.PLAY || client.state !== mc.states.PLAY) return 'Wait for the server connection to be ready.';
                 if (menuMonitor.getWindow() || menuMonitor.getDebugState().menuNavStep !== 'idle') return 'Close your current menu first.';
@@ -5684,34 +5681,12 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             if (quickBuy.allowOutbound(name, data)) return quickBuyTransport(name, data, 'relay-or-proxy-feature');
         };
 
-        watchdogReport = require('./src/menu/watchdogReport').createWatchdogReport({
-            menuMonitor,
-            sendCommand: sendHypixelCommand,
-            sendUpstream: (name, data) => {
-                if (hypixelClient.state === mc.states.PLAY) quickBuyTransport(name, data, 'watchdog-report');
-                if (name === 'close_window') {
-                    menuMonitor.setHold(false);
-                    menuMonitor.observeClientPacket(data, { name });
-                }
-            },
-            sendClient: (name, data) => client.write(name, data),
-            sendChat: message => sendChat(client, message),
-            canStart: () => {
-                if (hypixelClient.state !== mc.states.PLAY || client.state !== mc.states.PLAY) return 'Wait for the server connection to be ready.';
-                if (quickBuy.isBusy() || layoutPreview.isBusy() || killMessageLogger.isBusy()) return 'Finish the current menu operation first.';
-                if (nickRoll.isBusy()) return 'Stop the nickname reroller first.';
-                if (menuMonitor.getWindow() || menuMonitor.getDebugState().menuNavStep !== 'idle') return 'Close your current menu first.';
-                return null;
-            }
-        });
-
         const nickRoll = require('./src/nick/reroller').createNickReroller({
             sendCommand: sendHypixelCommand,
             playSound: playSelfSound,
             sendChat: message => sendChat(client, message),
             getSettings: () => require('./app_config').loadFeatureSettings().nickRoll,
             canStart: () => {
-                if (watchdogReport.isBusy()) return 'Wait for reports to finish or use /wdr cancel.';
                 if (hypixelClient.state !== mc.states.PLAY) return 'Server connection is not ready.';
                 if (gameActive || bedwarsPregameActive) return 'Use the reroller in a lobby.';
                 if (quickBuy.isBusy() || layoutPreview.isBusy() || killMessageLogger.isBusy()) return 'Finish the current menu operation first.';
@@ -11943,7 +11918,6 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             if (proxyStopping) return;
             quickBuyTrace.observe('client', meta.name, data);
             bookTrace.observe('client', meta.name, data);
-            if (watchdogReport.observeClient(data, meta)) return;
             nickRoll.observeClient(data, meta);
             if (layoutPreview.observeClient(data, meta)) return;
             if (quickBuy.observeClient(data, meta)) return;
@@ -12053,8 +12027,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             // client never sees an action number it did not send.
             const swallowedByQuickBuy = quickBuy.observeServer(data, meta);
             const swallowedBySharedMenuMonitor = menuMonitor.observeServerPacket(data, meta);
-            const swallowedByReport = watchdogReport.observeServer(data, meta);
-            const swallowedByMenuMonitor = swallowedBySharedMenuMonitor || swallowedByReport || swallowedByQuickBuy || swallowedByLayoutPreview || swallowedByNickRoll;
+            const swallowedByMenuMonitor = swallowedBySharedMenuMonitor || swallowedByQuickBuy || swallowedByLayoutPreview || swallowedByNickRoll;
 
             let forwardedToClient = false;
             // /lf owns the action bar while it is on; the packet is still parsed below.
@@ -12514,7 +12487,6 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             connectionTimersCleared = true;
             clearAutoDenickRetryTimers();
             cosmeticEffectRecorder.dispose();
-            watchdogReport.dispose();
             quickBuy.dispose();
             layoutPreview.dispose();
             quickBuyTrace.dispose();
@@ -12682,11 +12654,6 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
 
         async function handleClientChat(packet) {
             const msg = packet.message;
-            if (/^\/wdr(?:\s|$)/i.test(msg)) {
-                watchdogReport.command(msg.trim().split(/\s+/));
-                return;
-            }
-            watchdogReport.observeCommand(msg);
             quickMathsSession.observeCommand(msg);
             if (/^\/nickroll(?:\s|$)/i.test(msg)) {
                 nickRoll.command(msg.trim().split(/\s+/));

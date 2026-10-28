@@ -121,12 +121,6 @@ const HELP_SECTIONS = [
         title: 'Game & Overlay',
         entries: [
             {
-                label: '/wdr',
-                command: '/wdr ',
-                description: 'Confirm cheating reports for up to 8 players without opening the menu.',
-                variations: ['/wdr <player> [player ...]', '/wdr status', '/wdr cancel']
-            },
-            {
                 label: '/scan',
                 command: '/scan',
                 description: 'Analyze current game players.',

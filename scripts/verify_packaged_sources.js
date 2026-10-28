@@ -52,6 +52,8 @@ function verifySources(root, appRoot) {
     for (const retired of ['fury_hud.js', 'fury_hud.html', 'fury_hud.css', 'fury_hud_preload.js', 'fury-hud-demo']) {
         assert(!fs.existsSync(path.join(appRoot, retired)), `Retired desktop HUD was bundled: ${retired}`);
     }
+    assert(!fs.existsSync(path.join(appRoot, 'src/menu/watchdogReport.js')),
+        'Deferred background report automation must not be packaged');
     return { version: config.version, runtimeFileCount: Object.keys(files).length,
         sourceSha256: crypto.createHash('sha256').update(JSON.stringify(files)).digest('hex'), files };
 }
