@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en" class="fury-redesign">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'">
+  <title>Fury Denick Inspector</title>
+  <link rel="stylesheet" href="../../src/launcher/styles/launcher_redesign.css">
+  <link rel="stylesheet" href="inspector.css">
+  <script src="renderer.js" defer></script>
+</head>
+<body>
+<main class="inspector-app">
+  <header class="inspector-header"><div><span class="eyebrow">FURY · LOCAL TOOL</span><h1>Denick Inspector</h1><p>Follow the lookup from Aurora’s lists to Hypixel verification.</p></div><div class="actions"><button id="stop" disabled>Stop</button><button id="export" disabled>Export report</button></div></header>
+  <div id="connection" class="notice">Reading local API configuration…</div>
+  <div class="toolbar"><span id="usage">No API requests sent.</span><button id="folder">Choose Fury data folder</button></div>
+  <section class="panel" aria-labelledby="target-title">
+    <h2 id="target-title">1. Choose the detected counts</h2>
+    <div class="fields target-fields">
+      <label>Player name <span class="hint">optional</span><input id="player" placeholder="Siennawr" maxlength="16" autocomplete="off"></label>
+      <button id="load-player">Load Hypixel counts</button>
+      <label>Detected finals<input id="finals" inputmode="numeric" placeholder="4529"></label>
+      <label>Detected beds<input id="beds" inputmode="numeric" placeholder="1874"></label>
+    </div>
+    <p class="hint">Enter either stat or both. Loading a name fetches that player’s profile and fills both counts; it does not search Aurora.</p>
+  </section>
+  <section class="panel" aria-labelledby="rules-title">
+    <div class="section-title"><h2 id="rules-title">2. Set the rules</h2><button id="defaults">Reset to current proxy</button></div>
+    <div class="fields rules-fields">
+      <label>Candidate lists<select id="candidateMode"><option value="union">Either list (combined candidates)</option><option value="intersection">Both lists (overlap only)</option></select></label>
+      <label>Aurora search range<input id="lookupRange" type="number" min="0" max="100000" value="800"></label>
+      <label>Aurora candidates per stat<input id="lookupLimit" type="number" min="1" max="50" value="50"></label>
+      <label>Verification limit<input id="verifyLimit" type="number" min="0" max="100" value="25"></label>
+      <label>Finals below detected<input id="verifyFinalsBehind" type="number" min="0" max="100000" value="100"></label>
+      <label>Finals above detected<input id="verifyFinalsAhead" type="number" min="0" max="100000" value="4"></label>
+      <label>Beds below detected<input id="verifyBedsBehind" type="number" min="0" max="100000" value="100"></label>
+      <label>Beds above detected<input id="verifyBedsAhead" type="number" min="0" max="100000" value="0"></label>
+      <label>Single-stat fallback below<input id="singleStatFallbackRange" type="number" min="0" max="100000" value="200"></label>
+      <label>Beds gap allowance (%)<input id="bedsGapAllowancePercent" type="number" min="0" max="100000" value="25"></label>
+    </div>
+    <div class="actions"><button id="fetch" class="primary">Fetch Aurora lists</button><button id="analyze">Re-analyze cached data · no requests</button><label class="checkbox"><input id="force" type="checkbox">Use fresh API responses (bypass cache)</label></div>
+    <p class="hint">Aurora: one request per entered stat. Profiles: cached for 5 minutes; Aurora lists: 1 minute. Editing rules never sends requests.</p>
+    <p class="hint">One stat: widen the lower allowance only with at most two primary matches; 0 disables widening. More than three matches means waiting for the other stat. Combined searches use the primary allowances.</p>
+    <p class="hint">Both stats: the beds gap can be at most the finals gap plus 25% by default. Aurora can skip a profile check when both stored counts are available; verified totals must also pass.</p>
+  </section>
+  <div id="status" class="status" role="status" aria-live="polite">Enter counts and fetch Aurora lists to begin.</div>
+  <section id="results" class="panel" hidden aria-labelledby="results-title">
+    <div class="section-title"><h2 id="results-title">3. Inspect and verify candidates</h2><span id="mode" class="badge">Current proxy rules</span></div>
+    <p id="outcome"></p><p id="coverage" class="notice"></p><p id="stale" class="notice warning" hidden></p>
+    <div class="actions"><button id="select-considered">Select first unchecked proxy candidates</button><button id="select-all">Select all returned players</button><button id="select-none">Clear selection</button><label>Fresh profile budget<input id="budget" type="number" min="0" max="50" value="5"></label><button id="verify" class="primary">Verify selected with Hypixel</button></div>
+    <p class="hint">Each uncached profile uses one Minecraft name request and one Hypixel player request. No Urchin or ping requests. Verification stops on the first API error. This budget counts profile checks, not total HTTP calls.</p>
+    <div class="actions"><label for="aurora-reference">Compare Aurora counts with</label><select id="aurora-reference" aria-describedby="aurora-comparison-help"><option value="@detected">Entered counts</option></select></div>
+    <p id="aurora-comparison-help" class="hint">Aurora differences = this row minus the selected player or entered counts. Missing counts stay unknown. Comparisons use fetched data only.</p>
+    <div class="table-wrap"><table><thead><tr><th><span class="sr-only">Select</span></th><th>Player / lists</th><th>Aurora finals</th><th>Aurora beds</th><th>Aurora Δ finals / beds</th><th>Hypixel finals</th><th>Hypixel beds</th><th>Hypixel Δ finals / beds</th><th>Decision and reason</th></tr></thead><tbody id="candidates"></tbody></table></div>
+    <p id="checks" class="hint"></p>
+    <details><summary>Aurora responses · positions, counts and snapshot dates</summary><div id="discovery-lists"></div></details>
+    <details><summary>Exact lookup trace</summary><pre id="trace"></pre></details>
+  </section>
+  <footer>This standalone tool reads saved API keys in Main and does not change Fury settings, nickname history or proxy behavior. Experiment settings stay in this window. Request totals cover this inspector only.</footer>
+</main>
+</body>
+</html>

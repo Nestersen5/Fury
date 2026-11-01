@@ -10,7 +10,7 @@ const PROXY_COMMANDS = [
     '/stats', '/s', '/daily', '/weekly', '/monthly', '/yearly', '/reminder', '/reminders',
     '/session', '/ses', '/recap', '/clip', '/recordcheat', '/rc',
     '/profile', '/profiles', '/preset', '/presets',
-    '/info', '/general', '/ping', '/urchin', '/sw', '/duels',
+    '/info', '/general', '/ping', '/urchin', '/urchinrate', '/hypixelrate', '/sw', '/duels',
     '/scan', '/share', '/anticheat', '/scafdetect', '/scaffolddetect',
     '/ol', '/chattrigger', '/chattriggers', '/ctriggers',
     '/chatstats', '/lobbychatstats', '/lf',
@@ -278,7 +278,15 @@ function createProxyTabCompleter(options = {}) {
         const toggleCommands = ['autoskin', 'autostats', 'sharenick', 'announcements', 'showreal', 'nametags'];
         const controllerCommands = [...toggleCommands, 'partyannounce'];
         if (args.length === 2) {
-            return completeFromList(['add', 'party', 'self', 'status', 'info', 'help', ...controllerCommands, ...denickFilterFieldSuggestions()], args[1]);
+            return completeFromList(['add', 'party', 'test', 'self', 'status', 'info', 'help', ...controllerCommands, ...denickFilterFieldSuggestions()], args[1]);
+        }
+        if (sub === 'test') {
+            if (args.length === 3) return completeFromList(['finals', 'beds', 'messages', 'clear', 'reset'], args[2] || '');
+            if (args.length === 5 && ['finals', 'beds'].includes((args[2] || '').toLowerCase())) {
+                const remaining = args[2].toLowerCase() === 'finals' ? 'beds' : 'finals';
+                return completeFromList([remaining], args[4] || '');
+            }
+            return [];
         }
         if (controllerCommands.includes(sub)) {
             return args.length === 3 ? completeFromList(['on', 'off'], args[2] || '') : [];
@@ -563,6 +571,12 @@ function createProxyTabCompleter(options = {}) {
             if (args.length === 4 && sub === 'bind') {
                 return completeFromList(['bw', 'sw', 'duels'], args[3] || '');
             }
+            return [];
+        }
+        if (cmd === '/urchinrate' || cmd === '/hypixelrate') {
+            if (args.length === 2) return completeFromList(['delay', 'concurrency', 'status', 'reset'], args[1] || '');
+            if (args.length === 3 && args[1].toLowerCase() === 'delay') return completeFromList(['200', '500', '1000'], args[2] || '');
+            if (args.length === 3 && args[1].toLowerCase() === 'concurrency') return completeFromList(cmd === '/hypixelrate' ? ['1', '2', '4', '5', '8', '16'] : ['1', '2', '4', '8', '16'], args[2] || '');
             return [];
         }
         if (['/info', '/general', '/ping', '/urchin', '/denickskin'].includes(cmd)) {

@@ -27,7 +27,8 @@ async function run(apiAvailable) {
     const sessionFile = path.join(folder, 'sessions.json');
     let stamp = 100000, fetches = 0;
     const uuid = 'a'.repeat(32);
-    let stats = { losses_bedwars: 10, final_kills_bedwars: 20, final_deaths_bedwars: 10 };
+    let stats = { losses_bedwars: 10, final_kills_bedwars: 20, final_deaths_bedwars: 10,
+        kills_bedwars: 20, beds_lost_bedwars: 10 };
     const options = { sessionFile, now: () => stamp, saveDelayMs: 0,
         writeJsonOffThread: (file, data, label, done) => {
             fs.writeFileSync(file, JSON.stringify(data));
@@ -118,6 +119,11 @@ async function run(apiAvailable) {
         assert.equal(session().games[0].verificationStatus, 'pending', 'Partial API publication must wait for the loss');
         assert.equal(recaps.length, 1, 'Partial API publication cannot duplicate the recap');
         stats = { ...stats, losses_bedwars: 11 };
+        await tracker.processPendingVerifications({ force: true });
+        assert.equal(session().games[0].verificationStatus, 'pending', 'The result alone cannot erase observed combat or bed counts');
+        assert.equal(tracker.getSessionDelta().modes[0].kills, 1);
+        assert.equal(tracker.getSessionDelta().modes[0].bedsLost, 1);
+        stats = { ...stats, kills_bedwars: 21, beds_lost_bedwars: 11 };
         await tracker.processPendingVerifications({ force: true });
         assert.equal(session().games.length, 1);
         assert.equal(session().games[0].id, savedId, 'Verification updates the original record');

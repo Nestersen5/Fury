@@ -23,7 +23,7 @@ async function main() {
     const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'fury-mac-screenshot-'));
     const [directPort, failoverPort, healthPort, cosmeticPort, debugPort, blockedPort] = await unusedPorts(7);
     const env = cleanEnvironment(temporary, resources, cosmeticPort, blockedPort);
-    fs.writeFileSync(path.join(temporary, 'server_config.json'), JSON.stringify({
+    fs.writeFileSync(path.join(temporary, 'server_config.json'), JSON.stringify({ proxyCustomPort: 0,
         proxyDirectPort: directPort, proxyFailoverPort: failoverPort, healthPort,
         proxyDirectHost: '127.0.0.1', proxyFailoverHost: '127.0.0.1'
     }));

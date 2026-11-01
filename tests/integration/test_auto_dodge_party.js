@@ -14,7 +14,7 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 (async () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'fury-auto-dodge-party-'));
     const [directPort, failoverPort, healthPort, upstreamPort, cosmeticPort, blockedPort] = await unusedPorts(6);
-    fs.writeFileSync(path.join(directory, 'server_config.json'), JSON.stringify({
+    fs.writeFileSync(path.join(directory, 'server_config.json'), JSON.stringify({ proxyCustomPort: 0,
         proxyDirectHost: '127.0.0.1', proxyDirectPort: directPort,
         proxyFailoverHost: '127.0.0.1', proxyFailoverPort: failoverPort, healthPort
     }));
@@ -29,10 +29,19 @@ const createServer = mc.createServer, createClient = mc.createClient;
 mc.createServer = options => createServer({ ...options, host: '127.0.0.1', 'online-mode': false });
 mc.createClient = options => createClient({ ...options, host: '127.0.0.1', port: ${upstreamPort}, auth: 'offline' });
 require(${JSON.stringify(path.join(root, 'src/accounts/connectionAuth.js'))}).hasSavedLogin = () => true;
+const { parseUrchinBatchTags } = require(${JSON.stringify(path.join(root, 'src/stats/urchin.js'))});
+const tagFixtures = {
+    ExemptReplays: [{ type: 'Replays', reason: 'scaffold' }],
+    ExemptAccount: [{ type: 'Account' }],
+    ExemptBlacklist: [{ type: 'Blacklisted' }],
+    CleanCaution: [{ type: 'Caution', reason: 'THIS TAG DOES NOT MEAN THE PLAYER IS CHEATING! Replays needed' }],
+    DeniedCaution: [{ type: 'Caution', reason: 'not cheating, no scaffold' }],
+    Opponent: [{ type: 'Caution', reason: 'THIS TAG DOES NOT MEAN THE PLAYER IS CHEATING! scaffold, AB' }, { type: 'Replays' }]
+};
 require(${JSON.stringify(path.join(root, 'src/stats/fetch.js'))}).createStatsFetch = () => ({
     getPlayerData: async name => ({ fromCache: true, data: { player: { displayname: name,
         achievements: { bedwars_level: 1980 }, stats: { Bedwars: { final_kills_bedwars: 1353, final_deaths_bedwars: 100 } } },
-        urchin: { tag: 'Replays' }, seraph: {}, status: '' } })
+        urchin: parseUrchinBatchTags(tagFixtures[name] || [{ type: 'Sniper' }]), seraph: {}, status: '' } })
 });
 `);
     const env = cleanEnvironment(directory, root, cosmeticPort, blockedPort);
@@ -87,6 +96,13 @@ require(${JSON.stringify(path.join(root, 'src/stats/fetch.js'))}).createStatsFet
             await delay(100);
             assert(messages.slice(start).some(message => message.includes('State:') && message.includes('Confirmed')));
         }, 'Confirming the multipart party response before testing an opponent');
+        // Enter Auto Dodge through real chat packets and production tag shapes.
+        for (const name of ['ExemptReplays', 'ExemptAccount', 'ExemptBlacklist', 'CleanCaution', 'DeniedCaution']) {
+            chat('[MVP++] ' + name + ': hello');
+            await eventually(async () => assert(messages.some(message => message.includes('Pregame') && message.includes(name))), 'Checking exempt tag for ' + name);
+        }
+        assert(!messages.some(message => message.includes('matched auto-dodge')), 'exempt reports must not schedule a leave');
+        assert.strictEqual(leaves(), 0);
         chat('[MVP++] LateMate: hello');
         await eventually(async () => assert(messages.some(message => message.includes('matched auto-dodge') && message.includes('LateMate'))), 'Scheduling a current non-party player');
         chat('[MVP++] LateMate joined the party.');
@@ -96,8 +112,9 @@ require(${JSON.stringify(path.join(root, 'src/stats/fetch.js'))}).createStatsFet
 
         upstreamClient.write('scoreboard_score', { itemName: 'Starting in 2s', action: 0, scoreName: 'bedwars', value: 4 });
         chat('[MVP++] Opponent: hello');
-        await eventually(async () => assert.strictEqual(leaves(), 1), 'Dodging a tagged opponent with a confirmed roster');
+        await eventually(async () => assert.strictEqual(leaves(), 1), 'Dodging Caution cheats despite a later exempt Replays report');
         assert(messages.some(message => message.includes('Leaving lobby') && message.includes('Opponent')));
+        assert(messages.some(message => message.includes('Leaving lobby') && message.includes('Caution')), 'the matching report remains the dodge reason');
 
         // No transfer is simulated after /l, so reuse this waiting room to
         // reproduce a missing sidebar countdown and the one-second chat race.
@@ -117,7 +134,7 @@ require(${JSON.stringify(path.join(root, 'src/stats/fetch.js'))}).createStatsFet
         assert.strictEqual(leaves(), 2, 'actual game-start evidence still prevents further pregame dodges');
         assert(!messages.some(message => message.includes('Dodge') && message.includes('AfterStart')), 'a running game cannot schedule another dodge');
         assert.deepStrictEqual(errors, []);
-        console.log('Auto-dodge integration passed: party guards, tagged opponent, chat countdown fallback, paced final-second leave, and actual game start.');
+        console.log('Auto-dodge integration passed: tag exceptions, Caution cheats, party guards, chat countdown fallback, paced final-second leave, and actual game start.');
     } finally {
         player?.end();
         upstreamClient?.end();

@@ -32,6 +32,7 @@ const { bundled, validateNotes, summarizeNotes } = require('../../src/updates/re
         await current.dismiss('1.1.2'); current.dispose();
         current = service('1.1.1', { version: '1.1.2' });
         assert.equal(await current.check(), null, 'Dismissal survives restart');
+        assert.equal((await current.available()).version, '1.1.2', 'Dismissing the notice retains the updater offer');
         current.dispose();
         current = service('1.1.2');
         assert.equal(await current.check(), null, 'Dismissal survives upgrading to that release');

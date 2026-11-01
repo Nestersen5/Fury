@@ -25,7 +25,7 @@ const {
 } = require('./sessionSnapshot.js');
 const { resolveGameResult, isOwnTeamElimination } = require('./gameResult.js');
 const { createGame, observe, observeResult, localModes, FIELDS } = require('./localStats');
-const { singleApiResult, apiCompletedGames, observedSessionDelta } = require('./observedStats');
+const { singleApiResult, apiCompletedGames, apiCountsCoverObservations, observedSessionDelta } = require('./observedStats');
 
 const MODE_TO_GAME = {
     BEDWARS: 'Bedwars',
@@ -91,7 +91,7 @@ function createSessionTracker({
     let skipCurrentGameEnd = false; // manual finish during a live game
     let currentGameExcluded = false;
     let lastEndedSessionKey = null; // guards against a repeated end for one game
-    let endTimer = null;
+    const endTimers = new Set();
     let boundaryTimer = null;
     let verificationTimer = null;
     let inFlight = null;
@@ -113,6 +113,23 @@ function createSessionTracker({
         if (!boundaryTimer) return;
         clearTimeoutImpl(boundaryTimer);
         boundaryTimer = null;
+    }
+
+    function clearEndTimers() {
+        for (const timer of endTimers) clearTimeoutImpl(timer);
+        endTimers.clear();
+    }
+
+    // Completed observations belong to their original session even when a
+    // reset/disconnect arrives before the delayed API capture.
+    function preserveObservedEnds() {
+        for (const context of observedEnds) {
+            const id = context.sessionId || activeSessionId;
+            const session = id && store.findSession(id);
+            if (!session) continue;
+            appendPendingGame(id, context, context.baseSnapshot || session.latest || session.baseline, true);
+            observedEnds.delete(context);
+        }
     }
 
     function scheduleBoundaryClose() {
@@ -146,7 +163,13 @@ function createSessionTracker({
             try {
                 const data = await fetchOwnStats();
                 if (generation !== snapshotGeneration || !isApiAvailable()) return null;
-                return captureSessionSnapshot(data, { now });
+                const snapshot = captureSessionSnapshot(data, { now });
+                const uuid = String(getIdentity?.()?.uuid || '').replace(/-/g, '').toLowerCase();
+                if (uuid && snapshot && snapshot.uuid !== uuid) {
+                    logger.warn?.('[Session] Ignoring a snapshot that does not match the connected account.');
+                    return null;
+                }
+                return snapshot;
             } catch (error) {
                 logger.error?.('[Session] Snapshot fetch failed:', error?.message || error);
                 return null;
@@ -164,7 +187,7 @@ function createSessionTracker({
         const generation = snapshotGeneration;
         if (activeSessionId) {
             const active = store.findSession(activeSessionId);
-            if (active && !active.endedAt && now() - active.lastSeen < currentResumeWindowMs()) {
+            if (active && !active.endedAt && (pendingGame || now() - active.lastSeen < currentResumeWindowMs())) {
                 return activeSessionId;
             }
             if (active && !active.endedAt) store.endSession(activeSessionId, { endedAt: active.lastSeen });
@@ -379,10 +402,15 @@ function createSessionTracker({
         verificationTimer = null;
     }
 
+    function pendingForAccount() {
+        const uuid = String(getIdentity?.()?.uuid || '').replace(/-/g, '').toLowerCase();
+        return store.getPendingGames().filter(entry => !uuid || entry.session.uuid === uuid);
+    }
+
     function schedulePendingVerification(minWaitMs = 0) {
         clearVerificationTimer();
         if (detached || !isEnabled() || !isApiAvailable()) return;
-        const next = store.getPendingGames()[0];
+        const next = pendingForAccount()[0];
         if (!next) return;
         const waitMs = Math.max(Math.max(0, Number(minWaitMs) || 0), next.game.nextVerificationAt - now());
         verificationTimer = setTimeoutImpl(() => {
@@ -410,9 +438,12 @@ function createSessionTracker({
     function apiWindowMatchesGame(session, game, base, snapshot, delta) {
         const result = singleApiResult(delta, game.mode);
         const sibling = session.games.some(other => other.id !== game.id && other.mode === game.mode
-            && other.at > base.at && other.at <= snapshot.at && other.durationMs >= 1000);
+            && other.at > base.at && other.at <= snapshot.at
+            && (other.durationMs >= 1000 || ['win', 'loss'].includes(other.result)));
+        const awaitingCapture = [...observedEnds].some(other => other.mode === game.mode
+            && other.endedAt > base.at && other.endedAt <= snapshot.at);
         const anotherMatch = pendingGame?.mode === game.mode && pendingGame.startedAt >= (game.endedAt || game.at);
-        return Boolean(result && !sibling && !anotherMatch
+        return Boolean(result && !sibling && !awaitingCapture && !anotherMatch && apiCountsCoverObservations(delta, game)
             && (!game.result || game.resultSource === 'manual' || result === game.result));
     }
 
@@ -512,7 +543,7 @@ function createSessionTracker({
             schedulePendingVerification(30000);
             return null;
         }
-        const next = store.getPendingGames().find(entry => force || entry.game.nextVerificationAt <= now());
+        const next = pendingForAccount().find(entry => force || entry.game.nextVerificationAt <= now());
         if (!next) {
             schedulePendingVerification();
             return null;
@@ -542,12 +573,12 @@ function createSessionTracker({
     async function captureGameEnd(context) {
         const generation = snapshotGeneration;
         const sessionId = await context.sessionPromise || await ensureSession();
-        if (!sessionId || generation !== snapshotGeneration || !isApiAvailable()) return null;
+        if (!sessionId || generation !== snapshotGeneration || !isApiAvailable() || !observedEnds.has(context)) return null;
 
         const session = store.findSession(sessionId);
         const base = context.baseSnapshot || boundarySnapshot || session?.latest || session?.baseline;
         const snapshot = await takeSnapshot();
-        if (generation !== snapshotGeneration || !isApiAvailable()) return null;
+        if (generation !== snapshotGeneration || !isApiAvailable() || !observedEnds.has(context)) return null;
         observedEnds.delete(context);
         if (!snapshot) {
             const pending = appendPendingGame(sessionId, context, base);
@@ -560,6 +591,12 @@ function createSessionTracker({
             logger.warn?.('[Session] Snapshot regressed at game end — re-baselining.');
             store.rebaseline(sessionId, snapshot);
             boundarySnapshot = snapshot;
+            if (context.localModes?.length) {
+                const pending = appendPendingGame(sessionId, context, base);
+                schedulePendingVerification();
+                scheduleBoundaryClose();
+                return pending;
+            }
             return null;
         }
 
@@ -594,6 +631,7 @@ function createSessionTracker({
             roster: context.roster || [],
             metadata: context.metadata || null,
             events: context.events || [],
+            localModes: context.localModes || null,
             delta: { stats: gameDelta.stats, achievements: gameDelta.achievements },
             verificationStatus: 'verified',
             verificationAttempts: 1,
@@ -619,9 +657,11 @@ function createSessionTracker({
         events = [],
         durationMs = null,
         sessionKey = null,
-        immediate = false
+        immediate = false,
+        force = false
     } = {}) {
         if (quiescing || !isEnabled() || currentGameExcluded) return null;
+        if (pendingGame && mode && mode !== pendingGame.mode) return null;
 
         if (skipCurrentGameEnd) {
             skipCurrentGameEnd = false;
@@ -639,7 +679,7 @@ function createSessionTracker({
         // Too short to be a real game: a scoreboard flicker re-entering the
         // pregame state. Leave `pendingGame` intact so the genuine end still
         // reports the full duration.
-        if (!immediate && measured !== null && measured < minGameDurationMs) {
+        if (!immediate && !force && !pendingGame?.observed?.endObserved && measured !== null && measured < minGameDurationMs) {
             logger.warn?.(`[Session] Ignoring a ${Math.round(measured / 1000)}s "game end" — too short to be real.`);
             return null;
         }
@@ -663,8 +703,12 @@ function createSessionTracker({
             baseSnapshot: pendingGame?.baseSnapshot || boundarySnapshot,
             endedAt: now()
         };
-        const outcome = resolveGameResult(null, context);
         let observed = pendingGame?.observed || null;
+        if (observed?.result && !observed.resultConflict) {
+            context.events = [...events, { type: observed.result === 'win' ? 'victory' : 'defeat',
+                at: observed.endedAt || now(), ...(observed.resultFromGameOver ? { cause: 'game_over' } : {}) }];
+        }
+        const outcome = resolveGameResult(null, context);
         if (['win', 'loss'].includes(outcome.result)) {
             observed ||= createGame({ mode: context.mode, key: sessionKey,
                 startedAt: now() - (measured || 0), ownName: getIdentity?.()?.name, observedFromStart: false });
@@ -707,26 +751,27 @@ function createSessionTracker({
             return Promise.resolve(context.sessionPromise || ensureSession()).then(save);
         }
 
-        if (endTimer) {
-            clearTimeoutImpl(endTimer);
-            endTimer = null;
-        }
-
         if (gameEndDelayMs <= 0) return captureGameEnd(context);
 
-        endTimer = setTimeoutImpl(() => {
-            endTimer = null;
-            captureGameEnd(context).catch(error => {
+        const timer = setTimeoutImpl(() => {
+            endTimers.delete(timer);
+            return captureGameEnd(context).catch(error => {
                 logger.error?.('[Session] Game-end capture failed:', error?.message || error);
             });
         }, gameEndDelayMs);
-        if (typeof endTimer?.unref === 'function') endTimer.unref();
+        endTimers.add(timer);
+        if (typeof timer?.unref === 'function') timer.unref();
         return null;
     }
 
     // Close the current session and immediately open a new one from a fresh
     // snapshot (/session reset).
     async function reset() {
+        const generation = snapshotGeneration;
+        await Promise.all([...observedEnds].map(context => context.sessionPromise));
+        if (generation !== snapshotGeneration) return null;
+        preserveObservedEnds();
+        clearEndTimers();
         snapshotGeneration++;
         observedEnds.clear();
         skipCurrentGameEnd = Boolean(pendingGame);
@@ -742,19 +787,19 @@ function createSessionTracker({
     // Manual finish: take one last fresh snapshot so the final session card
     // includes stats earned since the previous game boundary, then close it.
     async function finish() {
+        const generation = snapshotGeneration;
         if (!activeSessionId) return null;
         await refresh({ force: true, reason: 'manual_finish' });
+        if (generation !== snapshotGeneration) return null;
         return end();
     }
 
     function end() {
+        preserveObservedEnds();
         snapshotGeneration++;
         observedEnds.clear();
         clearBoundaryTimer();
-        if (endTimer) {
-            clearTimeoutImpl(endTimer);
-            endTimer = null;
-        }
+        clearEndTimers();
         // Do not let a game which was already underway leak into a newly
         // automatic session after the player explicitly ended this one.
         skipCurrentGameEnd = Boolean(pendingGame);
@@ -772,18 +817,13 @@ function createSessionTracker({
     function quiesce() {
         if (quiescing) return quiescence;
         quiescing = true;
-        if (endTimer) { clearTimeoutImpl(endTimer); endTimer = null; }
+        clearEndTimers();
         clearBoundaryTimer(); clearVerificationTimer();
         const preserve = () => {
-            let missingBaseline = false;
             // Reuse the existing pending-verification record, including account
             // identity and the baseline that was already being established.
-            for (const context of observedEnds) {
-                const id = context.sessionId || activeSessionId;
-                const session = id && store.findSession(id);
-                if (session) appendPendingGame(id, context, context.baseSnapshot || session.latest || session.baseline, true);
-                else missingBaseline = true;
-            }
+            preserveObservedEnds();
+            const missingBaseline = observedEnds.size > 0;
             observedEnds.clear();
             detach();
             if (missingBaseline) throw new Error('Observed game end could not establish its session baseline.');
@@ -795,12 +835,10 @@ function createSessionTracker({
     }
 
     function detach() {
+        preserveObservedEnds();
         snapshotGeneration++;
         observedEnds.clear();
-        if (endTimer) {
-            clearTimeoutImpl(endTimer);
-            endTimer = null;
-        }
+        clearEndTimers();
         clearBoundaryTimer();
         clearVerificationTimer();
         detached = true;
@@ -822,6 +860,8 @@ function createSessionTracker({
         getActiveSession,
         getActiveSessionId: () => activeSessionId,
         getSessionDelta,
+        getObservedGameState: () => ({ ended: Boolean(pendingGame?.observed?.endObserved),
+            result: pendingGame?.observed?.resultConflict ? null : pendingGame?.observed?.result || null }),
         getHistory,
         refresh,
         onQueueStart,

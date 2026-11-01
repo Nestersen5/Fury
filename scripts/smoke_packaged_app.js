@@ -288,7 +288,7 @@ async function main(args) {
         const [directPort, failoverPort, healthPort, cosmeticPort, debugPort, blockedNetworkPort] = await unusedPorts(7);
         const env = cleanEnvironment(tempDirectory, resources, cosmeticPort, blockedNetworkPort);
         const nodeEnv = { ...env, ELECTRON_RUN_AS_NODE: '1' };
-        fs.writeFileSync(path.join(tempDirectory, 'server_config.json'), JSON.stringify({
+        fs.writeFileSync(path.join(tempDirectory, 'server_config.json'), JSON.stringify({ proxyCustomPort: 0,
             proxyDirectPort: directPort, proxyFailoverPort: failoverPort, healthPort,
             proxyDirectHost: '127.0.0.1', proxyFailoverHost: '127.0.0.1'
         }));

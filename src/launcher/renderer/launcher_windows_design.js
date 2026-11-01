@@ -1,5 +1,7 @@
 'use strict';
 
+const SERVER_DEFAULTS = require('../../net/serverDefaults');
+
 // Shared desktop design. The historical filename is retained by both packages.
 function mount({ document, clipboard }) {
     document.documentElement.classList.add('windows-simple-design');
@@ -40,7 +42,7 @@ function mount({ document, clipboard }) {
                         aria-describedby="join-failover-help" value="" placeholder="Loading address&hellip;">
                     <button type="button" data-copy-route="failover" aria-label="Copy proxy address" disabled>Copy</button>
                 </div>
-                <p class="join-destination">Connects to <span id="server-preview-failover-host">hypixel.fast</span></p>
+                <p class="join-destination">Connects to <span id="server-preview-failover-host">${SERVER_DEFAULTS.proxyFailoverHost}</span></p>
             </div>
             <div class="join-route" data-join-route="custom" hidden>
                 <label for="join-custom-address">Custom server</label>
@@ -50,7 +52,7 @@ function mount({ document, clipboard }) {
                         aria-describedby="join-custom-help" value="" placeholder="Loading address&hellip;">
                     <button type="button" data-copy-route="custom" aria-label="Copy custom server address" disabled>Copy</button>
                 </div>
-                <p class="join-destination">Connects to <span id="server-preview-custom-host">mc.hypixel.net</span></p>
+                <p class="join-destination">Connects to <span id="server-preview-custom-host">${SERVER_DEFAULTS.proxyCustomHost}</span></p>
             </div>
         </div>
         <div class="join-footer">

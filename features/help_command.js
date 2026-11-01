@@ -100,6 +100,18 @@ const HELP_SECTIONS = [
                 variations: ['/urchin <player>']
             },
             {
+                label: '/urchinrate',
+                command: '/urchinrate ',
+                description: 'Set and save the delay and concurrent reads for Urchin checks.',
+                variations: ['/urchinrate status', '/urchinrate delay <ms>', '/urchinrate concurrency <limit>', '/urchinrate reset']
+            },
+            {
+                label: '/hypixelrate',
+                command: '/hypixelrate ',
+                description: 'Set and save the base game delay and concurrent reads for Hypixel checks.',
+                variations: ['/hypixelrate status', '/hypixelrate delay <ms>', '/hypixelrate concurrency <limit>', '/hypixelrate reset']
+            },
+            {
                 label: '/partycheck',
                 command: '/partycheck status',
                 description: 'Save party split warnings on/off, or dismiss them for the current lobby. Test previews use test/stop.',
@@ -218,7 +230,7 @@ const HELP_SECTIONS = [
                 label: '/denick',
                 command: '/denick ',
                 description: 'Manual, automatic party, stat, and exact-match denick lookup. Party choices appear after a BedWars game starts.',
-                variations: ['/denick self', '/denick party', '/denick party test', '/denick party confirm', '/denick party choose <#>', '/denick add <nick> <realIGN>', '/denick finals <#> beds <#>', '/denick finalkill <name> beddestroy <name>'],
+                variations: ['/denick self', '/denick party', '/denick party test', '/denick party confirm', '/denick party choose <#>', '/denick add <nick> <realIGN>', '/denick finals <#> beds <#>', '/denick test finals <#> beds <#>', '/denick test messages', '/denick test clear', '/denick test reset', '/denick finalkill <name> beddestroy <name>'],
                 startup: 'Nick mappings and party denick'
             },
             {
@@ -297,7 +309,7 @@ const HELP_SUMMARIES = {
     '/session': 'Session tracking', '/recap': 'Last game recap', '/clip': 'Mark a replay moment',
     '/reminder status': 'Slumber reminders', '/info': 'Player status & tags',
     '/ping': 'Ping history', '/profile': 'Playstyle profiles',
-    '/urchin': 'Urchin tags', '/partycheck status': 'Party split warnings',
+    '/urchin': 'Urchin tags', '/urchinrate': 'Urchin check speed', '/hypixelrate': 'Hypixel check speed', '/partycheck status': 'Party split warnings',
     '/po': 'Local party check', '/scan': 'Scan current players', '/share': 'Scan broadcasts',
     '/overlay': 'Visibility & threat rules', '/ol': 'Manual overlay players',
     '/tabstats': 'Tab list stats', '/nametags': 'Above-player stats',

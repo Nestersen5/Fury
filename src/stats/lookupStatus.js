@@ -5,6 +5,8 @@
 // kept through one of these failures while the next lookup is pending.
 const TRANSIENT_PLAYER_LOOKUP_ERRORS = new Set([
     'lookup_failed',
+    'mojang_api_error',
+    'mojang_rate_limited',
     'hypixel_api_error',
     'hypixel_rate_limited',
     'hypixel_all_keys_unavailable'

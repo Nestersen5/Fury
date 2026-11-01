@@ -2,12 +2,9 @@
 
 const { FastQueue } = require('../src/util/fast_queue.js');
 
-// Cloudflare edge limits are per-IP, so the goal is to smooth spikes, not
-// maximize parallelism. Lookups are enqueued 140-175ms apart and typical API
-// latency is 300-500ms, so effective in-flight is ~2-3 and a cap of 5 never
-// binds in normal play — it only stops pile-ups when the API is slow, which
-// is exactly when bursting harder would extend an edge block.
-const HYPIXEL_API_BURST_CONCURRENCY = 5;
+// Default shared cap; /hypixelrate can change it without resetting usage,
+// provider cooldowns or queued work.
+const HYPIXEL_API_BURST_CONCURRENCY = 2;
 const HYPIXEL_API_NON_GAME_CONCURRENCY = 3;
 const HYPIXEL_API_NON_GAME_MIN_SPACING_MS = 450;
 // Game-priority traffic used to bypass every pacing gate in the queue and was
@@ -16,7 +13,11 @@ const HYPIXEL_API_NON_GAME_MIN_SPACING_MS = 450;
 // pacing at ~175ms summed to ~20 req/s from a single IP — which is what trips
 // the Cloudflare edge block (and no amount of key rotation helps, because the
 // edge limit is per-IP, not per-key). This is the global floor for game traffic.
-const HYPIXEL_API_GAME_MIN_SPACING_MS = 200;
+const HYPIXEL_API_GAME_MIN_SPACING_MS = 150;
+const HYPIXEL_REQUEST_SETTING_LIMITS = Object.freeze({
+    hypixelRequestDelayMs: Object.freeze({ min: 0, max: 60000 }),
+    hypixelRequestConcurrency: Object.freeze({ min: 1, max: 16 })
+});
 // Cloudflare bot heuristics also flag perfectly uniform cadence, so the floor
 // is jittered by +/- this fraction.
 const HYPIXEL_API_SPACING_JITTER = 0.15;
@@ -27,6 +28,19 @@ const HYPIXEL_API_LIMIT_MAX = 300;
 const HYPIXEL_API_LIMIT_WINDOW_MS = 5 * 60 * 1000;
 const HYPIXEL_API_USAGE_RETENTION_MS = 30 * 60 * 1000;
 const HYPIXEL_API_DIAGNOSTIC_LOG_THROTTLE_MS = 1500;
+
+function normalizeHypixelRequestSettings(settings = {}) {
+    const integer = (key, fallback) => {
+        const value = settings?.[key], bounds = HYPIXEL_REQUEST_SETTING_LIMITS[key];
+        if (typeof value !== 'number' && (typeof value !== 'string' || !/^\d+$/.test(value))) return fallback;
+        const number = Number(value);
+        return Number.isSafeInteger(number) && number >= bounds.min && number <= bounds.max ? number : fallback;
+    };
+    return {
+        hypixelRequestDelayMs: integer('hypixelRequestDelayMs', HYPIXEL_API_GAME_MIN_SPACING_MS),
+        hypixelRequestConcurrency: integer('hypixelRequestConcurrency', HYPIXEL_API_BURST_CONCURRENCY)
+    };
+}
 
 function createHypixelApiClient(options = {}) {
     const axios = options.axios;
@@ -40,6 +54,7 @@ function createHypixelApiClient(options = {}) {
 
     const hypixelApiQueue = new FastQueue({ compactThreshold: 128 });
     const hypixelApiUsageEvents = new FastQueue({ compactThreshold: 256 });
+    const hypixelApiBudgetEvents = new FastQueue({ compactThreshold: 256 });
     const hypixelApiKeyRuntime = new Map();
 
     let hypixelApiActiveRequests = 0;
@@ -49,13 +64,41 @@ function createHypixelApiClient(options = {}) {
     let hypixelApiWindowRequestCount = 0;
     let hypixelApiCooldownUntil = 0;
     let hypixelApiDrainTimer = null;
+    let hypixelApiDrainAt = 0;
     let hypixelApiWindowStartedAt = 0;
     let hypixelApiHeaderRemaining = null;
+    let hypixelApiAvailableRemaining = null;
     let hypixelApiHeaderLimit = null;
     let hypixelApiHeaderResetAt = 0;
     let hypixelApiLastDiagnosticLogAt = 0;
     let hypixelApiLastDiagnosticKey = '';
     let hypixelApiSuppressedDiagnosticLogs = 0;
+    let lastHypixelGameRequestAt = null;
+    let requestSettings = {
+        hypixelRequestDelayMs: HYPIXEL_API_GAME_MIN_SPACING_MS,
+        hypixelRequestConcurrency: HYPIXEL_API_BURST_CONCURRENCY
+    };
+
+    function getHypixelRequestSettings() {
+        return { ...requestSettings };
+    }
+
+    function configureHypixelRequests(patch = {}) {
+        const next = normalizeHypixelRequestSettings({ ...requestSettings, ...patch });
+        const delayChanged = next.hypixelRequestDelayMs !== requestSettings.hypixelRequestDelayMs;
+        if (!delayChanged && next.hypixelRequestConcurrency === requestSettings.hypixelRequestConcurrency) return getHypixelRequestSettings();
+        requestSettings = next;
+        if (delayChanged && lastHypixelGameRequestAt !== null) {
+            hypixelApiNextGameAt = lastHypixelGameRequestAt + hypixelGameSpacingMs();
+        }
+        // Re-evaluate pending jobs without cancelling active transports or
+        // resetting reserved quota, usage, key state or provider cooldowns.
+        if (hypixelApiDrainTimer) clearTimeout(hypixelApiDrainTimer);
+        hypixelApiDrainTimer = null;
+        hypixelApiDrainAt = 0;
+        drainHypixelApiQueue();
+        return getHypixelRequestSettings();
+    }
 
     function getCurrentHypixelUsageGameState() {
         return getGameState() || null;
@@ -104,7 +147,7 @@ function createHypixelApiClient(options = {}) {
     function hypixelApiKeyReason(entry, now = Date.now()) {
         const state = hypixelApiKeyState(entry);
         if (state.invalidUntil > now) return `invalid/expired (${Math.ceil((state.invalidUntil - now) / 1000)}s retry)`;
-        if (state.cooldownUntil > now) return `rate limited (${Math.ceil((state.cooldownUntil - now) / 1000)}s cooldown)`;
+        if (state.cooldownUntil > now) return `${state.lastFailure || 'temporarily unavailable'} (${Math.ceil((state.cooldownUntil - now) / 1000)}s cooldown)`;
         return state.lastFailure || 'healthy';
     }
 
@@ -220,8 +263,8 @@ function createHypixelApiClient(options = {}) {
     // stretches as the 5-minute budget (300 requests) drains, so a long game or
     // heavy lobby-hopping backs itself off before the edge does it for us.
     function hypixelGameSpacingMs() {
-        const used = hypixelApiWindowRequestCount / HYPIXEL_API_LIMIT_MAX;
-        let spacing = HYPIXEL_API_GAME_MIN_SPACING_MS;
+        const used = hypixelApiWindowRequestCount / (hypixelApiHeaderLimit || HYPIXEL_API_LIMIT_MAX);
+        let spacing = requestSettings.hypixelRequestDelayMs;
         if (used >= 0.9) spacing *= 4;
         else if (used >= 0.75) spacing *= 2.5;
         else if (used >= 0.5) spacing *= 1.5;
@@ -255,77 +298,154 @@ function createHypixelApiClient(options = {}) {
 
     function queueHypixelApiRequest(fn, meta = {}) {
         return new Promise((resolve, reject) => {
+            if (meta.signal?.aborted) return reject(meta.signal.reason || new Error('Hypixel request cancelled.'));
             const priority = hypixelApiQueuePriority(meta);
-            hypixelApiQueue.push({ fn, meta: { ...meta, priority }, resolve, reject });
+            const item = { fn, meta: { ...meta, priority }, resolve, reject };
+            if (meta.signal) {
+                item.onAbort = () => {
+                    const index = hypixelApiQueue.findIndex(queued => queued === item);
+                    if (index < 0) return;
+                    hypixelApiQueue.removeAt(index);
+                    meta.signal.removeEventListener('abort', item.onAbort);
+                    reject(meta.signal.reason || new Error('Hypixel request cancelled.'));
+                };
+                meta.signal.addEventListener('abort', item.onAbort, { once: true });
+            }
+            hypixelApiQueue.push(item);
             drainHypixelApiQueue();
         });
     }
 
     function scheduleHypixelApiDrain(delay) {
-        if (hypixelApiDrainTimer) return;
+        const dueAt = Date.now() + Math.max(1, delay);
+        if (hypixelApiDrainTimer && hypixelApiDrainAt <= dueAt) return;
+        if (hypixelApiDrainTimer) clearTimeout(hypixelApiDrainTimer);
+        hypixelApiDrainAt = dueAt;
         hypixelApiDrainTimer = setTimeout(() => {
             hypixelApiDrainTimer = null;
+            hypixelApiDrainAt = 0;
             drainHypixelApiQueue();
         }, Math.max(1, delay));
         if (typeof hypixelApiDrainTimer?.unref === 'function') hypixelApiDrainTimer.unref();
     }
 
     function drainHypixelApiQueue() {
-        const cooldownMs = hypixelApiCooldownUntil - Date.now();
-        if (cooldownMs > 0) {
-            scheduleHypixelApiDrain(cooldownMs);
-            return;
-        }
-
-        while (hypixelApiActiveRequests < HYPIXEL_API_BURST_CONCURRENCY && hypixelApiQueue.length) {
+        if (!hypixelApiQueue.length) return;
+        while (hypixelApiActiveRequests < requestSettings.hypixelRequestConcurrency && hypixelApiQueue.length) {
+            const now = Date.now();
+            // Reserve a slot before dispatch, including requests still in flight.
+            // Keep a rolling fallback even when upstream omits its quota headers.
+            const budgetWaitMs = hypixelApiBudgetWaitMs(now);
+            if (budgetWaitMs > 0) {
+                scheduleHypixelApiDrain(budgetWaitMs);
+                return;
+            }
             const item = takeNextHypixelApiQueueItem();
             if (!item) return;
+            if (item.onAbort) item.meta.signal.removeEventListener('abort', item.onAbort);
             const background = item.meta?.priority !== 'game';
             if (background) {
                 hypixelApiNonGameActiveRequests += 1;
                 hypixelApiNextNonGameAt = Date.now() + HYPIXEL_API_NON_GAME_MIN_SPACING_MS;
             } else {
+                lastHypixelGameRequestAt = Date.now();
                 hypixelApiNextGameAt = Date.now() + hypixelGameSpacingMs();
             }
             hypixelApiActiveRequests += 1;
+            if (hypixelApiAvailableRemaining !== null) hypixelApiAvailableRemaining -= 1;
             const usageEvent = recordHypixelApiRequest(item.meta);
+            hypixelApiBudgetEvents.push(usageEvent);
 
             Promise.resolve()
                 .then(() => item.fn(usageEvent))
                 .then(response => {
                     updateHypixelApiUsageEvent(usageEvent, response?.status || 200);
-                    noteHypixelRateLimitHeaders(response);
-                    item.resolve(response);
+                    if (usageEvent.keySlot === 'primary') noteHypixelRateLimitHeaders(response, response?.status === 429);
+                    return response;
                 })
                 .catch(e => {
+                    // A locally rejected job never reached Hypixel. Do not let
+                    // missing keys or the kill switch consume the hard budget.
+                    if (e?.hypixelApiUnavailable || e?.apiKillSwitchBlocked) {
+                        const budgetIndex = hypixelApiBudgetEvents.findIndex(event => event === usageEvent);
+                        if (budgetIndex >= 0) hypixelApiBudgetEvents.removeAt(budgetIndex);
+                        const usageIndex = hypixelApiUsageEvents.findIndex(event => event === usageEvent);
+                        if (usageIndex >= 0) hypixelApiUsageEvents.removeAt(usageIndex);
+                        hypixelApiWindowRequestCount = Math.max(0, hypixelApiWindowRequestCount - 1);
+                        if (hypixelApiAvailableRemaining !== null) hypixelApiAvailableRemaining += 1;
+                    }
                     const status = e?.response?.status || 0;
                     updateHypixelApiUsageEvent(usageEvent, status);
-                    if (status === 429) noteHypixelRateLimitHeaders(e.response, true);
+                    if (status === 429 && usageEvent.keySlot === 'primary') noteHypixelRateLimitHeaders(e.response, true);
                     logHypixelApiFailure(e, item.meta, usageEvent);
-                    item.reject(e);
+                    throw e;
                 })
                 .finally(() => {
                     hypixelApiActiveRequests = Math.max(0, hypixelApiActiveRequests - 1);
                     if (background) hypixelApiNonGameActiveRequests = Math.max(0, hypixelApiNonGameActiveRequests - 1);
                     drainHypixelApiQueue();
-                });
+                })
+                .then(item.resolve, item.reject);
         }
     }
 
+    function hypixelApiBudgetWaitMs(now = Date.now()) {
+        while (hypixelApiBudgetEvents.length && hypixelApiBudgetEvents.peek().at <= now - HYPIXEL_API_LIMIT_WINDOW_MS) {
+            hypixelApiBudgetEvents.shift();
+        }
+        if (hypixelApiHeaderResetAt && now >= hypixelApiHeaderResetAt + 350) {
+            hypixelApiAvailableRemaining = null;
+            hypixelApiHeaderResetAt = 0;
+        }
+        let waitMs = Math.max(0, hypixelApiCooldownUntil - now);
+        const primary = hypixelApiKeyRuntime.get('primary');
+        if (primary?.cooldownUntil > now && primary.invalidUntil <= now
+            && primary.key === String(getKeys()?.hypixel || '').trim()) {
+            waitMs = Math.max(waitMs, primary.cooldownUntil - now);
+        }
+        if (hypixelApiBudgetEvents.length >= (hypixelApiHeaderLimit || HYPIXEL_API_LIMIT_MAX)) {
+            waitMs = Math.max(waitMs, hypixelApiBudgetEvents.peek().at + HYPIXEL_API_LIMIT_WINDOW_MS - now + 350);
+        }
+        if (hypixelApiAvailableRemaining !== null && hypixelApiAvailableRemaining <= 1) {
+            waitMs = Math.max(waitMs, hypixelApiHeaderResetAt + 350 - now);
+        }
+        return waitMs;
+    }
+
     function hypixelApiGet(url, options = {}) {
-        const { apiPriority, ...axiosOptions } = options || {};
+        return runHypixelApiRequest(url, options, (requestUrl, requestOptions) => axios.get(requestUrl, requestOptions));
+    }
+
+    // The launcher also schedules proxy transports here. Only a grant and a
+    // compact outcome cross IPC; player responses stay in their requesting process.
+    function runHypixelApiRequest(url, options = {}, transport) {
+        const { apiPriority, apiKey, signal, ...axiosOptions } = options || {};
         return queueHypixelApiRequest(async (usageEvent = null) => {
-            const entry = selectHypixelApiKey();
+            const validationKey = String(apiKey || '').trim();
+            const configured = validationKey ? configuredHypixelApiKeys()[0] : null;
+            const entry = validationKey
+                ? (validationKey === configured?.key ? configured : { id: 'validation', label: 'validation', key: validationKey })
+                : selectHypixelApiKey();
             if (!entry) throw hypixelNoAvailableKeyError();
+            if (signal?.aborted) throw signal.reason || new Error('Hypixel request cancelled.');
             const state = hypixelApiKeyState(entry);
             state.active += 1;
             if (usageEvent) usageEvent.keySlot = entry.id;
             try {
-                const response = await axios.get(stripHypixelKeyParam(url), {
+                const response = await transport(stripHypixelKeyParam(url), {
                     ...axiosOptions,
+                    ...(signal ? { signal } : {}),
                     headers: { ...(axiosOptions.headers || {}), 'API-Key': entry.key }
                 });
-                noteHypixelApiKeySuccess(entry);
+                if ([401, 403, 429].includes(response?.status) || response?.status >= 500) {
+                    noteHypixelApiKeyFailure(entry, { response });
+                } else {
+                    noteHypixelApiKeySuccess(entry);
+                    if (validationKey && [200, 400, 422].includes(response?.status)) {
+                        state.invalidUntil = 0;
+                        state.cooldownUntil = 0;
+                    }
+                }
                 return response;
             } catch (error) {
                 noteHypixelApiKeyFailure(entry, error);
@@ -336,7 +456,8 @@ function createHypixelApiClient(options = {}) {
         }, {
             endpoint: getHypixelApiEndpoint(url),
             url,
-            priority: apiPriority
+            priority: apiPriority,
+            signal
         });
     }
 
@@ -508,15 +629,21 @@ function createHypixelApiClient(options = {}) {
         const remaining = readHeaderNumber(headers, 'RateLimit-Remaining');
         const limit = readHeaderNumber(headers, 'RateLimit-Limit');
         const resetSeconds = readHeaderNumber(headers, 'RateLimit-Reset');
-        const resetDelay = resetSeconds !== null && resetSeconds > 0
-            ? (resetSeconds * 1000) + 350
-            : HYPIXEL_API_RATE_LIMIT_COOLDOWN_MS;
+        const resetDelay = hypixelApiKeyResetDelay(response);
 
-        if (remaining !== null) hypixelApiHeaderRemaining = remaining;
-        if (limit !== null) hypixelApiHeaderLimit = limit;
+        if (remaining !== null) {
+            const reservedRemaining = Math.max(0, remaining - Math.max(0, hypixelApiActiveRequests - 1));
+            hypixelApiHeaderRemaining = remaining;
+            hypixelApiAvailableRemaining = hypixelApiAvailableRemaining === null
+                ? reservedRemaining : Math.min(hypixelApiAvailableRemaining, reservedRemaining);
+        }
+        if (limit !== null && limit > 0) hypixelApiHeaderLimit = limit;
         if (resetSeconds !== null && resetSeconds > 0) hypixelApiHeaderResetAt = Date.now() + (resetSeconds * 1000);
+        else if (hypixelApiAvailableRemaining !== null && hypixelApiAvailableRemaining <= 1 && !hypixelApiHeaderResetAt) {
+            hypixelApiHeaderResetAt = Date.now() + resetDelay;
+        }
 
-        if (wasLimited || (remaining !== null && remaining <= 1)) {
+        if (wasLimited || (hypixelApiAvailableRemaining !== null && hypixelApiAvailableRemaining <= 1)) {
             hypixelApiCooldownUntil = Math.max(hypixelApiCooldownUntil, Date.now() + resetDelay);
         }
     }
@@ -598,7 +725,7 @@ function createHypixelApiClient(options = {}) {
 
         const resetAt = hypixelApiWindowStartedAt + HYPIXEL_API_LIMIT_WINDOW_MS;
         return {
-            limit: HYPIXEL_API_LIMIT_MAX,
+            limit: hypixelApiHeaderLimit || HYPIXEL_API_LIMIT_MAX,
             keyPool: configuredHypixelApiKeys().map(entry => {
                 const state = hypixelApiKeyState(entry);
                 const now = Date.now();
@@ -622,7 +749,7 @@ function createHypixelApiClient(options = {}) {
             currentGameMode: game?.currentGamemode || null,
             currentWindow: {
                 count: currentWindowCount,
-                remaining: Math.max(0, HYPIXEL_API_LIMIT_MAX - currentWindowCount),
+                remaining: Math.max(0, (hypixelApiHeaderLimit || HYPIXEL_API_LIMIT_MAX) - currentWindowCount),
                 resetAt,
                 resetInMs: Math.max(0, resetAt - now)
             },
@@ -632,13 +759,14 @@ function createHypixelApiClient(options = {}) {
                 queued: hypixelApiQueue.length,
                 gameQueued: hypixelApiQueue.toArray().filter(item => item?.meta?.priority === 'game').length,
                 backgroundQueued: hypixelApiQueue.toArray().filter(item => item?.meta?.priority !== 'game').length,
-                concurrency: HYPIXEL_API_BURST_CONCURRENCY,
+                concurrency: requestSettings.hypixelRequestConcurrency,
                 backgroundConcurrency: HYPIXEL_API_NON_GAME_CONCURRENCY,
                 nextBackgroundInMs: Math.max(0, hypixelApiNextNonGameAt - now),
                 nextGameInMs: Math.max(0, hypixelApiNextGameAt - now),
-                gameSpacingMs: HYPIXEL_API_GAME_MIN_SPACING_MS,
+                gameSpacingMs: requestSettings.hypixelRequestDelayMs,
                 windowRequestCount: hypixelApiWindowRequestCount,
-                cooldownInMs: Math.max(0, hypixelApiCooldownUntil - now)
+                cooldownInMs: Math.max(0, hypixelApiCooldownUntil - now),
+                budgetWaitInMs: hypixelApiBudgetWaitMs(now)
             },
             headers: {
                 limit: hypixelApiHeaderLimit,
@@ -651,12 +779,15 @@ function createHypixelApiClient(options = {}) {
     }
 
     return {
+        getHypixelRequestSettings,
+        configureHypixelRequests,
         configuredHypixelApiKeys,
         getHypixelApiEndpoint,
         getHypixelApiUsageSnapshot,
         hasHypixelApiKeyConfigured,
         healthyHypixelApiKeys,
         hypixelApiGet,
+        runHypixelApiRequest,
         hypixelApiQueuePriority,
         hypixelUsageBreakdown,
         readHeaderNumber
@@ -664,6 +795,8 @@ function createHypixelApiClient(options = {}) {
 }
 
 module.exports = {
+    normalizeHypixelRequestSettings,
+    HYPIXEL_REQUEST_SETTING_LIMITS,
     HYPIXEL_API_BURST_CONCURRENCY,
     HYPIXEL_API_NON_GAME_CONCURRENCY,
     HYPIXEL_API_NON_GAME_MIN_SPACING_MS,

@@ -1,5 +1,6 @@
 const { spawnSync } = require('child_process');
 const path = require('path');
+const fs = require('fs');
 const { verifyApplication, payloadInventory, assertPayloadParity, writeReleaseMetadata } = require('./release_artifacts');
 const { verifyPair } = require('./verify_release_pair');
 
@@ -20,6 +21,9 @@ async function main() {
     if (result.status !== 0) throw new Error(`Windows packaging failed (${result.status}).`);
   }
   // NSIS finishes adding its helper before ZIP reads this same application.
+  if (!fs.existsSync(path.join(stage, 'resources', 'app-update.yml'))) {
+    throw new Error('Windows updater configuration is missing from the NSIS payload.');
+  }
   await verifyApplication(root, stage, 'win', 'x64');
   const before = await payloadInventory(stage);
   await verifyPair({ directory: outputDirectory, platform: 'win', arch: 'x64', sourceRoot: root, stage,

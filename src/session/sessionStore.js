@@ -118,7 +118,11 @@ function sessionHasCardStats(session, summary = summarizeSession(session)) {
         const { localModes, FIELDS } = require('./localTracking');
         return localModes(session.localTracking).some(mode => FIELDS.some(field => Number.isFinite(mode[field]) && mode[field] > 0));
     }
-    return ['Bedwars', 'SkyWars', 'Duels'].some(key => hasCardStatMovement(key, summary?.stats?.[key]));
+    if (['Bedwars', 'SkyWars', 'Duels'].some(key => hasCardStatMovement(key, summary?.stats?.[key]))) return true;
+    const observed = summary?.local ? summary : observedSessionDelta(session, summary);
+    const { FIELDS } = require('./localStats');
+    return Boolean(observed?.local && observed.modes?.some(mode => FIELDS
+        .some(field => Number.isFinite(mode[field]) && mode[field] > 0)));
 }
 
 // For destructive cleanup, missing data is not evidence of zero. Ignore timing
@@ -486,9 +490,12 @@ function createSessionStore({
         if (!session) return null;
         session.baseline = snapshot || null;
         session.latest = snapshot || null;
-        session.startedAt = Number(snapshot?.at) || now();
-        session.lastSeen = session.startedAt;
-        session.games = [];
+        const observed = session.localTracking || session.games.some(game => game.localModes?.length);
+        if (!observed) {
+            session.startedAt = Number(snapshot?.at) || now();
+            session.games = [];
+        }
+        session.lastSeen = Math.max(session.lastSeen, Number(snapshot?.at) || now());
         commit(store);
         return session;
     }

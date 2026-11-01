@@ -61,7 +61,7 @@ function endpoint({ isPackaged, env, release }) {
     return url;
 }
 
-function readManifest(url, { signal, timeoutMs = TIMEOUT_MS, maxBytes = MAX_BYTES } = {}) {
+function readManifest(url, { signal, timeoutMs = TIMEOUT_MS, maxBytes = MAX_BYTES, cache = true } = {}) {
     return new Promise((resolve, reject) => {
         let request, timer, settled = false;
         const finish = (error, value) => {
@@ -81,7 +81,7 @@ function readManifest(url, { signal, timeoutMs = TIMEOUT_MS, maxBytes = MAX_BYTE
             // No Electron session/cookie jar, auth headers, query parameters,
             // identifiers or version/platform headers. Never follow redirects.
             request = (url.protocol === 'https:' ? https : http).get(url, {
-                agent: false, headers: { Accept: 'application/json' }
+                agent: false, headers: { Accept: 'application/json', ...(cache ? {} : { 'Cache-Control': 'no-cache' }) }
             }, response => {
                 if (response.statusCode !== 200 || !/^application\/json(?:;|$)/i.test(response.headers['content-type'] || '')
                     || Number(response.headers['content-length']) > maxBytes) {

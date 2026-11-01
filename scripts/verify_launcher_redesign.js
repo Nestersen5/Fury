@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 
 // Launch the real app with two isolated accounts, no credentials and no external
 // network. Exercise existing event handlers, IPC and PNG exports, then inspect
@@ -22,7 +22,7 @@ const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
     if(packaged)require('./verify_packaged_sources').verifySources(root,packaged.appRoot);
     const defaults=require('../src/session/settings').SESSION_DEFAULTS;
     fs.writeFileSync(path.join(profile,'features_config.json'),JSON.stringify({...defaults,...(options['--focus'] === 'teammate-nicks' ? {autoSaveTeammateNicknames:false,shareOwnNicknameEnabled:false,autoSaveSharedNicknamesEnabled:false} : {}),apiKillSwitchEnabled:true,gameRecapEnabled:true,sessionGoalWins:10,sessionRecapStyle:'compact',friendAliasEnabled:true}));
-    fs.writeFileSync(path.join(profile,'server_config.json'),JSON.stringify({proxyDirectPort:directPort,proxyFailoverPort:failoverPort,healthPort,proxyDirectHost:'mc.hypixel.net',proxyFailoverHost:'hypixel.fast'}));
+    fs.writeFileSync(path.join(profile,'server_config.json'),JSON.stringify({ proxyCustomPort: 0,proxyDirectPort:directPort,proxyFailoverPort:failoverPort,healthPort,proxyDirectHost:'mc.hypixel.net',proxyFailoverHost:'hypixel.fast'}));
     const accounts=[{uuid:'a'.repeat(32),name:'Nestersen'},{uuid:'b'.repeat(32),name:'SecondAccount'}];
     const store=require('../src/reminders/rememberedAccount').createReminderAccountStore(path.join(profile,'launcher_data','reminders'));
     for(const [i,a] of accounts.entries()){

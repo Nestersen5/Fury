@@ -71,6 +71,11 @@ function createReleaseExperience({ installedVersion, isPackaged, statePath, upda
     }
     return {
         check, notes,
+        async available() {
+            if (!checkPromise) await check();
+            else await checkPromise;
+            return !stopped && offer?.kind === 'available' ? { ...offer } : null;
+        },
         async dismiss(version) {
             await initialize();
             if (stopped || version !== (offer?.version || installedVersion)) return false;

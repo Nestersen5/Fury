@@ -1,7 +1,11 @@
 'use strict';
 
 const { getFkdrColor } = require('../stats/colors.js');
+const { stripAnsi } = require('../../features/minecraft_chat.js');
 const { isUrchinDeveloperNotice } = require('../stats/urchinNotice.js');
+const { hasListedCheats } = require('../stats/tagReasonLabels.js');
+const { parseOverlayUrchinTag } = require('../overlay/tags.js');
+const { nametagTagCategory, stripNametagIconGlyphs } = require('../overlay/nametags.js');
 const { formatBedwarsPrestige } = require('../stats/format.js');
 const { createPregameCountdown } = require('./pregameCountdown.js');
 const chatController = require('../../features/chat_controller.js');
@@ -81,11 +85,22 @@ function createAutoDodger(deps) {
         };
     }
 
-    // The Urchin API attaches a developer/deprecation "Caution" notice to
-    // lookups. It is not a report against the player, so it must never trigger
-    // a dodge. Derive the dodge-worthy tag from the genuine report tags,
-    // ignoring the notice; fall back to the pre-derived tag for shapes that
-    // carry no rawTags (and only when that tag isn't the notice itself).
+    function getReportDodgeTag(rawTag) {
+        const report = parseOverlayUrchinTag(rawTag);
+        if (!report) return '';
+        // Keep the provider's classification. The display parser can call a
+        // report Caution solely because its reason contains the boilerplate.
+        const derived = String(rawTag.tooltip || '').split('(')[0].trim();
+        const value = stripNametagIconGlyphs(stripAnsi(derived || report.value)).replace(/[\[\]]/g, '').trim();
+        const category = nametagTagCategory(value);
+        if (category === 'account' || category === 'blacklisted') return '';
+        if (/^replays?(?: needed)?$/i.test(value)) return '';
+        if (category === 'caution' && !hasListedCheats(report.reasons)) return '';
+        return compactTagName(value);
+    }
+
+    // Evaluate every genuine report: exempt tags cannot hide another report.
+    // API developer notices remain excluded regardless of their wording.
     function getUrchinDodgeTag(urchin) {
         if (!urchin) return '';
         const rawTags = Array.isArray(urchin.rawTags) ? urchin.rawTags : [];
@@ -95,15 +110,17 @@ function createAutoDodger(deps) {
             return !isUrchinDeveloperNotice(tooltip);
         });
         if (genuine.length > 0) {
-            const tooltip = String(genuine[genuine.length - 1].tooltip || '');
-            const derived = tooltip.split('(')[0].trim().replace(/[\[\]]/g, '');
-            return compactTagName(derived) || compactTagName(genuine[genuine.length - 1].text) || '';
+            for (let index = genuine.length - 1; index >= 0; index--) {
+                const tag = getReportDodgeTag(genuine[index]);
+                if (tag) return tag;
+            }
+            return '';
         }
         // No genuine report tags. If the notice is present among rawTags (or is
         // what the pre-derived tag came from), there is nothing to dodge.
         if (rawTags.some((tag) => isUrchinDeveloperNotice(String(tag?.tooltip || '')))) return '';
         if (isUrchinDeveloperNotice(String(urchin.tag || ''))) return '';
-        return compactTagName(urchin.tag);
+        return getReportDodgeTag({ tooltip: urchin.tag });
     }
 
     function hasKnownDenick(knownDenick) {

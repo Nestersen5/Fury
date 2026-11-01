@@ -64,12 +64,10 @@ function createDuelsScanRunner(deps) {
 
         sendChat(client, `§d§lDuels §8» §7Analyzing §f${names.length} §7opponent${names.length === 1 ? '' : 's'} §8(§d${modeDef.label}§8)...`);
 
-        const urchinBatch = await getUrchinBatchRaw(names);
         if (!stillActive()) return false;
 
         const lookups = await Promise.allSettled(names.map(name =>
             getPlayerDataWithNickDetection(name, {
-                urchinOverride: urchinBatch.get(playerLookupKey(name)) || null,
                 apiPriority: 'game'
             })
         ));

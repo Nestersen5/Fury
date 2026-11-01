@@ -14,7 +14,7 @@ async function run(mode) {
     const data = path.join(directory, mode); fs.mkdirSync(data);
     const [debug, cosmetic, blocked, direct, failover, health, upstreamPort] = await unusedPorts(7);
     let upstream, player;
-    fs.writeFileSync(path.join(data, 'server_config.json'), JSON.stringify({ proxyDirectPort: direct, proxyFailoverPort: failover, healthPort: health }));
+    fs.writeFileSync(path.join(data, 'server_config.json'), JSON.stringify({ proxyCustomPort: 0, proxyDirectPort: direct, proxyFailoverPort: failover, healthPort: health }));
     fs.writeFileSync(path.join(data, 'features_config.json'), JSON.stringify({ apiKillSwitchEnabled: true }));
     const bootstrap = path.join(data, 'main.cjs'), authWorker = path.join(data, 'auth.cjs');
     const fromRoot = require('module').createRequire(path.join(REPOSITORY_ROOT, 'package.json'));
@@ -32,7 +32,7 @@ require(${resolve('./src/accounts/connectionAuth')}).hasSavedLogin=()=>true;
         upstream = mc.createServer({ host:'127.0.0.1',port:upstreamPort,'online-mode':false,version:'1.8.9',keepAlive:false });
         upstream.on('login', client => { client.on('error',()=>{}); client.write('login',{entityId:1,gameMode:0,dimension:0,difficulty:1,maxPlayers:8,levelType:'default',reducedDebugInfo:false}); client.write('position',{x:0,y:80,z:0,yaw:0,pitch:0,flags:0}); });
     }
-    if (mode === 'forced-quit') fs.appendFileSync(preload, `const shutdown=require(${resolve('./src/bootstrap/shutdown')});const install=shutdown.installServiceShutdown;shutdown.installServiceShutdown=actions=>install({...actions,drain:()=>new Promise(()=>{})});`);
+    if (mode === 'forced-quit' || mode === 'update-forced') fs.appendFileSync(preload, `const shutdown=require(${resolve('./src/bootstrap/shutdown')});const install=shutdown.installServiceShutdown;shutdown.installServiceShutdown=actions=>install({...actions,drain:()=>new Promise(()=>{})});`);
     fs.writeFileSync(bootstrap, `
 const fs=require('fs'),Module=require('module'),path=require('path'),cp=require('child_process');
 const {app,ipcMain,shell}=require('electron');
@@ -48,6 +48,7 @@ const main=new Module(file,module);main.filename=file;main.paths=Module._nodeMod
 main._compile(fs.readFileSync(file,'utf8')+'\\nmodule.exports={startService,stopService,requestQuit,services,refreshMicrosoftLogin,getLogin:()=>microsoftLogin};',file);
 const api=main.exports;let previousChild;
 ipcMain.handle('fixture:restart-quit',()=>{const stop=api.stopService('proxy');const start=api.startService('proxy').then(()=>false,()=>true);void api.requestQuit('quit');return start;});
+ipcMain.handle('fixture:update-quit',()=>{void api.requestQuit('update',()=>{fs.writeFileSync(${JSON.stringify(path.join(data,'update-handoff.txt'))},'clean');app.quit();});return true;});
 ipcMain.handle('fixture:quit',()=>{void api.requestQuit('quit');return true;});
 ipcMain.handle('fixture:seed',()=>new Promise(resolve=>{const child=api.services.proxy.child;previousChild=child;const ready=m=>{if(m?.type==='fixture:ready'){child.removeListener('message',ready);resolve(true);}};child.on('message',ready);child.send({type:'fixture:session'});}));
 ipcMain.handle('fixture:auth',()=>{void api.refreshMicrosoftLogin('Fixture').catch(()=>{});return true;});
@@ -63,7 +64,7 @@ ipcMain.handle('fixture:stale-exit',()=>{const current=api.services.proxy.child;
         const page = await eventually(async () => { assertRunning(child); const page = (await browser.pages()).find(page => page.url().endsWith('/launcher.html')); assert(page); return page; }, 'launcher renderer');
         await page.waitForFunction('typeof furyDesign !== "undefined" && !!furyDesign');
         const invoke = (channel, ...args) => page.evaluate((channel, args) => require('electron').ipcRenderer.invoke(channel, ...args), channel, args);
-        if (['restart','pending-quit','recording-quit','forced-quit','quit-during-restart'].includes(mode)) {
+        if (['restart','pending-quit','recording-quit','forced-quit','quit-during-restart','update-clean','update-forced'].includes(mode)) {
             await invoke('service:start', 'proxy');
             await eventually(async () => assert((await require('../../scripts/smoke_packaged_app').getJson(`http://127.0.0.1:${health}/health`)).ok), 'proxy ready');
             await invoke('fixture:seed');
@@ -96,10 +97,11 @@ ipcMain.handle('fixture:stale-exit',()=>{const current=api.services.proxy.child;
         if (mode === 'window-close') await page.evaluate(() => window.dispatchEvent(new CustomEvent('fury:accent-change', { detail: { color: '#123456' } })));
         const exitObserved = new Promise(resolve => child.once('exit', () => resolve(performance.now())));
         const start = performance.now();
-        await invoke(mode === 'window-close' ? 'window:control' : mode === 'quit-during-restart' ? 'fixture:restart-quit' : 'fixture:quit', 'close').catch(() => {});
+        await invoke(mode === 'window-close' ? 'window:control' : mode === 'quit-during-restart' ? 'fixture:restart-quit' : mode.startsWith('update-') ? 'fixture:update-quit' : 'fixture:quit', 'close').catch(() => {});
         const end = await require('../../src/bootstrap/shutdown').within(exitObserved, Date.now() + 7000, 'fixture');
-        assert.equal(child.exitCode, mode === 'forced-quit' ? 1 : 0, child.output);
-        if (mode !== 'forced-quit') assert(!child.output.includes('Shutdown did not'), child.output);
+        assert.equal(child.exitCode, ['forced-quit','update-forced'].includes(mode) ? 1 : 0, child.output);
+        if (!['forced-quit','update-forced'].includes(mode)) assert(!child.output.includes('Shutdown did not'), child.output);
+        if(mode.startsWith('update-')) assert.equal(fs.existsSync(path.join(data,'update-handoff.txt')),mode==='update-clean','Only a clean update may invoke the installer handoff');
         results.push({ mode, milliseconds: Math.round(end - start) });
         const pidFile=path.join(data,'owned-pids.json');
         if(fs.existsSync(pidFile))for(const pid of JSON.parse(fs.readFileSync(pidFile)))assert.throws(()=>process.kill(pid,0), 'Owned service/worker still alive: '+pid);
@@ -122,7 +124,7 @@ ipcMain.handle('fixture:stale-exit',()=>{const current=api.services.proxy.child;
         if(upstream){for(const client of Object.values(upstream.clients)){client.socket?.destroy();clearTimeout(client.closeTimer);}upstream.socketServer.close();}
     }
 }
-(async () => { for (const mode of ['idle', 'window-close', 'restart', 'pending-quit', 'auth', 'recording-quit', 'forced-quit', 'quit-during-restart']) await run(mode); console.log(JSON.stringify({ passed: true, results }, null, 2)); })()
+(async () => { for (const mode of process.argv.includes('--updates-only') ? ['update-clean','update-forced'] : ['idle', 'window-close', 'restart', 'pending-quit', 'auth', 'recording-quit', 'forced-quit', 'quit-during-restart','update-clean','update-forced']) await run(mode); console.log(JSON.stringify({ passed: true, results }, null, 2)); })()
     .catch(error => { console.error(error); process.exitCode = 1; })
     .finally(async () => {
         for (const child of children) if (child.exitCode === null && child.signalCode === null) {

@@ -320,7 +320,7 @@ function mount({ document, invoke, clipboard, nativeImage, navigate, settingsPag
     function fitOverlay(){const query=overlayFilter.value.toLowerCase(),rows=$$('#overlay-table .fury-board-row[data-player]');let visible=0;rows.forEach(row=>{const filtered=Boolean(query&&!row.textContent.toLowerCase().includes(query));row.classList.toggle('fury-filtered',filtered);if(!filtered)visible++;});overlayNoResults.hidden=!(query&&rows.length&&!visible);$$('#overlay-table .fury-board-card').forEach(card=>card.classList.toggle('fury-filtered',Boolean(query)&&!card.querySelector('.fury-board-row[data-player]:not(.fury-filtered)')));overlayBoard.fitBoard($('#overlay-table'));}
     new MutationObserver(fitOverlay).observe($('#overlay-table'),{childList:true});
     const recentTarget=$('.fury-recent-content');let recentKey='';
-    const pages = require('./launcher_redesign_pages').mount({ document, node, button, getState, openManager, validateNetwork });
+    const pages = require('./launcher_redesign_pages').mount({ document, node, button, getState, openManager, validateNetwork, clipboard, notify });
     const nicks = require('./launcher_redesign_nicks').mount({ document, node, button, escape });
     const nickroll = require('./launcher_nickroll').mount({ document, invoke, refresh });
     const refinedSettings = require('./launcher_settings_refinement').mount({document,node,button});
@@ -339,6 +339,6 @@ function mount({ document, invoke, clipboard, nativeImage, navigate, settingsPag
         refinedSettings.update();
         inGameAppearance.update();
     }
-    return { update, flushNickroll: nickroll.flush, renderSessions, renderLogs, renderNicks:nicks.render, openManager, showIngame, clearAccount(){calendarView.clear();sessionsKey='';sessionsDay='';recentKey='';cardGeneration++;cardsById.clear();openSessionCards.clear();$('#session-history-list').replaceChildren();recentTarget.replaceChildren();pages.clearAccount();}, showSignIn:signIn };
+    return { update, renderNetworkAddresses:pages.renderNetworkAddresses, flushNickroll: nickroll.flush, renderSessions, renderLogs, renderNicks:nicks.render, openManager, showIngame, clearAccount(){calendarView.clear();sessionsKey='';sessionsDay='';recentKey='';cardGeneration++;cardsById.clear();openSessionCards.clear();$('#session-history-list').replaceChildren();recentTarget.replaceChildren();pages.clearAccount();}, showSignIn:signIn };
 }
 module.exports={mount};

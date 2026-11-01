@@ -30,11 +30,17 @@ function createStatsLookup({ getPlayerData, makeUrchinData, makePingData } = {})
             : [body?.cause, body?.reason, body?.message, JSON.stringify(body || {})].filter(Boolean).join(' ');
         const clean = bodyText.toLowerCase();
 
-        if (stage === 'mojang' || status === 204 || status === 404) {
+        if (stage === 'mojang') {
+            if (status === 204 || status === 404) return { error: true, errorType: 'player_not_found', message: 'Player was not found.' };
+            if (status === 429) return { error: true, errorType: 'mojang_rate_limited', message: 'Minecraft profile lookups are rate limited. Try again in a bit.' };
+            return { error: true, errorType: 'mojang_api_error', message: 'Minecraft profile lookup is temporarily unavailable.' };
+        }
+
+        if (status === 204 || status === 404) {
             return { error: true, errorType: 'player_not_found', message: 'Player was not found.' };
         }
 
-        if (status === 401 || status === 403 || clean.includes('invalid api key') || clean.includes('api key')) {
+        if (status === 401 || status === 403) {
             return { error: true, errorType: 'hypixel_key_failed', message: 'Hypixel API key is invalid, expired, or revoked.' };
         }
 
@@ -44,6 +50,9 @@ function createStatsLookup({ getPlayerData, makeUrchinData, makePingData } = {})
 
         if (status >= 500) {
             return { error: true, errorType: 'hypixel_api_error', message: 'Hypixel API is unavailable.' };
+        }
+        if (clean.includes('invalid api key') || clean.includes('api key')) {
+            return { error: true, errorType: 'hypixel_key_failed', message: 'Hypixel API key is invalid, expired, or revoked.' };
         }
 
         return { error: true, errorType: 'lookup_failed', message: 'Player lookup failed.' };
@@ -94,6 +103,9 @@ function createStatsLookup({ getPlayerData, makeUrchinData, makePingData } = {})
         }
         if (errorType === 'hypixel_api_error' || errorType === 'lookup_failed') {
             return sendChat(client, '§cHypixel API lookup failed. Try again later.');
+        }
+        if (errorType === 'mojang_api_error' || errorType === 'mojang_rate_limited') {
+            return sendChat(client, `§c${result.message}`);
         }
         if (errorType === 'hypixel_player_missing') {
             return sendChat(client, `§c${target} exists, but has no Hypixel profile data.`);

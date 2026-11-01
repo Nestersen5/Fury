@@ -19,7 +19,7 @@ const item = (id, name, damage = 0, lore = []) => ({ blockId: id, itemCount: 1, 
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'fury-native-report-'));
     const [direct, failover, health, upstreamPort, cosmetic, blocked] = await unusedPorts(6);
     fs.writeFileSync(path.join(directory, 'server_config.json'), JSON.stringify({ proxyDirectHost: '127.0.0.1',
-        proxyDirectPort: direct, proxyFailoverHost: '127.0.0.1', proxyFailoverPort: failover, healthPort: health }));
+        proxyDirectPort: direct, proxyFailoverHost: '127.0.0.1', proxyFailoverPort: failover, proxyCustomPort: 0, healthPort: health }));
     fs.writeFileSync(path.join(directory, 'features_config.json'), JSON.stringify({ apiKillSwitchEnabled: true,
         autoSkinDenickEnabled: false, autoStatsDenickEnabled: false, pregameChatStatsEnabled: false, sessionTrackingEnabled: false }));
     const preload = path.join(directory, 'offline-fixture.js');

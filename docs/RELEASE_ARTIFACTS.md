@@ -107,6 +107,10 @@ The launcher's update check does not read this metadata. It reads a separate
 one-object manifest describing only the latest public version and the download
 page, published after these artifacts exist and are verified. That contract is
 `docs/UPDATE_NOTIFICATIONS.md`; per-distribution records stay here.
+Eligible installed Windows copies additionally consume the bounded, versioned
+`windows-update.json` projection of their one installer. They never receive the
+full six-artifact metadata. PREPARE generates that file from actual installer
+bytes and PUBLISH verifies it before the latest.json announcement advances.
 
 Production signing/notarization is a separate release step. Preserve the
 existing settings until that work is approved. Windows application and installer

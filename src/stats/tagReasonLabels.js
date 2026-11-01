@@ -2,7 +2,7 @@
 
 const { stripAnsi } = require('../../features/minecraft_chat');
 
-// Display-only summaries of Urchin's reason, never replacement classifications.
+// Summaries of Urchin's reason, never replacement classifications.
 // Order puts playstyle/association first, specific cheats next, queue size last.
 const RULES = [
     ['Annoying', /\b(?:annoying|cringe|bow\s*spam(?:ming|mer)?|punch\s*bow\s*abus(?:e|ing)|camp(?:ing|er)|stall(?:ing|er))\b|\bkeep(?:s)?\b[^.!?]{0,60}\bpot(?:ion)?\s*rushing\b/],
@@ -27,7 +27,17 @@ const NEGATED = /\b(?:no|not|never|without|didn't|didnt|doesn't|doesnt|don't|don
 const UNCERTAIN = /\b(?:maybe|possibly|probably|prob|likely|suspected|unsure|might|could|idk)\b|\bnot sure\b/;
 const OTHER_SUBJECT = /\b(?:against|versus|vs|(?:his|her|their|my|our)\s+(?:teammate|tm8|opponent))\b/;
 
-function tagReasonLabels(reports = [], classification = '') {
+// Auto Dodge needs all cheat allegations, including ones outside the two
+// visible reason labels. Playstyle, associations, history and queue sizes
+// alone do not make a Caution report a cheat report.
+const CHEAT_LABELS = new Set(['Blatant', 'Scaffold', 'Nuker', 'AB', 'Lag Abuse', 'Fastmine', 'Aim', 'Velocity', 'Bhop', 'Timer', 'AutoClutch']);
+const CHEAT_RULES = [
+    ...RULES.filter(([label]) => CHEAT_LABELS.has(label)),
+    ['Other cheats', /\b(?:double\s*shift(?:ing)?|auto[\s-]*block(?:ing)?|auto\s*click(?:er|ing)?|ac(?:ing)?|esp|x-?ray|full\s*bright|wall\s*hack|tracers?|chams?|visuals?|no\s*fog|fast\s*plac(?:e|ing)|safe\s*walk(?:ing)?|velo|pierc(?:e|ing)|reach|kill\s*aura|fly(?:ing)?|speed\s*(?:hack(?:s|ing)?|cheat(?:s|ing)?))\b/],
+    ['Cheating', /\b(?:(?:blatant|closet|known)\s+)?(?:cheat(?:er|ing|s)?|hack(?:s|ing|er)?)\b/]
+];
+
+function collectReasonLabels(reports, rules) {
     const found = new Map();
     for (const report of reports) {
         if (String(report?.source || '').toLowerCase() !== 'urchin' || report.title === 'Urchin API Status') continue;
@@ -40,7 +50,7 @@ function tagReasonLabels(reports = [], classification = '') {
         for (const clause of clauses) {
             if (/\[(?:shout|chat|party)\]|[<>]/.test(clause)) continue;
             const assertion = clause.replace(/\bnot sure\b/g, 'unsure');
-            for (const [label, pattern] of RULES) {
+            for (const [label, pattern] of rules) {
                 const match = assertion.match(pattern);
                 if (!match) continue;
                 const before = assertion.slice(0, match.index);
@@ -59,6 +69,15 @@ function tagReasonLabels(reports = [], classification = '') {
         }
     }
 
+    return found;
+}
+
+function hasListedCheats(reason = '') {
+    return collectReasonLabels([{ source: 'Urchin', reasons: reason }], CHEAT_RULES).size > 0;
+}
+
+function tagReasonLabels(reports = [], classification = '') {
+    const found = collectReasonLabels(reports, RULES);
     const base = classification.toLowerCase().replace(/\s+report$/, '');
     return RULES.map(([label]) => label)
         .filter(label => found.has(label) && label.toLowerCase() !== base)
@@ -66,4 +85,4 @@ function tagReasonLabels(reports = [], classification = '') {
         .map(label => label + (found.get(label) ? '?' : ''));
 }
 
-module.exports = { tagReasonLabels };
+module.exports = { tagReasonLabels, hasListedCheats };

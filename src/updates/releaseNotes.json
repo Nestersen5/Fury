@@ -68,20 +68,30 @@
     {
       "version": "1.1.3",
       "features": [
-        "AutoDenick can suggest a possible match from a final or bed count before checking both to confirm.",
+        "Windows installer users can download updates in Fury and choose when to restart.",
+        "AutoDenick can suggest possible real names from final kills or broken beds before checking both to confirm a match.",
         "Automatically save a teammate's nickname when only one party member can match, with Undo.",
-        "Share your current nickname while nicked with Fury players in your party and automatically save nicknames they share.",
-        "Use /denick self to see your checked nickname and saved nickname history."
+        "See your current and previously saved nicknames with /denick self."
       ],
       "improvements": [
-        "AutoDenick uses a tighter stats match and shows confirmed players with their stats on one line.",
+        "Urchin checks tags in small groups while available player stats keep loading.",
+        "Tab Stats shows available stats early, and Scan shows everyone together once checks finish.",
+        "Denick searches check more players and compare final kills and broken beds more carefully before confirming a match.",
+        "Denick messages show stats and tags together in chat, with fewer repeated notices.",
+        "AutoDenick announces when it starts checking finals, beds, or both, once per player for each check.",
+        "Auto Dodge ignores Replays, Account and Blacklisted tags, and only dodges Caution when cheats are listed.",
         "Choose whether Auto Dodge leaves instantly or just before the game starts.",
-        "Copy any API key with a Copy button and a confirmation popup.",
-        "Keep your older nicknames saved while checking your current nickname each game.",
-        "Turn sharing your own nickname on or off in Nicknames settings."
+        "Copy your API keys and Minecraft addresses with a Copy button.",
+        "Reset to defaults now restores all three preset Minecraft connections.",
+        "Player stats recover from more temporary loading problems and keep already loaded stats visible."
       ],
       "fixes": [
-        "AutoDenick stops repeating count messages and retries failed searches only when an error occurs.",
+        "Tab Stats no longer gets stuck or loses loaded stats when Hypixel refreshes the player list.",
+        "Quick Duels and rematches now count toward your session.",
+        "Finished games, kills and broken beds stay saved when stats arrive late or you disconnect, end or reset a session.",
+        "Refreshing stats no longer starts a new session during a game.",
+        "Session stats no longer use another account's results.",
+        "Player names above heads in Duels no longer turn white during a game.",
         "Auto Dodge no longer cancels a planned leave during the final Bed Wars countdown warning.",
         "Automatic skin and stats denicks no longer reveal party members in party chat."
       ]

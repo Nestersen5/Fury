@@ -66,11 +66,11 @@ assert(!createAutomaticRecapGuard({ now: () => 100000 })(recap()),
 // implementation of those rules in the test.
 {
     const proxy = fs.readFileSync(path.join(__dirname, '../../proxy.js'), 'utf8');
-    const begin = proxy.indexOf('                    if (!isActionBar && /^(?:GAME OVER|VICTORY|DEFEAT)');
+    const begin = proxy.indexOf('                    if (!isActionBar && !duelsState.active && /^(?:GAME OVER|VICTORY|DEFEAT)');
     assert(begin >= 0);
     const end = proxy.indexOf('\n                    }', begin) + '\n                    }'.length;
     let resets = 0;
-    const packet = vm.createContext({ isActionBar: false, cleanChatText: '',
+    const packet = vm.createContext({ isActionBar: false, cleanChatText: '', duelsState: { active: false },
         resetMatchState: () => resets++, clearTrackedScoreboard() {} });
     for (const text of ['Rival: VICTORY!', 'Party > Friend: GAME OVER!', 'The game starts in 1 second!']) {
         packet.cleanChatText = text; vm.runInContext(proxy.slice(begin, end), packet);
@@ -82,6 +82,9 @@ assert(!createAutomaticRecapGuard({ now: () => 100000 })(recap()),
     packet.isActionBar = false;
     vm.runInContext(proxy.slice(begin, end), packet);
     assert.equal(resets, 1, 'An exact server result still resets the match');
+    packet.duelsState.active = true;
+    vm.runInContext(proxy.slice(begin, end), packet);
+    assert.equal(resets, 1, 'A Duels result preserves the sidebar for same-server rematches');
 
     const functionStart = proxy.indexOf('        function finalizeSessionGame(');
     const functionEnd = proxy.indexOf('\n        function ', functionStart + 1);

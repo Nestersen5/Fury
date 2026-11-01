@@ -269,6 +269,63 @@ function findComponent(component, predicate) {
     assert.equal(delay, null, 'known denicks should be evaluated as their real account, not an unknown nick');
 }
 
+// Tag exceptions apply to each report, never to the player as a whole.
+{
+    const { parseUrchinBatchTags } = require('../../src/stats/urchin');
+    const profile = tags => ({ data: { urchin: parseUrchinBatchTags(tags) } });
+    const scheduled = (value, options = {}) => {
+        const h = makeHarness(options);
+        return captureScheduleDelay(() => h.dodger.maybeSchedule('TagException', value));
+    };
+    const exempt = ['Caution', 'Replays', 'Account', 'Blacklisted'];
+    for (const type of exempt) {
+        assert.strictEqual(scheduled(profile([{ type }])), null, `${type} alone is exempt`);
+        assert.strictEqual(scheduled({ data: { urchin: { tag: type } } }), null, `${type} fallback is exempt`);
+        for (const other of ['Sniper', 'Blatant Cheater', 'Closet Cheater', 'Confirmed Cheater', 'Legit Sniper', 'Custom Report']) {
+            for (const tags of [[{ type: other }, { type }], [{ type }, { type: other }]]) {
+                assert.strictEqual(scheduled(profile(tags)), 2000, `${type} cannot hide ${other} in either order`);
+            }
+        }
+    }
+    assert.strictEqual(scheduled(profile(exempt.map(type => ({ type })))), null, 'multiple exempt tags stay exempt');
+    for (const type of ['Replays', 'Account', 'Blacklisted']) {
+        assert.strictEqual(scheduled(profile([{ type, reason: 'scaffold, autoblock' }])), null, `${type} remains exempt regardless of its reason`);
+    }
+
+    const cheats = [
+        'scaffold', 'legitscaff', 'double shifting', 'nuker', 'autoblock', 'AB',
+        'lagrange', 'blink', 'backtracking', 'fastmine', 'aim assist', 'velocity',
+        'bhopping', 'timer', 'autoclutch', 'auto clicker', 'AC', 'ESP', 'x-ray',
+        'fast place', 'safewalk', 'piercing', 'reach', 'kill aura', 'fly hacking',
+        'speed hacks', 'cheating', 'blatant', 'possible scaffold',
+        'annoying, playing with cheaters, crossmapping, scaffold'
+    ];
+    for (const reason of cheats) {
+        assert.strictEqual(scheduled(profile([{ type: 'Caution', reason }])), 2000, `Caution still dodges listed cheats: ${reason}`);
+        assert.strictEqual(scheduled(profile([{ type: 'Caution', reason }, { type: 'Replays' }])), 2000, 'later exempt tag cannot hide Caution cheats');
+    }
+    for (const reason of [
+        '', 'No reason listed', 'Replays needed', 'annoying, bowspamming, camping',
+        'playing with cheaters', 'playing with a blatant cheater', '4q, crossmapping',
+        'blacklisted on other APIs', 'THIS TAG DOES NOT MEAN THE PLAYER IS CHEATING!',
+        'no scaffold or autoblock', 'not cheating', 'scaffold not detected',
+        'against a scaffold user', 'his teammate uses scaffold', '"I use scaffold"',
+        '[SHOUT] OtherPlayer: scaffold'
+    ]) {
+        assert.strictEqual(scheduled(profile([{ type: 'Caution', reason }])), null, `Caution needs an actual cheat allegation: ${reason}`);
+    }
+    assert.strictEqual(scheduled(profile([{ type: 'Caution', reason: 'THIS TAG DOES NOT MEAN THE PLAYER IS CHEATING! - scaffold' }])), 2000, 'Caution warning must not hide an appended cheat reason');
+    assert.strictEqual(scheduled(profile([{ type: 'Sniper', reason: 'THIS TAG DOES NOT MEAN THE PLAYER IS CHEATING!' }])), 2000, 'boilerplate in a non-exempt report must not change its classification');
+    assert.strictEqual(scheduled(profile([{ type: 'Caution', reason: 'not scaffold, but nuker' }])), 2000, 'a denied cheat must not hide a separate allegation');
+    assert.strictEqual(scheduled({ data: { urchin: { tag: 'Caution (Added by Mod 2026-01-01) - scaffold' } } }), 2000, 'fallback tooltip can contain a Caution cheat reason');
+    assert.strictEqual(scheduled(profile([{ type: 'BLACKLISTED' }])), null, 'provider casing is normalized');
+    assert.strictEqual(scheduled({ data: { urchin: { tag: '\u00a76[Caution]' } } }), null, 'formatted fallback tags are normalized');
+    assert.strictEqual(scheduled({ data: { ...statThreatProfile.data, urchin: profile([{ type: 'Account' }]).data.urchin } }, { statThreats: true }), 2000, 'tag exemption does not disable stat dodges');
+    assert.strictEqual(scheduled({ data: { isNicked: true, urchin: profile([{ type: 'Replays' }]).data.urchin } }, { nickedPlayers: true }), 2000, 'tag exemption does not disable nick dodges');
+    assert.strictEqual(scheduled(profile([{ type: 'Caution', reason: 'scaffold' }]), { taggedPlayers: false }), null, 'disabled tag filter still disables Caution dodges');
+    assert.strictEqual(scheduled(profile([{ type: 'Caution', reason: 'scaffold' }]), { isPartyMember: () => true }), null, 'party protection applies to Caution cheats');
+}
+
 // 4b. A countdown learned after scheduling must pull a long decision window
 // forward, so the leave cannot spill into the active game.
 {

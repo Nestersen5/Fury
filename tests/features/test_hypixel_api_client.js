@@ -52,7 +52,7 @@ async function run() {
         ));
         assert.strictEqual(dispatches.length, 4);
         for (let i = 1; i < dispatches.length; i++) {
-            assert(dispatches[i].at - dispatches[i - 1].at >= 165, 'Scan and LF requests must share the 200ms cadence (with 15% jitter), not burst together.');
+            assert(dispatches[i].at - dispatches[i - 1].at >= 122, 'Scan and LF requests share the 150ms base cadence with 15% jitter and clock tolerance.');
         }
         assert.strictEqual(pacedClient.getHypixelApiUsageSnapshot().lastFiveMinutes, 4, 'Both callers count against the same API budget.');
     } finally {

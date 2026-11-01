@@ -214,6 +214,16 @@ assert.deepStrictEqual(completer('/denick nametags '), ['on', 'off']);
 assert(completer('/denick ann').includes('announcements'), '/denick should complete automation toggles');
 assert.deepStrictEqual(completer('/denick party '), ['review', 'confirm', 'choose', 'test', 'cancel']);
 assert.deepStrictEqual(completer('/denick party test '), ['one', 'two', 'three', 'mismatch']);
+assert.deepStrictEqual(completer('/denick tes'), ['test']);
+assert.deepStrictEqual(completer('/denick test '), ['finals', 'beds', 'messages', 'clear', 'reset']);
+assert.deepStrictEqual(completer('/denick test m'), ['messages']);
+assert.deepStrictEqual(completer('/denick test messages '), []);
+assert.deepStrictEqual(completer('/denick test c'), ['clear']);
+assert.deepStrictEqual(completer('/denick test clear '), []);
+assert.deepStrictEqual(completer('/denick test finals '), []);
+assert.deepStrictEqual(completer('/denick test finals 1000 '), ['beds']);
+assert.deepStrictEqual(completer('/denick test beds 500 f'), ['finals']);
+assert.deepStrictEqual(completer('/denick test reset '), []);
 assert.deepStrictEqual(completer('/denick add Dem'), ['DemoPlayer_']);
 assert.deepStrictEqual(completer('/denick add DemoPlayer_ Ne'), ['Nestersen']);
 
@@ -241,6 +251,13 @@ assert.deepStrictEqual(completer('/scaffolddetect o'), ['on', 'off']);
 console.log('Command completion tests passed.');
 assert.deepStrictEqual(completer('/partycheck '), ['on', 'off', 'status', 'test', 'stop', 'dismiss']);
 assert.deepStrictEqual(completer('/partycheck o'), ['on', 'off']);
+assert.deepStrictEqual(completer('/urchinrate '), ['delay', 'concurrency', 'status', 'reset']);
+assert.deepStrictEqual(completer('/urchinrate delay 2'), ['200']);
+assert.deepStrictEqual(completer('/urchinrate concurrency '), ['1', '2', '4', '8', '16']);
+assert.deepStrictEqual(completer('/urchinrate status '), []);
+assert.deepStrictEqual(completer('/hypixelrate '), ['delay', 'concurrency', 'status', 'reset']);
+assert.deepStrictEqual(completer('/hypixelrate concurrency '), ['1', '2', '4', '5', '8', '16']);
+assert.deepStrictEqual(completer('/hypixelrate delay 5'), ['500']);
 
 for (const command of ['/alias', '/aliases', '/customname']) {
     assert(!PROXY_COMMANDS.includes(command));

@@ -54,6 +54,7 @@ const {
     saveAllSettings,
     saveScanSettings,
     saveFeatureSettings,
+    loadFeatureSettings,
     saveChatTriggerSettings,
     snoozeHypixelKeyReminder,
     loadKeys
@@ -82,6 +83,7 @@ app.on('web-contents-created', (event, contents) => {
 });
 const { createReminderAccountStore, createRememberedReminders } = require('./src/reminders/rememberedAccount');
 const { createHypixelApiClient } = require('./features/hypixel_api_client');
+const { attachHypixelApiCoordinator } = require('./src/net/hypixelApiCoordinator');
 const { normalizeAccount, sameAccount, sessionBelongsToAccount, buildAccountCatalog, createViewedAccountStore } = require('./src/accounts/launcherAccounts');
 const { promoteAuthCache } = require('./src/accounts/authCache');
 const { createRemovedAccountStore, removeAuthCaches } = require('./src/accounts/accountRemoval');
@@ -89,7 +91,11 @@ const removedAccounts = createRemovedAccountStore(dataPath('launcher_data', 'rem
 const accountSkins = require('./src/accounts/skinCache').createAccountSkinCache({directory:dataPath('launcher_data','skins'),axios});
 const viewedAccounts = createViewedAccountStore(dataPath('launcher_data', 'viewed-account.json'));
 const reminderAccounts = createReminderAccountStore(dataPath('launcher_data', 'reminders'));
-const reminderApi = createHypixelApiClient({ axios, getKeys: () => loadAllSettings().keys });
+let proxyHypixelGameState = null;
+const reminderApi = createHypixelApiClient({
+    axios, getKeys: loadKeys, getGameState: () => proxyHypixelGameState
+});
+reminderApi.configureHypixelRequests(loadFeatureSettings());
 const rememberedReminders = createRememberedReminders({
     store: reminderAccounts,
     getAccount: () => selectedLauncherAccount(),
@@ -313,6 +319,7 @@ async function startService(name) {
         env: {
             ...process.env,
             FURY_SERVICE_INSTANCE: instanceId,
+            FURY_HYPIXEL_COORDINATOR: name === 'proxy' ? '1' : '',
             FORCE_COLOR: '0',
             STATMOD_LAUNCHER: '1',
             // Electron's executable doubles as the bundled Node runtime.
@@ -324,6 +331,11 @@ async function startService(name) {
     });
 
     service.child = child;
+    if (name === 'proxy') attachHypixelApiCoordinator(child, {
+        client: reminderApi, instanceId,
+        canConfigure: () => service.child === child,
+        onGameState: state => { if (service.child === child) proxyHypixelGameState = state; }
+    });
     service.supervisor = superviseChild(child, instanceId, { log: message => pushLog(name, `[Launcher] ${message}`) });
     if (name === 'proxy') service.startedServerSettings = JSON.stringify(loadAllSettings().server);
     pushLog(name, `[Launcher] Started ${service.label} (pid ${child.pid})`);
@@ -1404,8 +1416,8 @@ async function getApiStatus(settings) {
 
     const validateHypixelEntry = async (field, key, acceptedDetail) => {
         try {
-            const response = await axios.get('https://api.hypixel.net/v2/player', {
-                headers: { 'API-Key': key },
+            const response = await reminderApi.hypixelApiGet('https://api.hypixel.net/v2/player', {
+                apiKey: key, apiPriority: 'background',
                 timeout: 3500,
                 validateStatus: () => true
             });
@@ -1438,7 +1450,16 @@ async function getApiStatus(settings) {
     }
 
     if (primaryHypixelKey) {
-        await validateHypixelEntry('hypixel', primaryHypixelKey, 'API key accepted');
+        const usage = reminderApi.getHypixelApiUsageSnapshot();
+        // A status refresh must not wait behind gameplay or a quota reset and
+        // hold up the launcher's complete state response.
+        if (usage.queue.active || usage.queue.queued || usage.queue.budgetWaitInMs > 0) {
+            status.hypixel = apiStatusCache.data?.hypixel
+                ? { ...apiStatusCache.data.hypixel }
+                : { label: 'Hypixel', state: 'configured', detail: 'API key configured' };
+        } else {
+            await validateHypixelEntry('hypixel', primaryHypixelKey, 'API key accepted');
+        }
     }
 
     apiStatusCache = { at: Date.now(), data: status };
@@ -1771,7 +1792,9 @@ async function testApiKey(provider, rawKey) {
     try {
         let response;
         if (name === 'hypixel') {
-            response = await request('https://api.hypixel.net/v2/player', { headers: { 'API-Key': key } });
+            response = await reminderApi.hypixelApiGet('https://api.hypixel.net/v2/player', {
+                apiKey: key, apiPriority: 'background', timeout: 6000, validateStatus: () => true
+            });
             if ([200, 400, 422].includes(response.status)) return { ok: true, state: 'available', detail: 'Hypixel accepted this API key.' };
         } else if (name === 'urchin' || name === 'urchinadmin') {
             response = await request('https://api.urchin.gg/v3/player/tags', { params: { player: 'Notch' }, headers: { 'X-API-Key': key } });
@@ -2265,6 +2288,7 @@ handleLauncherRequest('network:validate', (event, payload = {}) => validateNetwo
 // launcher state/history refresh and never participates in persistence drains.
 let updateNotifications = null;
 let releaseExperience = null;
+let installerUpdates = null;
 function getReleaseExperience() {
     updateNotifications ||= require('./src/updates/updateNotifications').createUpdateNotifications({
         installedVersion: app.getVersion(), isPackaged: app.isPackaged,
@@ -2279,6 +2303,17 @@ function updateSender(event) {
     return win && !win.isDestroyed() && event.sender === win.webContents
         && event.senderFrame === win.webContents.mainFrame;
 }
+function getInstallerUpdates() {
+    return installerUpdates ||= require('./src/updates/windowsInstallerUpdates').createInstallerUpdates({
+        installedVersion: app.getVersion(),
+        getAvailable: () => getReleaseExperience().available(),
+        detectInstallation: () => require('./src/updates/windowsInstallation').detectWindowsInstallation({ isPackaged: app.isPackaged, dataDirectory: getDataDir() }),
+        canInstall: () => require('./src/updates/windowsInstallation').canInstallWithCurrentProcesses(),
+        onChange: state => { if (win && !win.isDestroyed() && !win.webContents.isDestroyed()) win.webContents.send('updates:state-changed', state); },
+        requestInstall: handoff => requestQuit('update', handoff),
+        log: message => pushLog('proxy', `[Launcher] ${message}`)
+    });
+}
 handleLauncherRequest('updates:check', event => {
     if (!updateSender(event)) return null;
     return getReleaseExperience().check();
@@ -2287,7 +2322,11 @@ handleLauncherRequest('updates:notes', event => updateSender(event) ? getRelease
 handleLauncherRequest('updates:dismiss', (event, version) => updateSender(event) ? getReleaseExperience().dismiss(version) : false);
 handleLauncherRequest('updates:open', event => updateSender(event) && updateNotifications
     ? updateNotifications.open() : false);
-app.on('before-quit', () => { updateNotifications?.dispose(); releaseExperience?.dispose(); });
+handleLauncherRequest('updates:state', event => updateSender(event) ? getInstallerUpdates().getState() : null);
+handleLauncherRequest('updates:download', event => updateSender(event) ? getInstallerUpdates().download() : null);
+handleLauncherRequest('updates:cancel', event => updateSender(event) ? getInstallerUpdates().cancel() : null);
+handleLauncherRequest('updates:install', event => updateSender(event) ? getInstallerUpdates().install() : false);
+app.on('before-quit', () => { updateNotifications?.dispose(); releaseExperience?.dispose(); installerUpdates?.dispose(); });
 
 async function prepareRenderer(deadline) {
     if (!win || win.isDestroyed() || win.webContents.isDestroyed()) return;
@@ -2305,7 +2344,7 @@ async function prepareRenderer(deadline) {
         }), deadline, 'renderer');
     } finally { rendererFlushing = false; ipcMain.removeListener('shutdown:renderer-complete', listener); }
 }
-function requestQuit(reason) {
+function requestQuit(reason, installUpdate = null) {
     if (quitOperation) return quitOperation;
     quitting = true;
     const deadline = Date.now() + GRACE_MS;
@@ -2333,8 +2372,12 @@ function requestQuit(reason) {
         logUpdateTimers.forEach(timer => clearTimeout(timer)); logUpdateTimers.clear();
         settingsWatcher?.close(); profileWatcher?.close();
         quitAllowed = true;
-        if (relaunchRequested && clean) app.relaunch();
-        if (clean) app.quit();
+        if (relaunchRequested && clean && !installUpdate) app.relaunch();
+        if (clean && installUpdate) {
+            try { installUpdate(); }
+            catch { clean = false; pushLog('proxy', '[Launcher] Could not start the update installer.'); app.exit(1); }
+        }
+        else if (clean) app.quit();
         else app.exit(1);
         return { clean, outcome: clean ? 'EXITED' : 'FORCED' };
     })();

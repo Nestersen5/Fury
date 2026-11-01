@@ -30,7 +30,7 @@ const live = players => ({ connected: true, account: 'Nestersen', myTeam: 'Red',
     const output = target.output;
     const [debugPort, cosmeticPort, blockedPort, healthPort] = await unusedPorts(4), env = cleanEnvironment(profile, target.resources, cosmeticPort, blockedPort);
     // Point the launcher at an idle health port so a Fury proxy already running here cannot feed it live games.
-    fs.writeFileSync(path.join(profile, 'server_config.json'), JSON.stringify({ healthPort }));
+    fs.writeFileSync(path.join(profile, 'server_config.json'), JSON.stringify({ proxyCustomPort: 0, healthPort }));
     if (!target.packaged) env.NODE_BINARY = process.execPath;
     const child = startChild(target.executable, [...target.args, ...uiTestArguments(), `--remote-debugging-port=${debugPort}`, '--remote-debugging-address=127.0.0.1', '--disable-backgrounding-occluded-windows', '--disable-renderer-backgrounding', `--proxy-server=${env.HTTPS_PROXY}`], env, 'Overlay board verification');
     let browser;

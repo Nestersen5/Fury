@@ -239,8 +239,9 @@ function nametagTeamName(rawTeamName, index = 0) {
 // Give each entry ({ name, base }) a team name that sorts inside its base
 // team's block. Entries sharing a base are ordered by player name - the same
 // secondary sort the client applies - so teammates keep their vanilla order.
-// Input order is preserved; only `teamName` is added.
-function assignNametagTeamNames(entries = []) {
+// Input order is preserved; only `teamName` is added. `reservedNames` are skipped:
+// they belong to overlay teams that are staying on the client.
+function assignNametagTeamNames(entries = [], reservedNames = new Set()) {
     const groups = new Map();
     const rows = entries.map(entry => {
         const base = nametagTeamBase(entry?.base);
@@ -256,8 +257,11 @@ function assignNametagTeamNames(entries = []) {
             const right = String(b.name || '');
             return left < right ? -1 : (left > right ? 1 : 0);
         });
-        group.forEach((row, index) => {
+        let index = 0;
+        group.forEach(row => {
+            while (index < 99 && reservedNames.has(nametagTeamName(row.base, index))) index += 1;
             row.teamName = nametagTeamName(row.base, index);
+            index += 1;
         });
     });
 

@@ -15,7 +15,7 @@ const children = [], players = [], results = [];
 let upstream;
 async function run() {
     const [directPort, failoverPort, healthPort, upstreamPort, cosmeticPort, blockedPort] = await unusedPorts(6);
-    fs.writeFileSync(path.join(directory, 'server_config.json'), JSON.stringify({ proxyDirectPort: directPort, proxyFailoverPort: failoverPort, healthPort, proxyDirectHost: '127.0.0.1', proxyFailoverHost: '127.0.0.1' }));
+    fs.writeFileSync(path.join(directory, 'server_config.json'), JSON.stringify({ proxyCustomPort: 0, proxyDirectPort: directPort, proxyFailoverPort: failoverPort, healthPort, proxyDirectHost: '127.0.0.1', proxyFailoverHost: '127.0.0.1' }));
     fs.writeFileSync(path.join(directory, 'features_config.json'), JSON.stringify({ apiKillSwitchEnabled: true, autoSkinDenickEnabled: false, autoStatsDenickEnabled: false }));
     const preload = path.join(directory, 'fixture.cjs');
     const fromRoot = require('module').createRequire(path.join(REPOSITORY_ROOT, 'package.json'));

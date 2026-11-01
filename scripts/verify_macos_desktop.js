@@ -13,7 +13,7 @@ async function cdp(url){const ws=new WS(url);await new Promise((r,j)=>{ws.once('
 async function start(application){
  const [debug,inspect,cosmetic,blocked,direct,failover,health]=await unusedPorts(7);
  if(!fs.existsSync(canonical)){assert(ownsCanonical);fs.mkdirSync(canonical,{recursive:true});}
- fs.writeFileSync(path.join(canonical,'server_config.json'),JSON.stringify({proxyDirectPort:direct,proxyFailoverPort:failover,healthPort:health}));
+ fs.writeFileSync(path.join(canonical,'server_config.json'),JSON.stringify({ proxyCustomPort: 0,proxyDirectPort:direct,proxyFailoverPort:failover,healthPort:health}));
  const featureFile=path.join(canonical,'features_config.json');
  const features=fs.existsSync(featureFile)?JSON.parse(fs.readFileSync(featureFile)):{};
  fs.writeFileSync(featureFile,JSON.stringify({...features,apiKillSwitchEnabled:true,autoSkinDenickEnabled:false}));

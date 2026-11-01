@@ -3008,10 +3008,10 @@
                                     <strong>Fury Gateway - Failover</strong>
                                     <span class="minecraft-motd">
                                         <span class="minecraft-route-label is-failover">Backup route</span>
-                                        <span class="minecraft-route-description">Use this when the direct route is having trouble; Fury reconnects through <b id="server-preview-failover-host">hypixel.fast</b>.</span>
+                                        <span class="minecraft-route-description">Use this when the direct route is having trouble; Fury reconnects through <b id="server-preview-failover-host">free.stopthelag.lol</b>.</span>
                                     </span>
                                 </div>
-                                <div class="minecraft-server-address" aria-label="Failover proxy address">localhost:<span id="server-preview-failover-port">25566</span></div>
+                                <div class="minecraft-server-address" aria-label="Failover proxy address">localhost:<span id="server-preview-failover-port">25568</span></div>
                                 <span class="minecraft-signal" aria-label="Local proxy"><i></i><i></i><i></i><i></i><i></i></span>
                             </article>
                         </div>
@@ -4126,7 +4126,7 @@
                                         <article class="network-endpoint-card settings-search-item"><div class="network-endpoint-head"><span>C</span><div><h3>Custom Server</h3><small>Optional third connection</small></div><b data-network-status="custom">Checking</b></div><label>Local port<input id="proxy-custom-port" type="number" min="1" max="65535" placeholder="Add port"></label><small data-network-detail="custom">Enter a port to enable</small></article>
                                         <article class="network-endpoint-card settings-search-item"><div class="network-endpoint-head"><span>♥</span><div><h3>Health Panel</h3><small>Launcher monitoring endpoint</small></div><b data-network-status="health">Checking</b></div><label>Local port<input id="health-port" type="number" min="1" max="65535"></label><small data-network-detail="health">Validating port…</small></article>
                                     </div>
-                                    <details class="network-advanced"><summary><span><strong>Advanced host settings</strong><small>Destinations used by the three connections</small></span><b>Expand</b></summary><div class="network-host-grid"><label>Direct destination<input id="proxy-direct-host" placeholder="mc.hypixel.net"><small data-network-host-status="direct">Not checked</small></label><label>Failover destination<input id="proxy-failover-host" placeholder="hypixel.fast"><small data-network-host-status="failover">Not checked</small></label><label>Custom server destination<input id="proxy-custom-host" placeholder="play.example.com"><small data-network-host-status="custom">Not checked</small></label></div></details>
+                                    <details class="network-advanced"><summary><span><strong>Advanced host settings</strong><small>Destinations used by the three connections</small></span><b>Expand</b></summary><div class="network-host-grid"><label>Direct destination<input id="proxy-direct-host" placeholder="mc.hypixel.net"><small data-network-host-status="direct">Not checked</small></label><label>Failover destination<input id="proxy-failover-host" placeholder="free.stopthelag.lol"><small data-network-host-status="failover">Not checked</small></label><label>Custom server destination<input id="proxy-custom-host" placeholder="hypixel.fast"><small data-network-host-status="custom">Not checked</small></label></div></details>
                                     <div class="network-actions"><div><strong id="network-validation-summary">Validating configuration…</strong><small>Port and host checks never change your settings automatically.</small></div><button type="button" id="network-copy-config">Copy Configuration</button><button type="button" id="network-safe-defaults">Restore Safe Defaults</button></div>
                                 </section>
                             </div>
@@ -4158,6 +4158,7 @@
 
     <script>
         const { clipboard, ipcRenderer, shell, nativeImage } = require('electron');
+        const SERVER_DEFAULTS = require('./src/net/serverDefaults');
         const { VERSION: HISTORY_VERSION, HistoryResponseClient } = require('./src/session/historyResponse');
         const historyResponseClient = new HistoryResponseClient();
         async function invokeHistoryMutation(channel, ...args) {
@@ -7950,12 +7951,12 @@
                 : (isValidPort(savedValue) ? Number(savedValue) : fallback);
             const previewHost = (draftValue, savedValue, fallback) => String(draftValue || savedValue || fallback).trim() || fallback;
             const values = {
-                directPort: previewPort(draft.proxyDirectPort, server.proxyDirectPort, 25565),
-                directHost: previewHost(draft.proxyDirectHost, server.proxyDirectHost, 'mc.hypixel.net'),
-                failoverPort: previewPort(draft.proxyFailoverPort, server.proxyFailoverPort, 25566),
-                failoverHost: previewHost(draft.proxyFailoverHost, server.proxyFailoverHost, 'hypixel.fast'),
+                directPort: previewPort(draft.proxyDirectPort, server.proxyDirectPort, SERVER_DEFAULTS.proxyDirectPort),
+                directHost: previewHost(draft.proxyDirectHost, server.proxyDirectHost, SERVER_DEFAULTS.proxyDirectHost),
+                failoverPort: previewPort(draft.proxyFailoverPort, server.proxyFailoverPort, SERVER_DEFAULTS.proxyFailoverPort),
+                failoverHost: previewHost(draft.proxyFailoverHost, server.proxyFailoverHost, SERVER_DEFAULTS.proxyFailoverHost),
                 customPort: draft.proxyCustomPort === 0 ? 0 : previewPort(draft.proxyCustomPort, server.proxyCustomPort, 0),
-                customHost: previewHost(draft.proxyCustomHost, server.proxyCustomHost, 'mc.hypixel.net')
+                customHost: previewHost(draft.proxyCustomHost, server.proxyCustomHost, SERVER_DEFAULTS.proxyCustomHost)
             };
             const setText = (id, value) => {
                 const element = document.getElementById(id);
@@ -8020,12 +8021,7 @@
         function renderNetworkStudio(settings, service = {}) {
             const payload = currentNetworkPayload();
             renderServerPreview(settings.server, payload);
-            for (const key of ['direct','failover','custom']) {
-                const address = document.querySelector(`#proxy-${key}-port`)?.closest('.fury-connection-body')?.querySelector('.fury-connection-address');
-                if (address) address.textContent = payload[`proxy${key[0].toUpperCase()}${key.slice(1)}Port`]
-                    ? `Minecraft address: localhost:${document.getElementById(`proxy-${key}-port`).value}`
-                    : 'Add a local port to enable this connection.';
-            }
+            furyDesign?.renderNetworkAddresses();
             const running = Boolean(service.running);
             const live = document.getElementById('network-live-status');
             if (live) {
@@ -10735,12 +10731,12 @@
         });
         document.getElementById('network-safe-defaults')?.addEventListener('click', () => {
             const defaults = {
-                proxyDirectPort: 25565,
-                proxyFailoverPort: 25566,
-                proxyCustomPort: 0,
-                proxyDirectHost: 'mc.hypixel.net',
-                proxyFailoverHost: 'hypixel.fast',
-                proxyCustomHost: 'mc.hypixel.net'
+                proxyDirectPort: SERVER_DEFAULTS.proxyDirectPort,
+                proxyFailoverPort: SERVER_DEFAULTS.proxyFailoverPort,
+                proxyCustomPort: SERVER_DEFAULTS.proxyCustomPort,
+                proxyDirectHost: SERVER_DEFAULTS.proxyDirectHost,
+                proxyFailoverHost: SERVER_DEFAULTS.proxyFailoverHost,
+                proxyCustomHost: SERVER_DEFAULTS.proxyCustomHost
             };
             Object.entries(defaults).forEach(([key, value]) => {
                 if (!ids[key]) return;
@@ -11619,6 +11615,11 @@
         window.addEventListener('DOMContentLoaded', () => {
             require('./src/launcher/renderer/launcher_updates').mount({
                 document, notifications: window.FuryNotifications,
+                subscribe: listener => {
+                    const receive = (event, state) => listener(state);
+                    ipcRenderer.on('updates:state-changed', receive);
+                    return () => ipcRenderer.removeListener('updates:state-changed', receive);
+                },
                 invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args), isClosing: () => rendererClosing
             });
         }, { once: true });

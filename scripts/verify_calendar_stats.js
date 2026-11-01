@@ -6,7 +6,7 @@ const target=require('./launcher_verification_target').verificationTarget('calen
 (async()=>{
     const profile=fs.mkdtempSync(path.join(os.tmpdir(),'fury-calendar-check-'));
     const [debugPort,cosmeticPort,blockedPort,directPort,failoverPort,healthPort]=await unusedPorts(6),env=cleanEnvironment(profile,target.resources,cosmeticPort,blockedPort);
-    fs.writeFileSync(path.join(profile,'server_config.json'),JSON.stringify({proxyDirectPort:directPort,proxyFailoverPort:failoverPort,healthPort}));
+    fs.writeFileSync(path.join(profile,'server_config.json'),JSON.stringify({ proxyCustomPort: 0,proxyDirectPort:directPort,proxyFailoverPort:failoverPort,healthPort}));
     if(!target.packaged)env.NODE_BINARY=process.execPath;
     const account={uuid:'a'.repeat(32),name:'Nestersen'};
     require('../src/reminders/rememberedAccount').createReminderAccountStore(path.join(profile,'launcher_data','reminders')).remember(account.uuid,account.name);

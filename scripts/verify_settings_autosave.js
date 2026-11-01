@@ -6,6 +6,7 @@ const target=require('./launcher_verification_target').verificationTarget('setti
  const root=path.resolve(__dirname,'..'),profile=fs.mkdtempSync(path.join(os.tmpdir(),'fury-dashboard-check-'));
  const output=target.output;fs.mkdirSync(output,{recursive:true});
  const [debugPort,cosmeticPort,blockedPort,directPort,failoverPort,healthPort]=await unusedPorts(6),env=cleanEnvironment(profile,target.resources,cosmeticPort,blockedPort);if(!target.packaged)env.NODE_BINARY=process.execPath;
+ fs.writeFileSync(path.join(profile,'server_config.json'),JSON.stringify({proxyDirectPort:directPort,proxyFailoverPort:failoverPort,proxyCustomPort:0,healthPort}));
  const account={uuid:'a'.repeat(32),name:'Nestersen'};
  require('../src/reminders/rememberedAccount').createReminderAccountStore(path.join(profile,'launcher_data','reminders')).remember(account.uuid,account.name);
  fs.writeFileSync(path.join(profile,'session_data.json'),JSON.stringify({version:3,sessions:[{...account,id:'dashboard-test',startedAt:1788798600000,lastSeen:1788802980000,endedAt:1788802980000,summary:{stats:{Bedwars:{wins_bedwars:10,losses_bedwars:4,games_played_bedwars:14,final_kills_bedwars:24}}},games:[{id:"game-1",at:1788802980000,mode:"BEDWARS",result:"win",durationMs:300000,delta:{stats:{Bedwars:{wins_bedwars:1}}}}]}]}));
@@ -57,10 +58,75 @@ const target=require('./launcher_verification_target').verificationTarget('setti
   await edit('proxy-direct-host','bad/host');await settled();
   assert.equal(await page.evaluate('state.settings.server.proxyDirectHost'),'example.com');
   await edit('proxy-direct-host','mc.hypixel.net');await settled();
+  assert(await page.$eval('[data-copy-connection="custom"]',e=>e.disabled),'An unconfigured connection cannot be copied');
   await page.evaluate(()=>{
     document.getElementById('network-safe-defaults').click();
   });await settled();
-  assert.equal(await page.evaluate('state.settings.server.proxyDirectPort'),25565);
+  const serverDefaults=require('../src/net/serverDefaults');
+  for(const key of ['proxyDirectPort','proxyFailoverPort','proxyCustomPort','proxyDirectHost','proxyFailoverHost','proxyCustomHost']){
+    assert.equal(await page.evaluate(key=>state.settings.server[key],key),serverDefaults[key],`Reset restores ${key}`);
+    assert.equal(JSON.parse(fs.readFileSync(path.join(profile,'server_config.json')))[key],serverDefaults[key],`Reset persists ${key}`);
+  }
+  assert.equal(await page.evaluate('state.settings.server.healthPort'),healthPort,'Connection reset preserves the monitoring port');
+  await page.evaluate(()=>{
+    activateSettingsSubpage('network',false);
+    window.connectionCopyWrites=[];
+    window.connectionCopyOriginal=clipboard.writeText;
+    clipboard.writeText=value=>{
+      if(window.failConnectionCopy)throw new Error('Fixture clipboard failure');
+      window.connectionCopyWrites.push(value);
+    };
+  });
+  try{
+    const copySelector=key=>`[data-copy-connection="${key}"]`;
+    for(const [key,setting] of [['direct','proxyDirectPort'],['failover','proxyFailoverPort'],['custom','proxyCustomPort']]){
+      const selector=copySelector(key);
+      assert(await page.$eval(selector,e=>e.checkVisibility()&&!e.disabled&&e.getAttribute('aria-label').includes('Minecraft address')));
+      await page.click(selector);
+      assert.equal(await page.evaluate('connectionCopyWrites.at(-1)'),`localhost:${serverDefaults[setting]}`);
+      assert.equal(await page.$eval(selector,e=>e.textContent),'Copied');
+    }
+    const directCopy=copySelector('direct');
+    await page.waitForFunction(selector=>document.querySelector(selector).textContent==='Copy',{},directCopy);
+    await edit('proxy-direct-port','34567',false);
+    assert.equal(await page.$eval('.fury-connection-address',e=>e.textContent),'Minecraft address: localhost:34567');
+    await page.focus(directCopy);await page.keyboard.press('Enter');
+    assert.equal(await page.evaluate('connectionCopyWrites.at(-1)'),'localhost:34567','Keyboard copy uses the current edited address');
+    for(const invalid of ['65536','0','1.5','']){
+      await edit('proxy-direct-port',invalid,false);
+      assert(await page.$eval(directCopy,e=>e.disabled),`Cannot copy invalid port ${invalid}`);
+      const count=await page.evaluate('connectionCopyWrites.length');
+      await page.$eval(directCopy,e=>e.click());
+      assert.equal(await page.evaluate('connectionCopyWrites.length'),count);
+    }
+    await edit('proxy-direct-port',String(serverDefaults.proxyDirectPort));await settled();
+    await page.evaluate('window.failConnectionCopy=true');
+    await page.click(directCopy);
+    assert.equal(await page.$eval(directCopy,e=>e.textContent),'Copy','Clipboard errors do not show success');
+    assert.equal(await page.$eval('#save-status',e=>e.textContent),'Could not copy the Minecraft address. Try again.');
+    await page.evaluate('window.failConnectionCopy=false');
+    await page.focus(directCopy);await page.keyboard.press('Space');
+    assert.equal(await page.evaluate('connectionCopyWrites.at(-1)'),`localhost:${serverDefaults.proxyDirectPort}`);
+    await page.evaluate('refresh()');
+    assert.equal(await page.$eval(directCopy,e=>e.textContent),'Copied','Refreshing saved settings preserves feedback');
+    await page.evaluate(()=>document.querySelectorAll('.fury-notification button').forEach(button=>button.click()));
+    await page.waitForFunction(()=>!document.querySelector('.fury-notification'));
+    const originalTheme=await page.evaluate('document.documentElement.dataset.theme');
+    for(const [theme,width,height] of [['dark',1440,900],['light',1024,768]]){
+      await page.setViewport({width,height});
+      await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;},theme);
+      assert(await page.$$eval('.fury-connection-address-row',rows=>rows.length===3&&rows.every(row=>{
+        const text=row.querySelector('p').getBoundingClientRect(),button=row.querySelector('button').getBoundingClientRect(),bounds=row.getBoundingClientRect();
+        return button.width>0&&button.right<=bounds.right+1&&(button.left>=text.right||button.top>=text.bottom);
+      })),`${theme} address buttons fit without overlapping their text`);
+      const card=await page.$('.fury-connection-card');
+      await card.screenshot({path:path.join(output,`connection-copy-${theme}.png`)});
+    }
+    await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;},originalTheme);
+    await page.setViewport({width:1440,height:900});
+  }finally{
+    await page.evaluate(()=>{clipboard.writeText=window.connectionCopyOriginal;});
+  }
   assert(await page.$eval('#save-settings',e=>!e.checkVisibility()));
   assert.equal(await page.$('.fury-api-save'),null);
   await page.evaluate(()=>{
@@ -82,7 +148,7 @@ const target=require('./launcher_verification_target').verificationTarget('setti
   // Reset-to-defaults was checked above; reserve isolated listeners before launch.
   await page.evaluate(async ports=>{
     await ipcRenderer.invoke('settings:save-patch',{server:ports});await refresh();
-  },{proxyDirectPort:directPort,proxyFailoverPort:failoverPort,healthPort});
+  },{proxyDirectPort:directPort,proxyFailoverPort:failoverPort,proxyCustomPort:0,healthPort});
   await page.waitForFunction('!refreshInFlight');
   await page.evaluate(async()=>{await ipcRenderer.invoke('service:start','proxy');await refresh();});
   await page.waitForFunction('state.services.proxy.running');
@@ -100,7 +166,7 @@ const target=require('./launcher_verification_target').verificationTarget('setti
   assert.notEqual(await page.evaluate('state.services.proxy.pid'),oldPid);
   await page.evaluate(async()=>{await ipcRenderer.invoke('service:stop','proxy');});
   assert.deepEqual(errors,[]);
-  console.log('PASS autosave field isolation, thresholds, keys, invalid values, failure/retry, network reset, feature saves and restart status');
+  console.log('PASS autosave field isolation, thresholds, keys, invalid values, failure/retry, network reset, address copy and keyboard/error/disabled states, feature saves and restart status');
  target.record();
  }finally{if(browser)await browser.disconnect();await stopChild(child);}
 })().catch(e=>{console.error(e);process.exitCode=1;});

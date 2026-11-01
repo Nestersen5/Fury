@@ -15,7 +15,7 @@ const { unusedPorts, cleanEnvironment, startChild, stopChild, assertRunning, eve
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'fury-party-split-toggle-'));
     const [directPort, failoverPort, healthPort, upstreamPort, cosmeticPort, blockedPort] = await unusedPorts(6);
     const featureFile = path.join(directory, 'features_config.json');
-    fs.writeFileSync(path.join(directory, 'server_config.json'), JSON.stringify({
+    fs.writeFileSync(path.join(directory, 'server_config.json'), JSON.stringify({ proxyCustomPort: 0,
         proxyDirectHost: '127.0.0.1', proxyDirectPort: directPort,
         proxyFailoverHost: '127.0.0.1', proxyFailoverPort: failoverPort, healthPort
     }));
@@ -87,7 +87,9 @@ require(${JSON.stringify(path.join(REPOSITORY_ROOT, 'src/accounts/connectionAuth
                 'Name: cosmetic, not IGN', 'Combined example']) {
                 assert(guide.includes(text), `${input} should explain ${text}`);
             }
-            assert(output.length <= 8, 'Denick usage must stay compact');
+            const testHelp = output.findIndex(message => message.includes('Test AutoDenick'));
+            assert(testHelp >= 0 && testHelp <= 8, 'The main Denick usage must stay compact before the test commands');
+            assert(output.length <= 12, 'Denick usage including the test commands must stay bounded');
             assert(!guide.includes('"clickEvent"'), 'Denick help stays read-only');
         }
         await command('/denick status', 'Denick status.', true);

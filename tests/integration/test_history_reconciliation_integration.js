@@ -22,7 +22,7 @@ async function scenario(mode) {
         games: [{ id: 'g', at: now, mode: 'BEDWARS', result: 'win', verificationStatus: 'pending' }] }] };
     fs.writeFileSync(file, JSON.stringify(seed));
     const [direct, failover, health, cosmetic, blocked] = await unusedPorts(5);
-    fs.writeFileSync(path.join(data, 'server_config.json'), JSON.stringify({ proxyDirectPort: direct, proxyFailoverPort: failover,
+    fs.writeFileSync(path.join(data, 'server_config.json'), JSON.stringify({ proxyCustomPort: 0, proxyDirectPort: direct, proxyFailoverPort: failover,
         healthPort: health, proxyDirectHost: '127.0.0.1', proxyFailoverHost: '127.0.0.1' }));
     fs.writeFileSync(path.join(data, 'features_config.json'), JSON.stringify({ apiKillSwitchEnabled: true, autoSkinDenickEnabled: false, autoStatsDenickEnabled: false }));
     const worker = path.join(data, 'worker.cjs'), preload = path.join(data, 'preload.cjs');

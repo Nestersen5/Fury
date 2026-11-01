@@ -14,19 +14,19 @@ function expect(pattern, message, source = proxy) {
 }
 
 expect(/createHypixelApiClient\(\{[\s\S]*getKeys: \(\) => keys[\s\S]*getGameState: \(\) => activeUser\?\.getHypixelUsageGameState/, 'Proxy should wire the single Hypixel API key and game state to the client.');
-expect(/const HYPIXEL_API_BURST_CONCURRENCY = 5;/, 'Active-game Hypixel burst concurrency should be capped to limit Cloudflare burst trips.', hypixelApiClient);
+expect(/const HYPIXEL_API_BURST_CONCURRENCY = 2;/, 'Active-game Hypixel burst concurrency should be capped to limit Cloudflare burst trips.', hypixelApiClient);
 expect(/const HYPIXEL_API_NON_GAME_CONCURRENCY = 3;/, 'Hypixel background concurrency should be capped.', hypixelApiClient);
 expect(/const HYPIXEL_API_NON_GAME_MIN_SPACING_MS = 450;/, 'Hypixel background requests should be spaced.', hypixelApiClient);
 expect(/function hypixelApiQueuePriority\(meta = \{\}\) \{[\s\S]*return isHypixelApiGameActive\(\) \? 'game' : 'background';[\s\S]*\}/, 'Hypixel queue should infer game/background priority.', hypixelApiClient);
-expect(/const HYPIXEL_API_GAME_MIN_SPACING_MS = 200;/, 'Game-priority Hypixel requests need a global spacing floor; the per-IP Cloudflare edge limit is not raised by key rotation.', hypixelApiClient);
-expect(/function hypixelGameSpacingMs\(\) \{[\s\S]*hypixelApiWindowRequestCount \/ HYPIXEL_API_LIMIT_MAX[\s\S]*used >= 0\.9[\s\S]*HYPIXEL_API_SPACING_JITTER[\s\S]*\}/, 'Game spacing should stretch as the 5-minute budget drains and carry jitter.', hypixelApiClient);
+expect(/const HYPIXEL_API_GAME_MIN_SPACING_MS = 150;/, 'Game-priority Hypixel requests need a global spacing floor; the per-IP Cloudflare edge limit is not raised by key rotation.', hypixelApiClient);
+expect(/function hypixelGameSpacingMs\(\) \{[\s\S]*hypixelApiWindowRequestCount \/ \(hypixelApiHeaderLimit \|\| HYPIXEL_API_LIMIT_MAX\)[\s\S]*used >= 0\.9[\s\S]*HYPIXEL_API_SPACING_JITTER[\s\S]*\}/, 'Game spacing should stretch as the 5-minute budget drains and carry jitter.', hypixelApiClient);
 expect(/function takeNextHypixelApiQueueItem\(\) \{[\s\S]*findIndex\(item => item\?\.meta\?\.priority === 'game'\)[\s\S]*hypixelApiNextGameAt - Date\.now\(\)[\s\S]*scheduleHypixelApiDrain\(gameWaitMs\)[\s\S]*removeAt\(gameIndex\)[\s\S]*HYPIXEL_API_NON_GAME_CONCURRENCY[\s\S]*hypixelApiNextNonGameAt - Date\.now\(\)[\s\S]*hypixelApiQueue\.shift\(\);[\s\S]*\}/, 'Hypixel queue should pace game requests against a global floor before draining them, then pace background requests.', hypixelApiClient);
 expect(/hypixelApiNextGameAt = Date\.now\(\) \+ hypixelGameSpacingMs\(\);/, 'Dispatching a game request should arm the next game-spacing slot.', hypixelApiClient);
-expect(/function hypixelApiGet\(url, options = \{\}\) \{[\s\S]*const \{ apiPriority, \.\.\.axiosOptions \} = options \|\| \{\};[\s\S]*selectHypixelApiKey\(\)[\s\S]*stripHypixelKeyParam\(url\)[\s\S]*'API-Key': entry\.key[\s\S]*priority: apiPriority[\s\S]*\}/, 'Hypixel API wrapper should use one key while keeping request priority internal.', hypixelApiClient);
+expect(/function hypixelApiGet\(url, options = \{\}\) \{[\s\S]*runHypixelApiRequest\(url, options,[\s\S]*function runHypixelApiRequest[\s\S]*const \{ apiPriority, apiKey, signal, \.\.\.axiosOptions \} = options \|\| \{\};[\s\S]*selectHypixelApiKey\(\)[\s\S]*stripHypixelKeyParam\(url\)[\s\S]*'API-Key': entry\.key[\s\S]*priority: apiPriority[\s\S]*\}/, 'Local and proxy transports should share the keyed scheduler while keeping request priority internal.', hypixelApiClient);
 assert(/function configuredHypixelApiKeys\(\) \{[\s\S]*keys\.hypixel[\s\S]*return primary \? \[\{ id: 'primary'/.test(hypixelApiClient), 'Hypixel key selection should expose only the configured primary key.');
 assert(/function selectHypixelApiKey\(\) \{[\s\S]*healthyHypixelApiKeys\(\)\[0\]/.test(hypixelApiClient), 'Hypixel requests should always select the single configured key.');
 assert(!/hypixelSecondary|hypixelDualApiEnabled|activeHypixelBulkKeyPlan|hypixelKeyHint/.test(`${proxy}\n${hypixelApiClient}\n${overlayScan}`), 'The proxy, Hypixel client, and scan runner must not retain dual-key behavior.');
-expect(/async function performFullScan\(client, lobbyMap, detectedNickedPlayers, myTeam, context = \{\}\) \{[\s\S]*getPlayerDataWithNickDetection\(target\.lookupName, \{[\s\S]*apiPriority: 'game'[\s\S]*\}\)/, 'Full scans should use the one-key Hypixel request path.', overlayScan);
+expect(/async function performFullScan\(client, lobbyMap, detectedNickedPlayers, myTeam, context = \{\}\) \{[\s\S]*const getPlayerProfile = context\.getPlayerProfile \|\| getPlayerDataWithNickDetection;[\s\S]*getPlayerProfile\(target\.lookupName, \{[\s\S]*apiPriority: 'game'[\s\S]*\}\)/, 'Full scans should use the one-key Hypixel request path.', overlayScan);
 expect(/getOverlayPlayerData\(target, mode, 'chat_trigger', \{\s*apiPriority: options\.lookingFor \? 'game' : undefined,\s*preferCache: true/, '/lf overlay lookups must share scan pacing and reuse cached profiles.');
 expect(/async function getOverlayPlayerData\([^\n]*lookupOptions = \{\}\) \{[\s\S]*getPlayerDataWithNickDetection\(name, \{ \.\.\.lookupOptions, forceRefresh: manualLookup \}\)/, 'Overlay lookups must forward the requested API priority.');
 expect(/getPlayerDataWithNickDetection\(match\.sender, \{\s*preferCache: true,\s*apiPriority: match\.lookingFor \? 'game' : undefined/, '/lf chat-only fallback must use the same scan pacing as overlay lookups.');
@@ -42,11 +42,14 @@ expect(/createUrchinClient\(\{[\s\S]*getKey: \(\) => keys\.urchin[\s\S]*getGameS
 expect(/const URCHIN_BATCH_DEBOUNCE_MS = 40;/, 'Active-game Urchin debounce should stay fast.', urchinClient);
 expect(/const URCHIN_BATCH_NON_GAME_DEBOUNCE_MS = 650;/, 'Urchin background batches should have a slower debounce.', urchinClient);
 expect(/const URCHIN_BATCH_NON_GAME_MIN_SPACING_MS = 900;/, 'Urchin background batches should be spaced.', urchinClient);
-expect(/const URCHIN_BATCH_NON_GAME_MAX_NAMES = 12;/, 'Urchin background batches should be smaller than active-game batches.', urchinClient);
+expect(/const URCHIN_BATCH_NON_GAME_MAX_NAMES = 1;/, 'Urchin background reads should use only one slot.', urchinClient);
+expect(/const URCHIN_REQUEST_CONCURRENCY = 1;/, 'Urchin reads must respect the requested shared concurrency limit.', urchinClient);
+expect(/const URCHIN_REQUEST_MIN_SPACING_MS = 200;/, 'Urchin starts use the requested default spacing.', urchinClient);
+expect(/const URCHIN_LOCAL_BUDGET_LIMIT = 300;/, 'Missing headers must not disable the local request budget.', urchinClient);
 expect(/function urchinBatchPriority\(options = \{\}\) \{[\s\S]*return isUrchinBatchGameActive\(\) \? 'game' : 'background';[\s\S]*\}/, 'Urchin batch queue should infer game/background priority.', urchinClient);
-expect(/function nextUrchinBatchDelay\(baseDelay = URCHIN_BATCH_DEBOUNCE_MS\) \{[\s\S]*hasGameQueued[\s\S]*return Math\.max\(0, baseDelay\);[\s\S]*URCHIN_BATCH_NON_GAME_DEBOUNCE_MS[\s\S]*\}/, 'Urchin game batches should bypass non-game debounce.', urchinClient);
-expect(/function drainUrchinBatchQueue\(\) \{[\s\S]*const gameItem = Array\.from\(urchinBatchLookupQueue\.values\(\)\)\.find\(item => item\.priority === 'game'\);[\s\S]*priority === 'game' \? URCHIN_BATCH_MAX_NAMES : URCHIN_BATCH_NON_GAME_MAX_NAMES[\s\S]*if \(priority !== 'game'\) urchinNextNonGameBatchAt = Date\.now\(\) \+ URCHIN_BATCH_NON_GAME_MIN_SPACING_MS;[\s\S]*\}/, 'Urchin drain should prioritize game batches and pace background batches.', urchinClient);
-expect(/async function fetchUrchinSession\(player, period\) \{[\s\S]*await paceUrchinNonGameRequest\(\);[\s\S]*axios\.get\(url,[\s\S]*\}/, 'Urchin session endpoint should use non-game pacing.', urchinClient);
+expect(/function nextUrchinBatchDelay\(baseDelay = URCHIN_BATCH_DEBOUNCE_MS\) \{[\s\S]*hasGameQueued[\s\S]*requestSpacing[\s\S]*URCHIN_BATCH_NON_GAME_DEBOUNCE_MS/, 'Game priority must retain the global Urchin spacing.', urchinClient);
+expect(/async function drainUrchinBatchQueue\(\) \{[\s\S]*activeUrchinRequests\.size >= requestSettings\.urchinRequestConcurrency[\s\S]*localBudgetWaitMs\(\)[\s\S]*const gameItem[\s\S]*urchinNextRequestAt = lastUrchinRequestAt \+ requestSettings\.urchinRequestDelayMs/, 'Urchin drain should share configured concurrency, budget and pacing across reads.', urchinClient);
+expect(/async function fetchUrchinSession\(player, period\) \{[\s\S]*urchinBatchLookupQueue\.set\(`SESSION:[\s\S]*priority: 'background'/, 'Urchin session requests must join the shared read queue.', urchinClient);
 expect(/gameQueuedPlayers:[\s\S]*backgroundQueuedPlayers:[\s\S]*nextBackgroundBatchInMs:/, 'Urchin usage snapshot should expose background pacing.', urchinClient);
 
 console.log('API pacing static checks passed.');

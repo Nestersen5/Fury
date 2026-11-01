@@ -733,7 +733,10 @@ html.fury-redesign .fury-connection-fields label >span { flex:none;font-size:13p
 html.fury-redesign .fury-connection-fields input { width:100%;min-width:0;height:42px;min-height:42px;margin:0;padding:0 14px;border:1px solid var(--fury-border);border-radius:7px;background:var(--fury-inset); }
 html.fury-redesign .fury-connections button { min-height:42px;padding:0 18px;white-space:nowrap; }
 html.fury-redesign .fury-connections button.primary { background:var(--fury-gold);color:#101315;border-color:var(--fury-gold); }
-html.fury-redesign .fury-connection-address { margin:14px 0 0;color:var(--fury-muted);font-size:13px; }
+html.fury-redesign .fury-connection-address-row { display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin:14px 0 0; }
+html.fury-redesign .fury-connection-address { margin:0;color:var(--fury-muted);font-size:13px; }
+html.fury-redesign .fury-connection-address-row button { min-height:36px;padding:0 12px; }
+html.fury-redesign .fury-connection-address-row button.is-copied { color:var(--good); }
 html.fury-redesign .fury-connection-body >small:not([hidden]) { display:block;color:var(--bad,#f17474);margin-top:10px; }
 html.fury-redesign .fury-connection-alerts { display:grid;grid-template-columns:48px minmax(0,1fr) auto;align-items:center;gap:12px;padding:20px; }
 .fury-connection-alert-icon svg { width:28px;height:28px;fill:none;stroke:var(--fury-gold);stroke-width:1.7;stroke-linejoin:round; }

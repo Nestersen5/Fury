@@ -1,6 +1,8 @@
 'use strict';
 
 const { normalizeRecapFields, SESSION_DEFAULTS } = require('../session/settings');
+const { normalizeUrchinRequestSettings } = require('../../features/urchin_client');
+const { normalizeHypixelRequestSettings } = require('../../features/hypixel_api_client');
 
 // Bootstrap config loaders extracted from proxy.js. Owns parsing + defaults
 // for keys, scan thresholds, chat triggers, and feature flags from disk.
@@ -107,6 +109,8 @@ function createConfigLoader(deps) {
         const dodgePreset = String(features.autoDodgeIncludePreset || '').trim().toLowerCase();
 
         return {
+            ...normalizeUrchinRequestSettings(features),
+            ...normalizeHypixelRequestSettings(features),
             chatPrefixAccentHex: String(features.chatPrefixAccentHex || '#e5b35d'),
             anticheatEnabled: bool('anticheatEnabled', true),
             anticheatScaffoldEnabled: bool('anticheatScaffoldEnabled', true),

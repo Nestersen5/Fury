@@ -9,5 +9,6 @@ module.exports = Object.freeze({
     manifestUrl: 'https://furyproxy.online/latest.json',
     // The established Fury download page, and the only destination the update
     // action ever opens.
-    downloadPageUrl: 'https://furyproxy.online/'
+    downloadPageUrl: 'https://furyproxy.online/',
+    downloadOrigin: 'https://downloads.furyproxy.online'
 });

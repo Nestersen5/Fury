@@ -545,6 +545,14 @@ assert.strictEqual(
         ['Red28!2', 'Red28!0', 'Red28!1'],
         'a shared base indexes teammates by name while preserving input order'
     );
+    assert.deepStrictEqual(
+        assignNametagTeamNames([
+            { name: 'Zed', base: 'Red28' },
+            { name: 'Ada', base: 'Red28' }
+        ], new Set(['Red28!0'])).map(entryRow => entryRow.teamName),
+        ['Red28!2', 'Red28!1'],
+        'a name still held by an overlay team on the client is never reassigned'
+    );
 
     // '!' is below every character Hypixel uses in a team name, so the overlay
     // team sorts immediately after the real one and before the next team.

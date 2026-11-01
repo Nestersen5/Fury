@@ -22,7 +22,7 @@ function delay(ms) {
             if (String(url).includes('api.mojang.com/users/profiles/minecraft')) {
                 mojangCalls += 1;
                 await delay(15);
-                return { data: { id: uuid } };
+                return { data: { id: uuid, name: String(url).split('/').pop() } };
             }
             throw new Error(`Unexpected axios.get call: ${url}`);
         };

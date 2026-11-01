@@ -48,11 +48,12 @@ const server = http.createServer((req, res) => {
     res.setHeader('Content-Type', 'application/json');
     if (req.url === '/release-notes.json') {
         res.end(JSON.stringify({ schemaVersion: 1, releases: [{ version: latest,
-            features: ['Fixture new feature.'], improvements: ['Fixture improvement.'], fixes: ['Fixture bug fix.'] }] })); return;
+            features: Array.from({ length: 24 }, (_, i) => i === 0 ? 'Fixture new feature.' : `Fixture new feature ${i + 1}.`), improvements: ['Fixture improvement.'], fixes: ['Fixture bug fix.'] }] })); return;
     }
     if (req.url === '/timeout') return;
     if (req.url === '/available') { held.set(req.url, res); return; }
     if (req.url === '/malformed') { res.end('{broken'); return; }
+    if (req.url === '/installer') { res.end(JSON.stringify({ schemaVersion: 1, latestVersion: latest, releasePageUrl: pageUrl })); return; }
     res.end(JSON.stringify({ schemaVersion: 1, latestVersion: installed, releasePageUrl: pageUrl }));
 });
 server.on('connection', socket => { sockets.add(socket); socket.on('close', () => sockets.delete(socket)); });
@@ -82,6 +83,16 @@ const cp=require('child_process'),spawn=cp.spawn;cp.spawn=(...args)=>{const chil
 app.whenReady().then(()=>session.defaultSession.on('will-download',event=>{status.downloads++;event.preventDefault();}));
 const updates=require(${JSON.stringify(require.resolve('../src/updates/releaseExperience'))}),create=updates.createReleaseExperience;
 updates.createReleaseExperience=options=>{const service=create(options),check=service.check;service.check=async()=>{status.checks++;const result=await check();status.result=result;status.settled++;return result;};return service;};
+${mode === 'installer' ? `
+const installer=require(${JSON.stringify(require.resolve('../src/updates/windowsInstallerUpdates'))}),createInstaller=installer.createInstallerUpdates;
+let pendingDownload;status.installerDownloads=0;status.installs=0;
+installer.createInstallerUpdates=options=>createInstaller({...options,canInstall:async()=>true,detectInstallation:async()=>({directory:'C:\\\\Synthetic Fury'}),
+ read:async url=>url.pathname==='/latest.json'?{schemaVersion:1,latestVersion:${JSON.stringify(latest)},releasePageUrl:${JSON.stringify(pageUrl)}}:
+ {schemaVersion:1,version:${JSON.stringify(latest)},filename:'Fury-Setup-'+${JSON.stringify(latest)}+'-win-x64.exe',bytes:100000000,sha256:'a'.repeat(64),sha512:Buffer.alloc(64).toString('base64'),releasedAt:'2026-11-01T12:00:00Z'},
+ verify:async()=>{},requestInstall:async()=>{status.installs++;},
+ createUpdater:(metadata,callbacks)=>({download:()=>{status.installerDownloads++;callbacks.onProgress({percent:42,transferred:42000000});return new Promise((resolve,reject)=>{pendingDownload={resolve,reject};});},cancel:()=>pendingDownload?.reject(Error('cancelled')),dispose:()=>{},install:()=>{throw Error('Real installation blocked');}})});
+ipcMain.handle('fixture:update-action',(event,action)=>{if(action==='complete')pendingDownload.resolve('synthetic-installer.exe');else pendingDownload.reject(Error('synthetic failure'));return true;});
+` : ''}
 ipcMain.handle('fixture:update-status',()=>({...status,installedVersion:app.getVersion()}));
 require(${JSON.stringify(path.join(root, 'launcher.js'))});
 `);
@@ -103,7 +114,43 @@ require(${JSON.stringify(path.join(root, 'launcher.js'))});
             return result;
         };
         assert.equal((await status()).installedVersion, installed);
-        if (mode === 'available') {
+        if (mode === 'installer') {
+            await page.waitForSelector('.fury-release-reopen.fury-update-available');
+            assert.equal((await status()).installerDownloads, 0, 'Checking does not download');
+            await page.hover('.fury-release-reopen');
+            await page.waitForFunction('!document.querySelector(".fury-update-preview").hidden && document.querySelectorAll(".fury-update-notes li").length===26');
+            const footer = await page.$eval('.fury-update-preview .fury-release-actions', el => el.getBoundingClientRect().top);
+            assert(await page.$eval('.fury-update-notes', el => el.scrollHeight > el.clientHeight));
+            await page.$eval('.fury-update-notes', el => { el.scrollTop=el.scrollHeight; });
+            assert.equal(await page.$eval('.fury-update-preview .fury-release-actions', el => el.getBoundingClientRect().top), footer);
+            await page.screenshot({path:path.join(output,'installer-long-notes.png')});
+            await page.click('.fury-update-preview .primary');
+            await page.waitForFunction('document.querySelector(".fury-update-status").textContent.includes("42%")');
+            await page.click('.fury-update-preview .primary');
+            await page.waitForFunction('document.querySelector(".fury-update-status").textContent.includes("ready to download")');
+            await page.click('.fury-update-preview .primary');
+            await eventually(async()=>assert.equal((await status()).installerDownloads,2),'Second download');
+            await page.evaluate(()=>require('electron').ipcRenderer.invoke('fixture:update-action','fail'));
+            await page.waitForFunction('document.querySelector(".fury-update-status").textContent.includes("Could not")');
+            await page.click('.fury-update-preview .primary');
+            await eventually(async()=>assert.equal((await status()).installerDownloads,3),'Retry');
+            await page.evaluate(()=>require('electron').ipcRenderer.invoke('fixture:update-action','complete'));
+            await page.waitForFunction('document.querySelector(".fury-update-status").textContent.includes("ready to install")');
+            assert(await page.$eval('.fury-update-detail',el=>el.textContent.includes('disconnects Minecraft')));
+            await page.keyboard.press('Escape');
+            await page.focus('.fury-release-reopen'); await page.keyboard.press('Enter');
+            await page.waitForFunction('!document.querySelector(".fury-update-preview").hidden');
+            for(const theme of ['graphite','light']) {
+                await page.evaluate(theme=>{window.NesterTheme.apply(theme,false);window.NesterTheme.applySidebar('collapsed',false);},theme);
+                await page.setViewport({width:1024,height:680});
+                await page.hover('.fury-release-reopen');
+                await page.screenshot({path:path.join(output,`installer-${theme}-collapsed.png`)});
+                assert(await page.$eval('.fury-update-preview',el=>{const r=el.getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight;}));
+            }
+            await page.click('.fury-update-preview .primary');
+            await eventually(async()=>assert.equal((await status()).installs,1),'Explicit install request');
+            assert.deepEqual((await status()).opens,[]);
+        } else if (mode === 'available') {
             await eventually(() => assert(held.has('/available')), 'Manifest request');
             assert.equal((await status()).settled, 0, 'Launcher must be ready before the held check finishes');
             held.get('/available').end(JSON.stringify({ schemaVersion: 1, latestVersion: latest, releasePageUrl: pageUrl,
@@ -197,7 +244,7 @@ require(${JSON.stringify(path.join(root, 'launcher.js'))});
 (async () => {
     fs.mkdirSync(output, { recursive: true });
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-    for (const mode of ['available', 'welcome', 'welcome-dismiss', 'equal', 'malformed', 'timeout', 'dev-disabled']) await scenario(mode);
+    for (const mode of process.argv.includes('--installer-only') ? ['installer'] : ['available', 'welcome', 'welcome-dismiss', 'equal', 'malformed', 'timeout', 'dev-disabled', 'installer']) await scenario(mode);
     fs.writeFileSync(path.join(output, 'verification.json'), JSON.stringify({ passed: true, platform: process.platform, architecture: process.arch, packaged: false, results, requests }, null, 2));
     console.log(JSON.stringify({ passed: true, results }, null, 2));
 })().catch(error => { console.error(error); process.exitCode = 1; }).finally(async () => {

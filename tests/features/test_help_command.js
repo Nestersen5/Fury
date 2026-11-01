@@ -22,6 +22,11 @@ const startupSummary = getStartupCommandSummary();
 assert(startupSummary.includes('/help - Full in-game command guide'), 'Startup summary should direct players to the in-game command guide');
 assert(startupSummary.includes('/reminder - Slumber reminders'), 'Startup summary should stay in sync with the Slumber reminder commands');
 assert(startupSummary.includes('/denick - Nick mappings and party denick'), 'Startup summary should stay in sync with denick support');
+assert(HELP_SECTIONS.some(section => section.entries.some(entry => entry.label === '/denick'
+    && entry.variations.includes('/denick test finals <#> beds <#>')
+    && entry.variations.includes('/denick test clear')
+    && entry.variations.includes('/denick test messages')
+    && entry.variations.includes('/denick test reset'))), 'Help documents the local stats-denick simulation and reset');
 
 const row = createHelpRow({
     label: '/stats',

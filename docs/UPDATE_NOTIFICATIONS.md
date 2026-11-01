@@ -1,5 +1,16 @@
 # Fury update notifications
 
+## Windows installer updates
+
+Installed Windows x64 copies now extend this notification flow with explicit
+Download and Restart and update actions, a sidebar preview and scrollable notes.
+See [Windows installer updates](WINDOWS_INSTALLER_UPDATES.md) for eligibility,
+shutdown/data preservation, metadata publication and verification. Windows ZIP,
+macOS and development copies keep the website action. The schema-1 latest.json
+contract below remains unchanged; Windows installer metadata is a separate,
+versioned document published before the announcement. Online activation requires
+an updater-capable release and its metadata to be published.
+
 ## Release experience added for 1.1.2
 
 The launcher now opens an internal **What's new** dialog from the update
@@ -41,10 +52,11 @@ checks and `npm run test:updates` for the real Electron interaction suite.
 The historical description below documents the original notification service;
 its old single-button UI and session-only dismissal are superseded by this section.
 
-Fury tells a player that a newer public release exists and offers to open the
-official download page. It is not an updater. Fury never downloads, installs,
-replaces, restarts into or executes a release on the player's behalf, and the
-remote manifest cannot make it do so.
+The shared notification service tells a player that a newer public release
+exists and offers the official download page. It does not execute remote
+instructions. Installed Windows copies additionally use the explicitly initiated
+installer flow above; the remaining notification-only details describe the
+shared check and the manual-download fallback.
 
 ## Where checking runs
 
@@ -212,11 +224,13 @@ architecture or Fury version. Version comparison happens entirely on the client.
 
 ## Cross-platform behavior
 
-There is one implementation. The Windows installer, Windows portable ZIP, macOS
+There is one shared notification implementation. The Windows installer, Windows portable ZIP, macOS
 Intel DMG and ZIP, and macOS ARM DMG and ZIP all run the same Main service, read
 the same manifest, compare the same `app.getVersion()` and open the same download
 page. Nothing branches on platform, architecture or distribution format, and no
-artifact filename appears in the launcher.
+artifact filename appears in that notification service. Eligible installed
+Windows copies separately validate their one installer artifact before enabling
+the in-app update controls.
 
 ## Development behavior
 

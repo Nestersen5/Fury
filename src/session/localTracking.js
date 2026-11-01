@@ -140,6 +140,11 @@ function withLocalTracking(api, { store, getIdentity, isApiAvailable, isEnabled,
             wins: local.totals.BEDWARS?.wins.available !== false,
             losses: local.totals.BEDWARS?.losses.available !== false
         };
+        const variantCoverage = local.variants.BEDWARS?.[game.variant.id]?.counts;
+        const previousVariantCoverage = {
+            wins: variantCoverage?.wins.available !== false,
+            losses: variantCoverage?.losses.available !== false
+        };
         if (!game.endObserved) {
             settleGame(game);
             game.endObserved = true;
@@ -150,7 +155,7 @@ function withLocalTracking(api, { store, getIdentity, isApiAvailable, isEnabled,
         const record = finishGame(false);
         store.flush();
         return record && { sessionId: session.id, gameId: record.id, game,
-            previousStreak, previousCoverage,
+            previousStreak, previousCoverage, previousVariantCoverage,
             needsResult: !game.result || game.resultConflict
                 || !game.counts.wins.available || !game.counts.losses.available };
     };
@@ -172,6 +177,13 @@ function withLocalTracking(api, { store, getIdentity, isApiAvailable, isEnabled,
         totals.losses.value += game.counts.losses.value;
         totals.wins.available = localTicket.previousCoverage.wins;
         totals.losses.available = localTicket.previousCoverage.losses;
+        const variant = local.variants.BEDWARS?.[game.variant.id]?.counts;
+        if (variant) {
+            variant.wins.value += game.counts.wins.value;
+            variant.losses.value += game.counts.losses.value;
+            variant.wins.available = localTicket.previousVariantCoverage.wins;
+            variant.losses.available = localTicket.previousVariantCoverage.losses;
+        }
         local.streaks.BEDWARS = nextStreak(localTicket.previousStreak, game);
         if (!save(local)) return null;
         const one = { totals: { BEDWARS: game.counts }, variants: {}, streaks: { BEDWARS: local.streaks.BEDWARS } };
@@ -233,6 +245,11 @@ function withLocalTracking(api, { store, getIdentity, isApiAvailable, isEnabled,
         store.flush(); return id;
     };
     facade.getActiveSession = () => localSource() ? current() : api.getActiveSession();
+    facade.getObservedGameState = () => {
+        if (!localSource()) return api.getObservedGameState();
+        const game = current()?.localTracking?.current;
+        return { ended: Boolean(game?.endObserved), result: game?.resultConflict ? null : game?.result || null };
+    };
     facade.getActiveSessionId = () => facade.getActiveSession()?.id || null;
     facade.getSessionDelta = () => localSource() ? delta() : api.getSessionDelta();
     facade.getHistory = () => identity() ? store.getHistory(identity().uuid) : [];

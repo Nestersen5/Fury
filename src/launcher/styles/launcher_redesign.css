@@ -1,5 +1,8 @@
 /* Final visual layer: shared geometry for every launcher page and dialog. */
-.fury-release-dialog { width:min(620px,calc(100vw - 40px));max-height:calc(100vh - 48px);box-sizing:border-box;overflow:auto;padding:24px;border:1px solid var(--fury-border);border-radius:12px;background:var(--fury-panel);color:var(--fury-text); }
+.fury-release-dialog { width:min(620px,calc(100vw - 40px));max-height:calc(100vh - 48px);box-sizing:border-box;overflow:hidden;padding:24px;border:1px solid var(--fury-border);border-radius:12px;background:var(--fury-panel);color:var(--fury-text); }
+.fury-release-dialog[open] { display:flex;flex-direction:column; }
+.fury-release-dialog > :not(.fury-release-content) { flex-shrink:0; }
+.fury-release-dialog .fury-release-content { min-height:0;overflow-y:auto;overscroll-behavior:contain; }
 .fury-release-dialog::backdrop { background:#0008; }
 .fury-release-head { display:flex;align-items:center;justify-content:space-between;gap:16px; }
 .fury-release-head h2 { margin:0;font-size:22px; }
@@ -15,6 +18,23 @@
 .fury-release-reopen svg { width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round; }
 html[data-sidebar="collapsed"] .fury-release-reopen { margin:8px auto;padding:10px;width:40px;height:40px; }
 html[data-sidebar="collapsed"] .fury-release-reopen span { display:none; }
+html.fury-redesign .fury-release-reopen.fury-update-available { position:relative;color:var(--fury-control-accent,var(--fury-gold));border-color:var(--fury-gold);background:color-mix(in srgb,var(--fury-gold) 6%,var(--fury-panel));font-size:12px;white-space:nowrap;gap:7px;padding-inline:8px; }
+.fury-update-available::after { content:'';position:absolute;right:5px;top:5px;width:5px;height:5px;border-radius:50%;background:var(--fury-gold); }
+.fury-update-preview { position:fixed;inset:auto;margin:0;display:flex;flex-direction:column;gap:10px;padding:20px;box-sizing:border-box;overflow:hidden;border:1px solid var(--fury-border);border-radius:12px;background:var(--fury-panel);color:var(--fury-text);font:14px/1.45 "Segoe UI",sans-serif; }
+.fury-update-preview[hidden] { display:none; }
+.fury-update-preview > :not(.fury-update-notes) { flex-shrink:0; }
+.fury-update-preview::backdrop { background:transparent;pointer-events:none; }
+.fury-update-preview .fury-release-head h2 { margin:0;font-size:20px; }
+html.fury-redesign .fury-update-preview p { margin:0; }
+.fury-update-preview .fury-update-status { color:var(--fury-control-accent,var(--fury-gold));font-weight:600; }
+.fury-update-preview .fury-update-notes { min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable;margin:4px 0;padding-right:10px; }
+.fury-update-preview .fury-update-detail { border-top:1px solid var(--fury-border);padding-top:12px; }
+.fury-update-preview .fury-release-actions button { padding:8px 11px; }
+.fury-update-preview progress { appearance:none;display:block;width:100%;height:5px;border:0;border-radius:4px;background:var(--fury-border); }
+.fury-update-preview progress::-webkit-progress-bar { background:var(--fury-border);border-radius:4px; }
+.fury-update-preview progress::-webkit-progress-value { background:var(--fury-gold);border-radius:4px; }
+.fury-update-preview progress[hidden] { display:none; }
+.fury-release-status:empty { display:none; }
 html.fury-redesign #nickroll-form select.stat-select-native { display:none!important; }
 html.fury-redesign #nickroll-form .stat-select-shell { width:100%; min-width:0; }
 .nickroll-rank-vip { color:#55ff55; }

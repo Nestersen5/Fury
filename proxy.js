@@ -42,7 +42,10 @@ const { createChatTabCompletion } = require('./features/chat_completion.js');
 const { handleHelpCommand, getStartupCommandSummary } = require('./features/help_command.js');
 const { createFuryMenu, normalizeFuryPage, FURY_HELP_TOPICS } = require('./features/fury_menu.js');
 const { createHypixelApiClient, HYPIXEL_API_GAME_MIN_SPACING_MS } = require('./features/hypixel_api_client.js');
+const { createHypixelApiCoordinatorClient } = require('./src/net/hypixelApiCoordinator');
 const { createUrchinClient } = require('./features/urchin_client.js');
+const { createUrchinRateCommandHandler } = require('./features/urchin_rate_command.js');
+const { createHypixelRateCommandHandler } = require('./features/hypixel_rate_command.js');
 const {
     makeUrchinData,
     classifyUrchinRequestError,
@@ -179,7 +182,7 @@ const {
     formatSkyWarsLevel
 } = require('./src/stats/format.js');
 const { buildNickedBedwarsTabColumns, resolveTabPing } = require('./src/stats/tabStats.js');
-const { getBedwarsScanStats, formatBedwarsScanLine } = require('./src/stats/scanLine.js');
+const { getBedwarsScanStats, formatDenickAnnouncement, formatAutoDenickMatch, formatAutoDenickPossibleMatches, formatAutoDenickNotice } = require('./src/stats/scanLine.js');
 const { isLikelyBot } = require('./src/denick/botNames.js');
 const { isTransientPlayerLookupFailure, isConfirmedPlayerLookupFailure } = require('./src/stats/lookupStatus.js');
 const {
@@ -311,13 +314,22 @@ const GLOBAL_PROFILE_CACHE_MAX_ENTRIES = 1000;
 const AURORA_PING_CACHE_MAX_ENTRIES = 2000;
 const LOCAL_COSMETIC_SEARCH_URL = require('./src/net/cosmeticSearchAddress').localCosmeticSearchUrl();
 const COSMETIC_SEARCH_TOKEN = process.env.COSMETIC_SEARCH_TOKEN || '';
-const hypixelApiClient = createHypixelApiClient({
+const localHypixelApiClient = createHypixelApiClient({
     axios,
     getKeys: () => keys,
     getGameState: () => activeUser?.getHypixelUsageGameState ? activeUser.getHypixelUsageGameState() : null,
     logger: console
 });
+const hypixelApiClient = process.env.FURY_HYPIXEL_COORDINATOR === '1'
+    ? createHypixelApiCoordinatorClient({
+        channel: process, instanceId: process.env.FURY_SERVICE_INSTANCE, axios,
+        localClient: localHypixelApiClient,
+        getGameState: () => activeUser?.getHypixelUsageGameState ? activeUser.getHypixelUsageGameState() : null
+    })
+    : localHypixelApiClient;
 const {
+    getHypixelRequestSettings,
+    configureHypixelRequests,
     getHypixelApiUsageSnapshot,
     hasHypixelApiKeyConfigured,
     hypixelApiGet
@@ -337,6 +349,8 @@ const urchinClient = createUrchinClient({
     resolveSessionEndpoint: period => SESSION_PERIODS[period]?.endpoint || 'daily'
 });
 const {
+    getUrchinRequestSettings,
+    configureUrchinRequests,
     fetchUrchinFull,
     fetchUrchinSession,
     getUrchinBatchRaw,
@@ -884,6 +898,8 @@ if (!fs.existsSync(AUTH_PATH)) fs.mkdirSync(AUTH_PATH);
 
 function loadFeatureConfig(options = {}) {
     const features = configLoader.parseFeatureConfig(options);
+    configureUrchinRequests(features);
+    configureHypixelRequests(features);
     setChatPrefixAccent(features.chatPrefixAccentHex);
     anticheatEnabled = features.anticheatEnabled !== false;
     anticheatScaffoldEnabled = features.anticheatScaffoldEnabled !== false;
@@ -992,6 +1008,8 @@ function loadFeatureConfig(options = {}) {
 
 function currentFeatureConfigSnapshot() {
     return {
+        ...getUrchinRequestSettings(),
+        ...getHypixelRequestSettings(),
         chatPrefixAccentHex: getChatPrefixAccent()?.sourceHex || '#e5b35d',
         anticheatEnabled,
         anticheatScaffoldEnabled,
@@ -1121,6 +1139,25 @@ const handleApiKillSwitchCommand = createApiKillSwitchCommandHandler({
         state.apiKillSwitchEnabled = Boolean(enabled);
         activeUser?.refreshPartyCoordination?.();
         saveFeatureConfig();
+    }
+});
+
+const handleUrchinRateCommand = createUrchinRateCommandHandler({
+    sendChat,
+    getSettings: getUrchinRequestSettings,
+    setSettings: next => {
+        // Persist through the shared settings path before applying a live change.
+        saveFeatureSettings({ ...currentFeatureConfigSnapshot(), ...next });
+        configureUrchinRequests(next);
+    }
+});
+
+const handleHypixelRateCommand = createHypixelRateCommandHandler({
+    sendChat,
+    getSettings: getHypixelRequestSettings,
+    setSettings: next => {
+        saveFeatureSettings({ ...currentFeatureConfigSnapshot(), ...next });
+        configureHypixelRequests(next);
     }
 });
 
@@ -2053,6 +2090,11 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         let connectionTimersCleared = false;
         let connectionPersistenceFlushed = false;
         let gameSessionId = 0;
+        let statsLookupRetryController = new AbortController();
+        function renewStatsLookupRecovery() {
+            statsLookupRetryController.abort();
+            statsLookupRetryController = new AbortController();
+        }
         let gamblerGeorgeTransitionId = 0;
         // The BedWars game a VICTORY!/GAME OVER! banner belongs to, kept alive
         // past resetMatchState so a banner that lands after a fast /leave still
@@ -3931,8 +3973,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             autoSkinDenickAttempts.delete(nickKey(realPlayerName));
 
             if (tabStatsTimers.has(realPlayerName)) {
-                clearTimeout(tabStatsTimers.get(realPlayerName));
-                tabStatsTimers.delete(realPlayerName);
+                clearTabStatsUpdate(realPlayerName);
             }
             tabStatsAppliedNames.delete(realPlayerName);
             tabIdentityWidths.delete(realPlayerName);
@@ -4042,45 +4083,53 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         async function announceSuccessfulDenick(name, result = {}, options = {}) {
             const realName = result.realName;
             const isCurrent = options.isCurrent || (() => true);
+            const preview = options.preview === true;
+            const announcementsEnabled = preview || denickChatAnnouncementsEnabled;
             if (!isCurrent()) return;
-            if (shouldSuppressDenickAnnouncement(name)) return;
-            if (hasAnnouncedDenick(name)) return;
-            markDenickAnnounced(name);
-            const compactStats = result.source === 'stats';
-            if (denickChatAnnouncementsEnabled && !compactStats) {
-                sendChat(client, `§b[Denick] §c${name} §a(${realName})`);
+            if (!preview) {
+                if (shouldSuppressDenickAnnouncement(name)) return;
+                if (hasAnnouncedDenick(name)) return;
+                markDenickAnnounced(name);
             }
-
-            const profile = await getPlayerData(realName, { includeErrors: true });
-            if (!isCurrent() || shouldSuppressDenickAnnouncement(name)) return;
-            if (profile?.error || !profile?.data?.player) {
-                if (denickChatAnnouncementsEnabled) {
+            const compactStats = result.source === 'stats';
+            const announcementMode = currentGamemode;
+            const targets = {
+                finals: result.observedFinals, beds: result.observedBeds
+            };
+            let profile;
+            try {
+                profile = await getPlayerData(realName, { includeErrors: true });
+            } catch (_) { /* Keep the confirmed identity even if stats fail. */ }
+            if (!isCurrent() || (!preview && shouldSuppressDenickAnnouncement(name))) return;
+            if (profile?.error || !profile?.data?.player || profile.data.lookupFailed || profile.data.isNicked) {
+                if (announcementsEnabled) {
                     sendChat(client, compactStats
-                        ? `§b[AutoDenick] §c${name} §a(${realName}) ✔ §7| Stats unavailable right now.`
-                        : `§7Could not fetch full stats for §a${realName}§7 right now.`);
+                        ? formatAutoDenickMatch(name, { ...result, urchin: options.candidate?.urchin }, targets, { confirmed: true, unavailable: true, getInteractiveTags })
+                        : formatDenickAnnouncement(name, realName, profile?.data || {}, {
+                            gameMode: announcementMode, unavailable: true, getInteractiveTags
+                        }));
                 }
                 return;
             }
-            rememberPlayerActiveCosmetics(name, profile.data, 'denick');
-            rememberPlayerActiveCosmetics(realName, profile.data, 'denick');
+            if (!preview) {
+                rememberPlayerActiveCosmetics(name, profile.data, 'denick');
+                rememberPlayerActiveCosmetics(realName, profile.data, 'denick');
 
-            if (denickPartyAnnounceEnabled) {
-                announceDenickToParty(name, realName, profile.data);
+                if (denickPartyAnnounceEnabled) {
+                    announceDenickToParty(name, realName, profile.data);
+                }
             }
 
-            if (!denickChatAnnouncementsEnabled) return;
+            if (!announcementsEnabled) return;
 
             if (compactStats) {
-                sendChat(client, `§b[AutoDenick] ${formatBedwarsScanLine(
-                    getBedwarsScanStats(profile.data.player), `§c${name} §8(§a${realName}§8)`
-                )}`);
-            } else if (currentGamemode === 'SKYWARS') {
-                renderSkyWarsDashboard(client, profile.data, profile.fromCache);
+                sendChat(client, formatAutoDenickMatch(name, {
+                    ...result, scanStats: getBedwarsScanStats(profile.data.player), urchin: profile.data.urchin
+                }, targets, { confirmed: true, getInteractiveTags }));
             } else {
-                renderBedwarsStats(client, profile.data, BEDWARS_MODE_DEFS[0], {
-                    detailed: false,
-                    isCached: profile.fromCache
-                });
+                sendChat(client, formatDenickAnnouncement(name, realName, profile.data, {
+                    gameMode: announcementMode, getInteractiveTags
+                }));
             }
         }
 
@@ -4745,14 +4794,27 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         let localDuelKey=null,localDuelStartedAt=0;
         function finishLocalDuel(){
             if(!localDuelKey)return;
-            sessionTracker.onGameEnd({mode:'DUELS',sessionKey:localDuelKey,force:true,durationMs:Math.max(0,Date.now()-localDuelStartedAt)});
+            const observed = sessionTracker.getObservedGameState();
+            Promise.resolve(sessionTracker.onGameEnd({mode:'DUELS',sessionKey:localDuelKey,force:true,
+                immediate:observed.ended, durationMs:Math.max(0,Date.now()-localDuelStartedAt),
+                metadata:{variant:duelsState.modeName || null}}))
+                .catch(error => console.error('[Session] Duel finalization failed:', error?.message || error));
             localDuelKey=null;
+        }
+        function startObservedDuel(text) {
+            if (!/^opponents?\s*:/i.test(stripAnsi(text).trim()) || !state.sessionTrackingEnabled) return;
+            if (localDuelKey && sessionTracker.getObservedGameState().ended) finishLocalDuel();
+            if (localDuelKey) return;
+            localDuelStartedAt=Date.now();localDuelKey=`duel:${duelsState.sessionId}:${localDuelStartedAt}`;
+            sessionTracker.onGameStart({mode:'DUELS',sessionKey:localDuelKey,observedFromStart:true,
+                variant:duelsState.modeDef?{id:duelsState.modeDef.id,label:duelsState.modeDef.label}:duelsState.modeName,
+                ...localSessionIdentity()});
         }
         function observeSessionGameChat(text) {
             if (gameActive && currentGamemode === 'BEDWARS' && activeSessionGameMetadata?.privateGame) return;
             if(localDuelKey&&state.sessionTrackingEnabled){
                 sessionTracker.observeLocalChat(text,{mode:'DUELS',sessionKey:localDuelKey,...localSessionIdentity()});
-                if(sessionTracker.observeLocalResult(text)&&sessionTracker.getActiveSession()?.localTracking?.current?.result)finishLocalDuel();
+                if(sessionTracker.observeLocalResult(text)&&sessionTracker.getObservedGameState().result)finishLocalDuel();
                 return;
             }
             if (!gameActive || !gameStartTime || !state.sessionTrackingEnabled
@@ -6009,21 +6071,11 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             }
 
             sendChat(client, `§8[§5§lParty Overview§8] §7Checking §f${names.length} §7party member${names.length === 1 ? '' : 's'} locally…`);
-            let urchinBatch = new Map();
-            try {
-                urchinBatch = await getUrchinBatchRaw(names);
-            } catch (error) {
-                // The normal profile lookup still returns a clear, explicit
-                // unknown result if Urchin cannot be reached. Do not abort the
-                // entire overview because a single provider is unavailable.
-            }
-
             const results = await Promise.all(names.map(async (name) => {
                 try {
                     const [profile, monthlySession] = await Promise.all([
                         getPlayerDataWithNickDetection(name, {
                             preferCache: true,
-                            urchinOverride: urchinBatch.get(playerLookupKey(name)) || null,
                             apiPriority: 'background'
                         }),
                         fetchUrchinSession(name, 'monthly').catch(() => ({}))
@@ -6933,21 +6985,91 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             }
         }
 
-        async function runAutoDenickForObservedPlayer(key, sessionId) {
-            const observed = autoDenickStats.get(key);
-            if (connectionTimersCleared || !observed || observed.sessionId !== sessionId || observed.done || observed.inFlight || observed.notNicked) return;
-            const mappingVersion = denickTracker.mappingVersion(observed.name);
-            if (!denickTracker.canAutoDenick(observed.name, mappingVersion)) return;
-            if (!autoStatsDenickEnabled) return;
-            if (getAutoDenickResult(observed.name)?.realName) {
-                observed.done = true;
-                autoDenickStats.set(key, observed);
+        // One explicit local simulation per connection. Never put its fake
+        // identity in the live tracker, snapshots, history, or retry queue.
+        let autoDenickTestRun = null;
+
+        async function handleAutoDenickTestCommand(args) {
+            const tokens = args.slice(2);
+            if (tokens.length === 1 && tokens[0].toLowerCase() === 'messages') {
+                showAutoDenickMessagePreview();
                 return;
             }
-            if (isOwnPlayerName(observed.name) || isSameTeamAsClient(observed.name) || !isDetectedNickedPlayer(observed.name)) {
-                observed.notNicked = true;
-                autoDenickStats.set(key, observed);
+            if (tokens.length === 1 && ['clear', 'reset'].includes(tokens[0].toLowerCase())) {
+                autoDenickTestRun = null;
+                sendChat(client, '§b[AutoDenick] §7Test counts cleared.');
                 return;
+            }
+            if (!tokens.length) {
+                sendChat(client, '§b[AutoDenick] §7Usage: §f/denick test finals <count> §7or §f/denick test beds <count>§7. You can include both.');
+                sendChat(client, '§b[AutoDenick] §7Counts carry over to your next test. Use §f/denick test clear §7to start over. Uses your API keys; nothing is saved or shared.');
+                sendChat(client, '§b[AutoDenick] §7Use §f/denick test messages §7to preview all messages without API requests.');
+                return;
+            }
+            const counts = {};
+            for (let i = 0; i < tokens.length; i += 2) {
+                const stat = tokens[i].toLowerCase();
+                const raw = tokens[i + 1] || '';
+                const value = parseStatCount(raw);
+                if (!['finals', 'beds'].includes(stat) || Object.hasOwn(counts, stat)
+                    || !/^(?:\d+|\d{1,3}(?:,\d{3})+)$/.test(raw) || !Number.isSafeInteger(value)) {
+                    sendChat(client, '§b[AutoDenick] §cUse finals or beds followed by a whole number, e.g. §f/denick test finals 1000 beds 500§c.');
+                    return;
+                }
+                counts[stat] = value;
+            }
+            const previous = autoDenickTestRun?.observed;
+            const observed = {
+                name: 'TestNick', finals: previous?.finals ?? null, beds: previous?.beds ?? null,
+                ...counts, sessionId: gameSessionId, attempts: {}, inFlight: false, done: false
+            };
+            const testRun = { observed, stats: new Map([[nickKey(observed.name), observed]]) };
+            autoDenickTestRun = testRun;
+            await runAutoDenickForObservedPlayer(nickKey(observed.name), observed.sessionId, testRun);
+        }
+
+        function showAutoDenickMessagePreview() {
+            sendChat(client, '§b[AutoDenick] §7Message preview: example players. No API requests; nothing is saved or shared.');
+            for (const stage of ['finals', 'beds', 'combined']) {
+                sendChat(client, formatAutoDenickNotice('started', 'ExampleNick', stage));
+            }
+            const tagged = { ok: true, requestStatus: 'ok', rawTags: [{ type: 'Caution',
+                reason: 'Example tag shown only in the message preview.', added_by_username: 'Fury' }] };
+            const candidates = [
+                { name: 'ExampleAlpha', scanStats: { stars: 250, fkdr: 4.5, wlr: 2.1, ws: 6 }, urchin: tagged },
+                { name: 'ExampleBravo', scanStats: { stars: 489, fkdr: 8.25, wlr: 3.4, ws: 12 } },
+                { name: 'ExampleCharlie', scanStats: { stars: 125, fkdr: 2.75, wlr: 1.8, ws: 0 } }
+            ];
+            for (const count of [1, 2, 3]) {
+                formatAutoDenickPossibleMatches('ExampleNick', candidates.slice(0, count), { getInteractiveTags })
+                    .forEach(message => sendChat(client, message));
+            }
+            sendChat(client, formatAutoDenickMatch('ExampleNick', candidates[0], {}, { confirmed: true, getInteractiveTags }));
+            sendChat(client, formatAutoDenickMatch('ExampleNick', candidates[0], {}, { confirmed: true, unavailable: true, getInteractiveTags }));
+            sendChat(client, formatAutoDenickNotice('unconfirmed', 'ExampleNick'));
+            sendChat(client, formatAutoDenickNotice('error', 'ExampleNick'));
+            sendChat(client, formatAutoDenickNotice('keys', 'ExampleNick'));
+        }
+
+        async function runAutoDenickForObservedPlayer(key, sessionId, testRun = null) {
+            const observations = testRun ? testRun.stats : autoDenickStats;
+            const observed = observations.get(key);
+            if (connectionTimersCleared || !observed || observed.sessionId !== sessionId || observed.done || observed.inFlight || observed.notNicked) return;
+            const announcementsEnabled = Boolean(testRun) || denickChatAnnouncementsEnabled;
+            const mappingVersion = denickTracker.mappingVersion(observed.name);
+            if (!testRun) {
+                if (!denickTracker.canAutoDenick(observed.name, mappingVersion)) return;
+                if (!autoStatsDenickEnabled) return;
+                if (getAutoDenickResult(observed.name)?.realName) {
+                    observed.done = true;
+                    autoDenickStats.set(key, observed);
+                    return;
+                }
+                if (isOwnPlayerName(observed.name) || isSameTeamAsClient(observed.name) || !isDetectedNickedPlayer(observed.name)) {
+                    observed.notNicked = true;
+                    autoDenickStats.set(key, observed);
+                    return;
+                }
             }
             const stage = getAutoDenickStage(observed);
             if (!stage) return;
@@ -6956,15 +7078,15 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             if (attempt.complete) return;
             const canRunPostGame = sessionId === lastBedwarsGameSessionId && Date.now() <= autoDenickGraceUntil;
             const canRunInGame = gameActive && currentGamemode === 'BEDWARS' && sessionId === gameSessionId;
-            if (!canRunInGame && !canRunPostGame) return;
+            if (!testRun && !canRunInGame && !canRunPostGame) return;
             if (attempt.retryAt > Date.now()) {
-                if (attempt.retryable !== false) queueAutoDenickRetry(key, observed, sessionId, attempt.retryAt);
+                if (!testRun && attempt.retryable !== false) queueAutoDenickRetry(key, observed, sessionId, attempt.retryAt);
                 return;
             }
 
-            const retryTimer = autoDenickRetryTimers.get(key);
+            const retryTimer = !testRun && autoDenickRetryTimers.get(key);
             if (retryTimer) clearTimeout(retryTimer);
-            autoDenickRetryTimers.delete(key);
+            if (!testRun) autoDenickRetryTimers.delete(key);
             // Counts may keep changing while HTTP is in flight. Match and save
             // the counts actually searched, and discard a single-stat response
             // if the second stat arrives before it completes.
@@ -6972,6 +7094,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             if (observed.finals !== null) targets.finals = observed.finals;
             if (observed.beds !== null) targets.beds = observed.beds;
             const isAttemptCurrent = () => {
+                if (testRun) return !connectionTimersCleared && autoDenickTestRun === testRun;
                 const stillInGame = gameActive && currentGamemode === 'BEDWARS' && sessionId === gameSessionId;
                 const stillInGrace = !gameActive && sessionId === lastBedwarsGameSessionId && Date.now() <= autoDenickGraceUntil;
                 return !connectionTimersCleared && autoStatsDenickEnabled
@@ -6981,36 +7104,36 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                     && !isOwnPlayerName(observed.name) && !isSameTeamAsClient(observed.name)
                     && denickTracker.canAutoDenick(observed.name, mappingVersion);
             };
-            const canContinue = () => isAttemptCurrent() && !getAutoDenickResult(observed.name)?.realName;
+            const canContinue = () => isAttemptCurrent() && (Boolean(testRun) || !getAutoDenickResult(observed.name)?.realName);
             const reportError = (retryable = true) => {
                 if (!canContinue()) return;
                 attempt.retryAt = Date.now() + 30000;
                 attempt.retryable = retryable;
-                if (!attempt.errorAnnounced && denickChatAnnouncementsEnabled) {
-                    sendChat(client, retryable
-                        ? `§b[AutoDenick] §7Could not check §c${observed.name} §7right now. Will retry.`
-                        : `§b[AutoDenick] §7Could not check §c${observed.name}§7. Check your Hypixel and Aurora API keys.`);
+                if (!attempt.errorAnnounced && announcementsEnabled) {
+                    sendChat(client, formatAutoDenickNotice(retryable ? 'error' : 'keys', observed.name));
                 }
                 attempt.errorAnnounced = true;
-                if (retryable) queueAutoDenickRetry(key, observed, sessionId, attempt.retryAt);
+                if (!testRun && retryable) queueAutoDenickRetry(key, observed, sessionId, attempt.retryAt);
             };
 
             observed.inFlight = true;
             observed.lastAttemptAt = Date.now();
-            if (!attempt.startedAnnounced) {
-                attempt.startedAnnounced = true;
-                if (denickChatAnnouncementsEnabled) {
-                    const counts = Object.entries(targets).map(([stat, value]) => `${formatCount(value)} ${stat}`).join(' and ');
-                    sendChat(client, `§b[AutoDenick] §7Checking §c${observed.name} §7using §f${counts}§7...`);
-                }
-            }
-            autoDenickStats.set(key, observed);
+            observations.set(key, observed);
 
             try {
                 if (!canContinue()) return;
 
+                if (announcementsEnabled && !attempt.startedAnnounced) {
+                    sendChat(client, formatAutoDenickNotice('started', observed.name, stage));
+                    attempt.startedAnnounced = true;
+                }
+
                 const lookup = await findDenickCandidatesByStats(targets, {
-                    verifyRange: 100, includeScanStats: true, isCurrent: canContinue
+                    // Allow a few finals gained after chat, while older totals
+                    // retain the existing allowance for delayed stats.
+                    verifyRange: 100, verifyFinalsAhead: 4,
+                    ...(stage !== 'combined' ? { singleStatFallbackRange: 200 } : {}),
+                    includeScanStats: true, isCurrent: canContinue
                 });
 
                 if (!canContinue() || lookup.cancelled) return;
@@ -7020,25 +7143,22 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 }
                 attempt.complete = true;
                 const { candidates } = lookup;
-                const unique = lookup.complete === true && candidates.length === 1;
                 if (stage !== 'combined') {
-                    if (denickChatAnnouncementsEnabled) {
-                        if (unique) {
-                            const best = candidates[0];
-                            sendChat(client, `§b[AutoDenick] §ePossible match: ${formatBedwarsScanLine(
-                                best.scanStats, `§c${observed.name} §8(§e${best.displayName || best.name}§8)`, '§e?'
-                            )}`);
-                        } else {
-                            const missing = stage === 'finals' ? 'bed' : 'final';
-                            sendChat(client, `§b[AutoDenick] §7Could not identify §c${observed.name} §7from ${stage} alone. Waiting for their ${missing} count.`);
-                        }
+                    if (announcementsEnabled) {
+                        if (candidates.length > 3) return;
+                        // One-stat suggestions remain tentative even when the
+                        // provider list is limited. Only both stats can confirm.
+                        formatAutoDenickPossibleMatches(observed.name, candidates, { getInteractiveTags })
+                            .forEach(message => sendChat(client, message));
                     }
                     return;
                 }
-                if (!unique) {
+                if (lookup.complete !== true || candidates.length !== 1) {
                     observed.done = true;
-                    if (denickChatAnnouncementsEnabled) {
-                        sendChat(client, `§b[AutoDenick] §7Could not confidently denick §c${observed.name} §7using their finals and beds.`);
+                    if (announcementsEnabled) {
+                        formatAutoDenickPossibleMatches(observed.name, candidates, { getInteractiveTags })
+                            .forEach(message => sendChat(client, message));
+                        sendChat(client, formatAutoDenickNotice('unconfirmed', observed.name));
                     }
                     return;
                 }
@@ -7054,6 +7174,12 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                     observedBeds: targets.beds,
                     at: Date.now()
                 };
+
+                if (testRun) {
+                    observed.done = true;
+                    await announceSuccessfulDenick(observed.name, result, { preview: true, candidate: best, isCurrent: canContinue });
+                    return;
+                }
 
                 autoDenickResults.set(key, result);
                 rememberCurrentGameDenickNames(observed.name, result.realName);
@@ -7076,10 +7202,11 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                     queueOverlayStatsUpdate(observed.name, 0);
                 }
                 announceSuccessfulDenick(observed.name, result, {
+                    candidate: best,
                     isCurrent: () => isAttemptCurrent() && getAutoDenickResult(observed.name) === result
                 }).catch(() => {
                     if (isAttemptCurrent() && getAutoDenickResult(observed.name) === result && denickChatAnnouncementsEnabled) {
-                        sendChat(client, `§b[AutoDenick] §c${observed.name} §a(${result.realName}) ✔ §7| Stats unavailable right now.`);
+                        sendChat(client, formatAutoDenickMatch(observed.name, { ...result, urchin: best.urchin }, targets, { confirmed: true, unavailable: true, getInteractiveTags }));
                     }
                 });
                 if (isTabStatsActiveInGame() && gameRoster.has(observed.name)) {
@@ -7089,12 +7216,12 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             } catch (error) {
                 reportError();
             } finally {
-                const latest = autoDenickStats.get(key);
+                const latest = observations.get(key);
                 if (latest === observed) {
                     latest.inFlight = false;
-                    autoDenickStats.set(key, latest);
+                    observations.set(key, latest);
                     if (getAutoDenickStage(latest) !== stage && !latest.done) {
-                        runAutoDenickForObservedPlayer(key, sessionId).catch(() => {});
+                        runAutoDenickForObservedPlayer(key, sessionId, testRun).catch(() => {});
                     }
                 }
             }
@@ -7306,8 +7433,10 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 duelsAutoScanTimer = null;
             }
             if (!duelsState.active && !duelsState.opponents.length && !duelsState.modeDef) return;
+            // Hand players back while the duel still decides how: deleting our
+            // team alone leaves them in none, with a plain white nametag.
+            if (nametagOverlayEnabled) clearNametagTeams({ restoreOriginalTeams: duelsState.active });
             duelsState = { active: false, modeDef: null, modeName: '', opponents: [], sessionId: duelsState.sessionId + 1 };
-            if (nametagOverlayEnabled) clearNametagTeams();
         }
 
         // Keep duelsState in sync with the sidebar every scoreboard tick. Returns
@@ -7549,12 +7678,14 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             };
         }
 
-        async function getCachedOrPendingPregameChatProfile(name) {
+        async function getCachedOrPendingPregameChatProfile(name, onPrimaryProfile = null) {
             const cached = getCachedPregameChatProfile(name);
             if (cached) return cached;
 
             const pending = pregameChatLookupPromises.get(nickKey(name));
             if (!pending) return null;
+            const unsubscribe = typeof observePendingPlayerProfile === 'function'
+                ? observePendingPlayerProfile(name, onPrimaryProfile) : () => {};
             try {
                 const profile = await pending;
                 if (!profile?.data?.player || profile.data.lookupFailed || profile.data.isNicked || profile.pregameRealName) return null;
@@ -7564,7 +7695,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 };
             } catch (error) {
                 return null;
-            }
+            } finally { unsubscribe(); }
         }
 
         // The profile every in-game stats surface (tab row, overlay row,
@@ -7594,7 +7725,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 }
                 settledNickVerifiedAt.set(key, Date.now());
             }
-            return await getCachedOrPendingPregameChatProfile(name)
+            return await getCachedOrPendingPregameChatProfile(name, options.lookup?.onPrimaryProfile)
                 || await getPlayerDataWithNickDetection(name, options.lookup || {});
         }
 
@@ -9031,10 +9162,8 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             const mode = currentGamemode;
             applyKnownDenickFromHistory(name, 'overlay_history', { queueUpdates: false });
             const knownDenickResult = getAutoDenickResult(name);
-            const urchinOverride = tabStatsUrchinOverrides.get(playerLookupKey(name)) || cachedUrchinBatchData(name) || null;
             const profile = await getStatsProfileForRosterPlayer(name, {
-                denickResult: knownDenickResult,
-                lookup: { urchinOverride }
+                denickResult: knownDenickResult
             });
             if (sessionId !== gameSessionId || currentGamemode !== mode || !gameRoster.has(name) || !isEligibleForCurrentGameRoster(name)) return;
 
@@ -9124,6 +9253,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
 
         if (activeUser?.client === client) activeUser.getLiveGameState = buildLiveGameState;
         if (activeUser?.client === client) {
+            activeUser.getStatsLookupRetrySignal = () => statsLookupRetryController.signal;
             activeUser.getHypixelUsageGameState = () => ({
                 gameActive,
                 currentGamemode,
@@ -9445,6 +9575,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             gameStartTime = snapshot.gameStartTime || Date.now();
             generatorSidebarElapsedMs = null;
             generatorClockFallbackStartAt = null;
+            renewStatsLookupRecovery();
             gameSessionId += 1;
             sessionGameFinalized = Boolean(snapshot.sessionGameFinalized);
             activeSessionGameEvents = Array.isArray(snapshot.sessionGameEvents)
@@ -9618,7 +9749,8 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                     getKnownDenick: findKnownDenickByNick,
                     isDenickAliasDuplicate,
                     isOwnPlayer: isOwnPlayerName,
-                    getCachedPlayerProfile: getCachedOrPendingPregameChatProfile,
+                    getCachedPlayerProfile: getCachedPregameChatProfile,
+                    getPlayerProfile: (name, lookup) => getStatsProfileForRosterPlayer(name, { denickResult: null, lookup }),
                     rememberActiveCosmetics: rememberPlayerActiveCosmetics,
                     rememberOverlayPlayer,
                     shareStream: shareStream ? { onRow: r => shareStream.onRow(r), onTeam: (k, rows) => shareStream.onTeam(k, rows) } : null,
@@ -9721,6 +9853,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 gameStartTime = Date.now();
                 generatorSidebarElapsedMs = null;
                 generatorClockFallbackStartAt = null;
+                renewStatsLookupRecovery();
                 gameSessionId += 1;
                 startSessionGameEventCapture(mode, { map: pregameMap });
                 if (startingNewGame) sessionTracker.onGameStart({
@@ -9861,6 +9994,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             clearAutoSkinDenickAttempts();
             if (wasActiveSupportedGame && overlayAutoClearOnGameStartEnd) clearManualOverlayPlayers('game_end');
             clearOverlayStatsTimers();
+            renewStatsLookupRecovery();
             gameSessionId += 1;
             scoreboardState.reset();
             sidebarScoreboardObjective = '';
@@ -10228,7 +10362,6 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         const tabStatsGuildTags = new Map();
         const tabStatsSessionStats = new Map();
         let tabStatsSupplementalGeneration = 0;
-        let tabStatsUrchinOverrides = new Map();
         const syntheticBedwarsTeams = new Map();
         const ENABLE_SYNTHETIC_BEDWARS_TEAMS = false;
         // Name-tag overlay (above-head): client-only teams created ONLY for
@@ -10237,6 +10370,8 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         const nametagTeams = new Map();      // nickKey -> { teamName, prefix, suffix, name }
         const nametagGuildTags = new Map();  // nickKey -> guild tag string (lazy)
         const nametagSessionStats = new Map(); // nickKey -> { fkdr, wlr, wins, finals } (lazy)
+        const duelsNameColors = new Map();   // nickKey -> last colour Hypixel's team prefix gave them
+        const duelsUnseatedPlayers = new Set(); // names in no team while invisible
         let nametagSyncTimer = null;
         let nametagFetchTimers = new Set();
         let nametagConfigRefreshTimer = null;
@@ -10650,26 +10785,38 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
 
         // Assign every pending row a team name, then write the diff.
         function applyNametagTeamAssignments(pending) {
+            const activeKeys = new Set(pending.map(entry => entry.key));
+            Array.from(nametagTeams.keys()).forEach(key => {
+                if (activeKeys.has(key)) return;
+                const entry = nametagTeams.get(key);
+                removeNametagTeam(key, entry?.name);
+            });
+            // Anyone we could not hand back keeps their team, and its name.
+            const heldNames = new Set(Array.from(nametagTeams.entries())
+                .filter(([key]) => !activeKeys.has(key))
+                .map(([, entry]) => entry.teamName));
             const rows = assignNametagTeamNames(pending.map(entry => ({
                 ...entry,
                 base: originalRawTeamNameFor(entry.name)
-            })));
+            })), heldNames);
 
-            const activeKeys = new Set();
-            rows.forEach(({ key, name, teamName, teamState, prefix, suffix }) => {
-                activeKeys.add(key);
+            // The player moved (re-teamed by Hypixel, or a teammate joined their
+            // team and shifted the index). Drop every old overlay team before
+            // creating any new one: leaving it behind would keep the client's
+            // stale sort key alive for that row, and an index can pass to a
+            // teammate in the same sync. The client ignores a create for a name
+            // it still holds, then the holder's delete leaves the new owner in
+            // no team, which draws their nametag plain white.
+            rows.forEach(({ key, teamName }) => {
                 const previous = nametagTeams.get(key);
-                if (previous && previous.teamName !== teamName) {
-                    // The player moved (re-teamed by Hypixel, or a teammate
-                    // joined their team and shifted the index). Drop the old
-                    // overlay team first: leaving it behind would keep the
-                    // client's stale sort key alive for that row.
-                    try {
-                        writeScoreboardTeamPacket({ team: previous.teamName, mode: 1 });
-                    } catch (e) {}
-                    nametagTeams.delete(key);
-                }
+                if (!previous || previous.teamName === teamName) return;
+                try {
+                    writeScoreboardTeamPacket({ team: previous.teamName, mode: 1 });
+                } catch (e) {}
+                nametagTeams.delete(key);
+            });
 
+            rows.forEach(({ key, name, teamName, teamState, prefix, suffix }) => {
                 const existing = nametagTeams.get(key);
                 const color = legacyColorToPacketColor(teamState.color);
                 const friendlyFire = teamState.friendlyFire ?? 0;
@@ -10689,12 +10836,6 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                     writeNametagTeam(teamName, teamState, 3, [name]);
                 }
                 nametagTeams.set(key, { teamName, prefix, suffix, name, color, friendlyFire, nameTagVisibility });
-            });
-
-            Array.from(nametagTeams.keys()).forEach(key => {
-                if (activeKeys.has(key)) return;
-                const entry = nametagTeams.get(key);
-                removeNametagTeam(key, entry?.name);
             });
         }
 
@@ -10831,7 +10972,20 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             } catch (e) {}
         }
 
+        // Duels teams carry no BedWars evidence, so the trusted lookup below
+        // rejects them all. There the live membership is the answer: Hypixel
+        // already keeps that team current on the client, so only the seat moves.
+        function restorePlayerDuelsTeam(name) {
+            const rawTeamName = scoreboardEntryTeams.get(String(name || ''));
+            if (!rawTeamName || !originalScoreboardTeamsOnClient.has(rawTeamName)) return false;
+            try {
+                writeScoreboardTeamPacket({ team: rawTeamName, mode: 3, players: [name] });
+            } catch (e) {}
+            return true;
+        }
+
         function restorePlayerOriginalTeam(name) {
+            if (duelsState.active) return restorePlayerDuelsTeam(name);
             const trusted = trustedOriginalScoreboardTeamForPlayer(name);
             if (!trusted?.rawTeamName) return false;
             // Both packets below address an existing team: a 1.8 client applies
@@ -11066,7 +11220,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                     nametagFetchTimers.add(timer);
                 });
             };
-            getUrchinBatchRaw(names).then(dispatch).catch(dispatch);
+            dispatch();
         }
 
         // Config edits (rule picker clicks, presets, audience toggles) redraw
@@ -11095,12 +11249,14 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         // tab list (lobbyPlayers) since duels has no Bedwars scoreboard teams.
         function duelsNametagRosterNames() {
             const now = Date.now();
+            // The age limit only keeps stale rows from joining. Someone already
+            // annotated stays until the tab list says they left.
             return Array.from(lobbyPlayers.entries())
                 .filter(([name, player]) => isValidPlayerName(name)
                     && !isOwnPlayerName(name)
                     && !isDenickAliasDuplicate(name)
                     && player.inTab
-                    && now - (player.lastSeen || 0) < 90 * 1000)
+                    && (nametagTeams.has(nickKey(name)) || now - (player.lastSeen || 0) < 90 * 1000))
                 .map(([name]) => name);
         }
 
@@ -11148,7 +11304,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                     nametagFetchTimers.add(timer);
                 });
             };
-            getUrchinBatchRaw(names).then(dispatch).catch(dispatch);
+            dispatch();
         }
 
         function scheduleDuelsNametagRefresh(delay = 800) {
@@ -11169,9 +11325,14 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 if (isOwnPlayerName(name)) return;
                 const key = nickKey(name);
                 if (isPlayerEntityInvisible(name)) {
-                    if (nametagTeams.has(key)) removeNametagTeam(key, name, { restore: false });
+                    if (nametagTeams.has(key)) {
+                        removeNametagTeam(key, name, { restore: false });
+                        duelsUnseatedPlayers.add(name);
+                    }
                     return;
                 }
+                // Unlike BedWars, nothing re-teams them when invisibility ends.
+                if (duelsUnseatedPlayers.delete(name)) restorePlayerOriginalTeam(name);
                 const row = overlayPlayerStats.get(nickKey(name));
                 if (!row) return;
                 // A 1.8 client renders a nametag as team prefix + name + team
@@ -11183,10 +11344,18 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 // The raw team's own prefix is the most faithful source - it is
                 // literally what the client was rendering - with the parsed
                 // team colour and the API rank colour behind it.
+                //
+                // Hypixel can blank that prefix mid-duel, and the colour byte it
+                // sends then is 15 on every team, so a parsed white only counts
+                // when the team really is White. Hold the colour we last saw.
                 const original = findScoreboardTeamForPlayer(name)?.teamInfo;
                 const rawTeamPrefix = rawScoreboardTeams.get(scoreboardEntryTeams.get(String(name || '')) || '')?.prefix;
-                const nameColor = leadingScoreboardColor(rawTeamPrefix)
-                    || original?.color
+                const liveColor = leadingScoreboardColor(rawTeamPrefix);
+                if (liveColor) duelsNameColors.set(key, liveColor);
+                const parsedColor = original?.isBedwarsTeam || original?.color !== '§f' ? original?.color : null;
+                const nameColor = liveColor
+                    || duelsNameColors.get(key)
+                    || parsedColor
                     || row.rankNameColorCode
                     || row.nameColorCode
                     || '§7';
@@ -11228,6 +11397,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             clearNametagFetchTimers();
             nametagGuildTags.clear();
             nametagSessionStats.clear();
+            duelsNameColors.clear();
             if (nametagSyncTimer) {
                 clearTimeout(nametagSyncTimer);
                 nametagSyncTimer = null;
@@ -11239,6 +11409,8 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 if (restoreOriginalTeams && entry.name) restorePlayerOriginalTeam(entry.name);
             });
             nametagTeams.clear();
+            if (restoreOriginalTeams) duelsUnseatedPlayers.forEach(name => restorePlayerOriginalTeam(name));
+            duelsUnseatedPlayers.clear();
         }
 
         function clearDelayedRosterSync() {
@@ -11611,11 +11783,29 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
 
             applyKnownDenickFromHistory(name, 'tabstats_history', { queueUpdates: false });
             const knownDenickResult = getAutoDenickResult(name);
+            const displayGeneration = tabStatsSupplementalGeneration;
+            const isStillCurrent = () => isTabStatsActiveInGame() && isCurrentGameSession(sessionId)
+                && currentGamemode === mode && gameRoster.has(name) && isEligibleForCurrentGameRoster(name)
+                && lobbyPlayers.get(name)?.uuid === uuid && displayGeneration === tabStatsSupplementalGeneration;
+            let lastDisplay;
+            const renderReadyProfile = ready => {
+                if (!ready?.data?.player || !isStillCurrent()) return;
+                const denick = getAutoDenickResult(name);
+                // A resolution arriving during the lookup invalidates an old
+                // nickname's primary preview just as it does its final row.
+                if (denick?.realName && nickKey(ready.data.player.displayname) !== nickKey(denick.realName)) return;
+                const text = buildTabStatsDisplay(name, ready, lobbyPlayers.get(name) || info, mode, { denickResult: denick });
+                if (text !== lastDisplay) {
+                    writeTabDisplayName(uuid, text);
+                    tabStatsAppliedNames.add(name);
+                    lastDisplay = text;
+                }
+            };
             const profile = await getStatsProfileForRosterPlayer(name, {
                 denickResult: knownDenickResult,
-                lookup: { apiPriority: 'game' }
+                lookup: { apiPriority: 'game', onPrimaryProfile: renderReadyProfile }
             });
-            if (!isTabStatsActiveInGame() || !isCurrentGameSession(sessionId) || currentGamemode !== mode || !gameRoster.has(name) || !isEligibleForCurrentGameRoster(name)) return;
+            if (!isStillCurrent()) return;
             if (profile?.data?.isNicked) markNickedPlayer(name, 'tabstats');
             if (profile?.data?.player && !profile.data.isNicked && !profile.data.lookupFailed) {
                 rememberPlayerActiveCosmetics(name, profile.data, 'tabstats');
@@ -11624,16 +11814,25 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             const denickResult = getAutoDenickResult(name);
             let displayProfile = profile;
             if (denickResult?.realName) {
-                const realProfile = await getPlayerData(denickResult.realName, { includeErrors: true });
+                const realProfile = await getPlayerData(denickResult.realName, {
+                    includeErrors: true, apiPriority: 'game', onPrimaryProfile: renderReadyProfile
+                });
                 if (realProfile?.data?.player && !realProfile.error) {
                     displayProfile = realProfile;
                     rememberPlayerActiveCosmetics(name, realProfile.data, 'denick_tabstats');
                     rememberPlayerActiveCosmetics(denickResult.realName, realProfile.data, 'denick_tabstats');
                 }
             }
-            if (!isCurrentGameSession(sessionId) || currentGamemode !== mode || !gameRoster.has(name) || !isEligibleForCurrentGameRoster(name)) return;
+            const previous = tabStatsProfileCache.get(name);
+            const retryLookup = isTransientPlayerLookupFailure(displayProfile?.data)
+                && previous?.mode === mode
+                && previous.denickRealName === (denickResult?.realName || '')
+                && hasRealPlayerLookupData(previous.profile?.data);
+            if (retryLookup) displayProfile = previous.profile;
+            if (!isStillCurrent()) return;
+            renderReadyProfile(displayProfile);
             await ensureTabStatsSupplementalData(name, displayProfile, mode, denickResult);
-            if (!isCurrentGameSession(sessionId) || currentGamemode !== mode || !gameRoster.has(name) || !isEligibleForCurrentGameRoster(name)) return;
+            if (!isStillCurrent() || (getAutoDenickResult(name)?.realName || '') !== (denickResult?.realName || '')) return;
             rememberOverlayPlayer(name, displayProfile, {
                 mode,
                 source: denickResult?.realName ? 'denick_tabstats' : 'tabstats',
@@ -11643,10 +11842,10 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             tabStatsProfileCache.set(name, {
                 profile: displayProfile,
                 mode,
-                denickRealName: denickResult?.realName || ''
+                denickRealName: denickResult?.realName || '',
+                retryLookup
             });
-            writeTabDisplayName(uuid, buildTabStatsDisplay(name, displayProfile, latestInfo, mode, { denickResult }));
-            tabStatsAppliedNames.add(name);
+            renderReadyProfile(displayProfile);
             scheduleNametagSync();
         }
 
@@ -11672,10 +11871,22 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         }
 
         function reapplyCachedTabStatsForPlayer(name) {
-            if (!isTabStatsActiveInGame() || !name || isDenickAliasDuplicate(name)) return false;
+            if (!isTabStatsActiveInGame() || !name || isDenickAliasDuplicate(name)
+                || !gameRoster.has(name) || !isEligibleForCurrentGameRoster(name)) return false;
             const info = lobbyPlayers.get(name);
             if (!info?.uuid) return false;
-            const cached = cachedTabStatsProfileForPlayer(name);
+            let cached = cachedTabStatsProfileForPlayer(name);
+            if (!cached && typeof observePendingPlayerProfile === 'function') {
+                const denickResult = getAutoDenickResult(name);
+                const unsubscribe = observePendingPlayerProfile(denickResult?.realName || name, profile => {
+                    if (!profile?.data?.player) return;
+                    if (denickResult?.realName && nickKey(profile.data.player.displayname) !== nickKey(denickResult.realName)) return;
+                    cached = { profile, denickResult };
+                });
+                // Read only an already-ready preview; do not start another
+                // request or keep a listener after this synchronous restore.
+                unsubscribe();
+            }
             if (!cached) return false;
             writeTabDisplayName(info.uuid, buildTabStatsDisplay(name, cached.profile, info, currentGamemode, {
                 denickResult: cached.denickResult
@@ -11701,21 +11912,39 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             refreshBedwarsGeneratorFooter();
         }
 
+        function clearTabStatsUpdate(name) {
+            const pending = tabStatsTimers.get(name);
+            if (pending) clearTimeout(pending.timer);
+            tabStatsTimers.delete(name);
+        }
+
         function queueTabStatsUpdate(name, delay = 0, options = {}) {
             if (isDenickAliasDuplicate(name)) {
                 cleanupDenickAliasDuplicate(name, 'tab_queue_alias');
                 return;
             }
             if (!isTabStatsActiveInGame() || !gameRoster.has(name) || !isEligibleForCurrentGameRoster(name)) return;
-            if (tabStatsTimers.has(name)) clearTimeout(tabStatsTimers.get(name));
             const sessionId = gameSessionId;
-
-            const timer = setTimeout(() => {
+            const waitMs = Math.max(0, Number(delay) || 0);
+            const dueAt = Date.now() + waitMs;
+            const pending = tabStatsTimers.get(name);
+            // Server tab/team packets can repeat faster than the staggered
+            // updates. Coalesce at the earliest deadline so the later rows
+            // cannot be postponed forever by each new packet.
+            if (pending?.sessionId === sessionId && pending.dueAt <= dueAt) {
+                pending.options = { ...pending.options, ...options };
+                return;
+            }
+            clearTabStatsUpdate(name);
+            const entry = { sessionId, dueAt,
+                options: { ...(pending?.sessionId === sessionId ? pending.options : {}), ...options }, timer: null };
+            entry.timer = setTimeout(() => {
+                if (tabStatsTimers.get(name) !== entry) return;
                 tabStatsTimers.delete(name);
                 if (!isCurrentGameSession(sessionId)) return;
-                updateTabStatsForPlayer(name, sessionId, options).catch((e) => console.error(`[TabStats] ${name}:`, e.message));
-            }, delay);
-            tabStatsTimers.set(name, timer);
+                updateTabStatsForPlayer(name, sessionId, entry.options).catch((e) => console.error(`[TabStats] ${name}:`, e.message));
+            }, waitMs);
+            tabStatsTimers.set(name, entry);
         }
 
         // Latency packets carry nothing the tab row shows, so rendered rows are
@@ -11725,7 +11954,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             if (!isTabStatsActiveInGame()) return;
             const cached = tabStatsAppliedNames.has(name) ? tabStatsProfileCache.get(name) : null;
             const cachedData = cached?.profile?.data;
-            if (cachedData && !cachedData.lookupFailed) return;
+            if (cachedData && !cachedData.lookupFailed && !cached.retryLookup) return;
             const now = Date.now();
             if (now - (tabLatencyRetriedAt.get(name) || 0) < TAB_LATENCY_RETRY_MS) return;
             tabLatencyRetriedAt.set(name, now);
@@ -11739,21 +11968,9 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             }
             seedGameRoster();
             const names = Array.from(gameRoster).slice(0, 32);
-            const sessionId = gameSessionId;
-            getUrchinBatchRaw(names)
-                .then(batch => {
-                    if (!isCurrentGameSession(sessionId) || !isTabStatsActiveInGame()) return;
-                    tabStatsUrchinOverrides = batch;
-                    names.forEach((name, index) => {
-                        queueTabStatsUpdate(name, index * HYPIXEL_API_GAME_MIN_SPACING_MS);
-                    });
-                })
-                .catch(() => {
-                    if (!isCurrentGameSession(sessionId) || !isTabStatsActiveInGame()) return;
-                    names.forEach((name, index) => {
-                        queueTabStatsUpdate(name, index * HYPIXEL_API_GAME_MIN_SPACING_MS);
-                    });
-                });
+            names.forEach((name, index) => {
+                queueTabStatsUpdate(name, index * HYPIXEL_API_GAME_MIN_SPACING_MS);
+            });
         }
 
         function clearTabStatsDisplay(name) {
@@ -11766,9 +11983,8 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         }
 
         function clearAllTabStatsDisplays({ restoreOriginalTeams = false } = {}) {
-            tabStatsTimers.forEach(timer => clearTimeout(timer));
+            tabStatsTimers.forEach(entry => clearTimeout(entry.timer));
             tabStatsTimers.clear();
-            tabStatsUrchinOverrides = new Map();
             tabStatsGuildTags.clear();
             tabStatsSessionStats.clear();
             tabStatsSupplementalGeneration += 1;
@@ -11779,7 +11995,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
 
         activeUser.pauseExpensiveProxyFeatures = () => {
             clearAllTabStatsDisplays({ restoreOriginalTeams: gameActive && currentGamemode === 'BEDWARS' });
-            clearNametagTeams({ restoreOriginalTeams: gameActive && currentGamemode === 'BEDWARS' });
+            clearNametagTeams({ restoreOriginalTeams: duelsState.active || (gameActive && currentGamemode === 'BEDWARS') });
             clearOverlayStatsTimers();
         };
 
@@ -11830,7 +12046,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             }
 
             if (isNametagOverlayActive() || isNametagOverlayActiveDuels()) applyNametagConfigChange();
-            else clearNametagTeams({ restoreOriginalTeams: gameActive && currentGamemode === 'BEDWARS' });
+            else clearNametagTeams({ restoreOriginalTeams: duelsState.active || (gameActive && currentGamemode === 'BEDWARS') });
 
             sessionTracker.refreshSettings();
             if (!state.sessionTrackingEnabled || !state.gameRecapEnabled) recapDelivery.clear();
@@ -12159,6 +12375,10 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                                 originalDisplayName: p.displayName ?? null,
                                 source: 'player_info_display'
                             });
+                            // The server packet above replaced our display
+                            // name. Restore completed stats in this packet
+                            // turn, while the normal queue refreshes them.
+                            reapplyCachedTabStatsForPlayer(name);
                             queueTabStatsUpdate(name, index * 175);
                             queueOverlayStatsUpdate(name, index * 220);
                         });
@@ -12187,8 +12407,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                             if (name) {
                                 gameRoster.delete(name);
                                 if (tabStatsTimers.has(name)) {
-                                    clearTimeout(tabStatsTimers.get(name));
-                                    tabStatsTimers.delete(name);
+                                    clearTabStatsUpdate(name);
                                 }
                                 if (overlayStatsTimers.has(name)) {
                                     clearTimeout(overlayStatsTimers.get(name));
@@ -12332,7 +12551,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 const titleText = titlePacketText(data.text);
                 const observed=sessionTracker.observeLocalResult(titleText);
                 if (gameActive && currentGamemode === 'BEDWARS') bedwarsStatsDebug.observeTitle(titleText);
-                if(observed&&localDuelKey&&sessionTracker.getActiveSession()?.localTracking?.current?.result)finishLocalDuel();
+                if(observed&&localDuelKey&&sessionTracker.getObservedGameState().result)finishLocalDuel();
                 // Also record it on the game itself, so API-tracked games keep
                 // a result when the stats delta cannot settle one.
                 const banner = gameActive
@@ -12430,13 +12649,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                                 nicknameDuelsSession = duelsState.sessionId;
                                 queuePartyCoordinationUpdate();
                                 nicknameSharing.request();
-                                if(localDuelKey&&/^opponents?\s*:/i.test(stripAnsi(text).trim())&&sessionTracker.getActiveSession()?.localTracking?.current?.endObserved)finishLocalDuel();
-                                if(!localDuelKey&&/^opponents?\s*:/i.test(stripAnsi(text).trim())&&(state.apiKillSwitchEnabled||!hasHypixelApiKeyConfigured())&&state.sessionTrackingEnabled){
-                                    localDuelStartedAt=Date.now();localDuelKey=`duel:${duelsState.sessionId}:${localDuelStartedAt}`;
-                                    sessionTracker.onGameStart({mode:'DUELS',sessionKey:localDuelKey,observedFromStart:true,
-                                        variant:duelsState.modeDef?{id:duelsState.modeDef.id,label:duelsState.modeDef.label}:duelsState.modeName,
-                                        ...localSessionIdentity()});
-                                }
+                                startObservedDuel(text);
                             }
                         }
                     }
@@ -12466,7 +12679,9 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                         queueTimeTracker.observeStartChat(text);
                     }
                      
-                    if (!isActionBar && /^(?:GAME OVER|VICTORY|DEFEAT)\s*!?$/i.test(cleanChatText.trim())) {
+                    // Duels rematches can reuse the same sidebar. Keep its
+                    // mode evidence until the server actually changes it.
+                    if (!isActionBar && !duelsState.active && /^(?:GAME OVER|VICTORY|DEFEAT)\s*!?$/i.test(cleanChatText.trim())) {
                         resetMatchState({ clearPlayers: true, clearSnapshot: true });
                         clearTrackedScoreboard();
                     }
@@ -12480,6 +12695,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         });
 
         function clearConnectionTimers() {
+            statsLookupRetryController.abort();
             if (generatorFooterRefreshTimer) clearTimeout(generatorFooterRefreshTimer);
             generatorFooterRefreshTimer = null;
             recapDelivery.clear();
@@ -12507,7 +12723,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             matchSnapshotTimer = null;
             pendingMatchSnapshotReason = '';
             clearOverlayStatsTimers();
-            tabStatsTimers.forEach(timer => clearTimeout(timer));
+            tabStatsTimers.forEach(entry => clearTimeout(entry.timer));
             tabStatsTimers.clear();
             quickMathsSession.reset();
             enderDustReminder.stop();
@@ -12540,8 +12756,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             // Stops the pending game-end capture and flushes the session store. The
             // session row stays OPEN on disk so reconnecting inside the resume
             // window continues the same session instead of re-baselining.
-            if (proxyStopping) connectionDrains.track(sessionTracker.quiesce());
-            else sessionTracker.detach();
+            connectionDrains.track(sessionTracker.quiesce());
         }
 
         let connectionDrain;
@@ -12808,6 +13023,12 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 await handlePingCommand(client, args);
             }
             
+            else if (cmd === '/hypixelrate') {
+                handleHypixelRateCommand(client, args);
+            }
+            else if (cmd === '/urchinrate') {
+                handleUrchinRateCommand(client, args);
+            }
             else if (cmd === '/urchin') {
                 const target = args[1] || client.username;
                 if (!target) return sendChat(client, "§cUsage: /urchin <player>");
@@ -13147,6 +13368,10 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 handleScanModeCommand(client, ['/scanmode', 'off']);
             }
             else if (cmd === '/denick') {
+                if (String(args[1] || '').toLowerCase() === 'test') {
+                    await handleAutoDenickTestCommand(args);
+                    return;
+                }
                 if (String(args[1] || '').toLowerCase() === 'party') {
                     await handlePartyDenickCommand(args);
                     return;
@@ -13636,13 +13861,13 @@ const {
     auroraPingDeduper
 });
 
-const { getPlayerData } = createStatsFetch({
+const { getPlayerData, observePendingPlayerProfile, cancelPendingRetries: cancelPendingStatsRetries } = createStatsFetch({
     globalCache,
     cacheDuration: CACHE_DURATION,
     getHypixelKey: () => keys.hypixel,
     hasHypixelApiKeyConfigured,
     hypixelApiGet,
-    getUrchinRaw: (name, uuid) => getUrchinRaw(name, uuid),
+    getUrchinRaw: (name, uuid, options) => getUrchinRaw(name, uuid, options),
     getAuroraPingRaw: (uuid) => getAuroraPingRaw(uuid),
     getHypixelStatusRaw: (uuid) => getHypixelStatusRaw(uuid),
     makePingData: (overrides) => makePingData(overrides),
@@ -13650,6 +13875,11 @@ const { getPlayerData } = createStatsFetch({
     notifyUrchinOutageOnce: (urchin) => notifyUrchinOutageOnce(urchin),
     classifyPlayerLookupError: (e, stage) => classifyPlayerLookupError(e, stage),
     playerLookupDeduper,
+    getRetrySignal: () => activeUser?.getStatsLookupRetrySignal?.(),
+    captureRetryGuard: () => {
+        const owner = activeUser;
+        return () => !proxyStopping && !state.apiKillSwitchEnabled && activeUser === owner;
+    },
     observeHypixelPlayerData: (uuid, player) => {
         try {
             if (player?.displayname) rankBook.record(player.displayname, rankedDisplayForPlayer(player));
@@ -14947,6 +15177,8 @@ console.log([
 // Install after startup ownership is complete. One deadline is supplied by Main.
 installServiceShutdown({
     async quiesce() {
+        cancelPendingStatsRetries();
+        hypixelApiClient.close?.();
         proxyStopping = true;
         upstreamOwner.quiesce();
         liveSettingsWatcher?.close();

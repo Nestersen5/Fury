@@ -131,6 +131,7 @@ function isUrchinRequestFailed(urchin = {}) {
 
 function shortUrchinStatusLabel(urchin = {}) {
     const status = urchin.requestStatus || 'failed';
+    if (status === 'pending') return '...';
     if (status === 'missing_key') return 'KEY';
     if (status === 'invalid_key') return 'KEY';
     if (status === 'rate_limited') return 'LIMIT';

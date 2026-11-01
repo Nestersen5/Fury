@@ -16,7 +16,7 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
     const root = REPOSITORY_ROOT;
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'fury-team-debug-integration-'));
     const [directPort, failoverPort, healthPort, upstreamPort, cosmeticPort, blockedPort] = await unusedPorts(6);
-    fs.writeFileSync(path.join(directory, 'server_config.json'), JSON.stringify({ proxyDirectPort: directPort, proxyFailoverPort: failoverPort, healthPort, proxyDirectHost: '127.0.0.1', proxyFailoverHost: '127.0.0.1' }));
+    fs.writeFileSync(path.join(directory, 'server_config.json'), JSON.stringify({ proxyCustomPort: 0, proxyDirectPort: directPort, proxyFailoverPort: failoverPort, healthPort, proxyDirectHost: '127.0.0.1', proxyFailoverHost: '127.0.0.1' }));
     fs.writeFileSync(path.join(directory, 'features_config.json'), JSON.stringify({ apiKillSwitchEnabled: true, autoSkinDenickEnabled: false, autoStatsDenickEnabled: false, tabStatsEnabled: true, nametagOverlayEnabled: true,
         nametagTeammatesEnabled: true, nametagTeammatesPrefix: 'fkdr', nametagTeammatesSuffix: 'none',
         nametagOthersEnabled: true, nametagOthersPrefix: 'star', nametagOthersSuffix: 'none' }));

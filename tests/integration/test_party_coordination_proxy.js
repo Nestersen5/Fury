@@ -11,7 +11,7 @@ const root = path.resolve(__dirname, '../..');
 (async () => {
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'fury-party-coordination-proxy-'));
     const [direct, failover, health, upstreamPort, cosmetic, blocked, relayPort] = await unusedPorts(7);
-    fs.writeFileSync(path.join(directory, 'server_config.json'), JSON.stringify({
+    fs.writeFileSync(path.join(directory, 'server_config.json'), JSON.stringify({ proxyCustomPort: 0,
         proxyDirectHost: '127.0.0.1', proxyDirectPort: direct,
         proxyFailoverHost: '127.0.0.1', proxyFailoverPort: failover, healthPort: health
     }));

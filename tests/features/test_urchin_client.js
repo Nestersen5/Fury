@@ -75,7 +75,7 @@ async function run() {
 
     const snapshot = client.getUrchinRateLimitSnapshot();
     assert.strictEqual(snapshot.limit, 120);
-    assert.strictEqual(snapshot.remaining, 119);
+    assert.strictEqual(snapshot.remaining, 118, 'Later replies cannot restore a slot already consumed by the client');
     assert.strictEqual(snapshot.cachedPlayers, 2);
 
     const session = await client.fetchUrchinSession('DemoPlayer_', 'weekly');

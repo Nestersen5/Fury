@@ -4,7 +4,14 @@ const assert = require('assert');
 const fs = require('fs');
 const vm = require('vm');
 const { createPartyTracker } = require('../../src/net/session/partyTracking');
-const { getBedwarsScanStats, formatBedwarsScanLine } = require('../../src/stats/scanLine');
+const { getBedwarsScanStats, formatBedwarsScanLine, formatSkywarsScanLine, formatDenickAnnouncement, formatAutoDenickMatch } = require('../../src/stats/scanLine');
+const { stripAnsi, extractText, sendChat } = require('../../features/minecraft_chat');
+const { parseUrchinBatchTags } = require('../../src/stats/urchin');
+const { formatSkyWarsLevel } = require('../../src/stats/format');
+const { createOverlayTagBuilder } = require('../../src/overlay/tags');
+const { buildOverlayTagComponents } = require('../../src/overlay/chat_overlay_annotation');
+const { isUrchinRequestFailed, shortUrchinStatusLabel, urchinStatusMessage } = require('../../src/stats/urchin');
+const { buildOverlayTags } = createOverlayTagBuilder({ compactTagName: String });
 
 // Exercise the production announcement path without starting the proxy or
 // sending commands to Hypixel.
@@ -12,9 +19,12 @@ const source = fs.readFileSync(require.resolve('../../proxy.js'), 'utf8');
 const start = source.indexOf('        async function announceSuccessfulDenick(');
 const end = source.indexOf('        function queueAutoSkinDenick(', start);
 assert(start >= 0 && end > start, 'production announcement functions must be present');
+const tagStart = source.indexOf('function getInteractiveTags(');
+const tagEnd = source.indexOf('// renderSkyWarsDashboard lives', tagStart);
+assert(tagStart >= 0 && tagEnd > tagStart);
 
 function harness({ broadcast = true, local = true, mode = 'BEDWARS', lookup } = {}) {
-    const commands = [], messages = [], dashboards = [], cosmetics = [];
+    const commands = [], messages = [], rawMessages = [], dashboards = [], cosmetics = [];
     const announced = new Set();
     const partyTracker = createPartyTracker({
         stripFormatting: value => value,
@@ -31,8 +41,9 @@ function harness({ broadcast = true, local = true, mode = 'BEDWARS', lookup } = 
         shouldSuppressDenickAnnouncement: () => false,
         hasAnnouncedDenick: name => announced.has(name),
         markDenickAnnounced: name => announced.add(name),
-        sendChat: (_, message) => messages.push(message),
-        getBedwarsScanStats, formatBedwarsScanLine,
+        sendChat: (_, message) => { rawMessages.push(message); messages.push(extractText(message)); },
+        getBedwarsScanStats, formatDenickAnnouncement, formatAutoDenickMatch,
+        buildOverlayTags, buildOverlayTagComponents, isUrchinRequestFailed, shortUrchinStatusLabel, urchinStatusMessage,
         getPlayerData: lookup || (async () => ({ data: { player: {} }, fromCache: false })),
         rememberPlayerActiveCosmetics: name => cosmetics.push(name),
         renderBedwarsStats: () => dashboards.push('BEDWARS'),
@@ -42,20 +53,71 @@ function harness({ broadcast = true, local = true, mode = 'BEDWARS', lookup } = 
         sendHypixelCommand: (command, options) => commands.push({ command, options })
     };
     vm.createContext(context);
+    vm.runInContext(source.slice(tagStart, tagEnd), context);
     vm.runInContext(source.slice(start, end), context);
-    return { context, partyTracker, commands, messages, dashboards, cosmetics, announced };
+    return { context, partyTracker, commands, messages, rawMessages, dashboards, cosmetics, announced };
 }
 
 async function run() {
+    const player = {
+        achievements: { bedwars_level: 44 },
+        stats: {
+            Bedwars: { final_kills_bedwars: 218, final_deaths_bedwars: 100, wins_bedwars: 41, losses_bedwars: 100, winstreak: 3 },
+            SkyWars: { levelFormatted: '§6[12★]', kills: 500, deaths: 100, wins: 20, losses: 10, win_streak: 2 }
+        }
+    };
+    for (const mode of ['BEDWARS', 'SKYWARS']) {
+        let lookups = 0;
+        const h = harness({ mode, lookup: async () => {
+            lookups++;
+            return { data: { player, urchin: parseUrchinBatchTags([{ type: 'Sniper', reason: 'scaffold', added_by_username: 'Moderator' }]) } };
+        } });
+        await h.context.announceSuccessfulDenick('Mason300', { realName: 'NotVectoria', source: 'skin' });
+        const row = h.rawMessages[0], identity = '§cMason300 §a(NotVectoria)';
+        assert.strictEqual(h.messages.length, 1);
+        assert.strictEqual(lookups, 1, 'inline stats reuse the single existing lookup');
+        assert.deepStrictEqual(h.dashboards, []);
+        assert.strictEqual(row.text, '§b[Denick] ');
+        assert.strictEqual(row.extra[0].text, mode === 'SKYWARS'
+            ? formatSkywarsScanLine({ skyLevel: formatSkyWarsLevel(player.stats.SkyWars, player), kdr: 5, wlr: 2, ws: 2 }, identity)
+            : formatBedwarsScanLine(getBedwarsScanStats(player), identity), 'use the same colored stat line as scan results');
+        const plain = stripAnsi(h.messages[0]);
+        assert(plain.includes('Mason300 (NotVectoria)'));
+        assert(plain.includes(mode === 'SKYWARS' ? 'KDR: 5.00' : 'FKDR: 2.18'));
+        assert(plain.includes(mode === 'SKYWARS' ? 'WLR: 2.00' : 'WLR: 0.41'));
+        const badge = row.extra.find(part => part.clickEvent);
+        assert.strictEqual(badge.clickEvent.value, '/urchin NotVectoria');
+        assert(badge.hoverEvent.value.includes('scaffold'));
+        const packets = [];
+        sendChat({ state: 'play', write: (type, packet) => { if (type === 'chat') packets.push(packet); } }, row);
+        assert.strictEqual(packets.length, 1, 'production chat sends one line without a stats card');
+        assert(!extractText(JSON.parse(packets[0].message)).includes('\n'));
+    }
+    for (const lookup of [
+        async () => ({ error: true }),
+        async () => { throw new Error('Offline fixture'); },
+        async () => ({ data: { player: {}, lookupFailed: true } }),
+        async () => ({ data: { player: {}, isNicked: true } })
+    ]) {
+        const h = harness({ lookup });
+        await h.context.announceSuccessfulDenick('HiddenNick', { realName: 'Enemy', source: 'skin' });
+        assert.strictEqual(h.messages.length, 1, 'failed stats still show the confirmed identity once');
+        assert(stripAnsi(h.messages[0]).includes('[Denick] HiddenNick (Enemy) | Stats unavailable right now.'));
+        assert(!/FKDR:|WLR:|WS:/.test(h.messages[0]), 'failed stats must not appear as zeroes');
+        assert.deepStrictEqual(h.dashboards, []);
+        assert.strictEqual(h.commands.length, 0);
+    }
     for (const method of ['skin', 'stats']) {
         for (const realName of ['fRiEnD', 'LEADER', 'Self']) {
             const h = harness();
             await h.context.announceSuccessfulDenick('HiddenNick', { realName, source: method });
             assert.strictEqual(h.commands.length, 0, `${method}: party members must not be broadcast`);
             assert(h.messages.some(message => message.includes(realName)), 'local result remains visible');
-            assert.deepStrictEqual(h.dashboards, method === 'stats' ? [] : ['BEDWARS'], 'stats denicks use one compact line; skin denicks keep their dashboard');
+            assert.deepStrictEqual(h.dashboards, [], 'denicks never open a stats card automatically');
+            assert.strictEqual(h.messages.length, 1, 'identity and stats share one message');
             if (method === 'stats') {
                 assert.strictEqual(h.messages.length, 1);
+                assert(h.messages[0].includes('Confirmed match:'));
                 assert(h.messages[0].includes('FKDR:') && h.messages[0].includes('WLR:') && h.messages[0].includes('WS:'));
             }
             assert.deepStrictEqual(h.cosmetics, ['HiddenNick', realName], 'cosmetics still update');
@@ -112,19 +174,40 @@ async function run() {
     assert.strictEqual(saved.commands.length, 1, 'saved denicks retain the same party protection');
 
     const unavailable = harness({ lookup: async () => ({ error: true }) });
-    await unavailable.context.announceSuccessfulDenick('HiddenNick', { realName: 'Enemy', source: 'stats' });
+    await unavailable.context.announceSuccessfulDenick('HiddenNick', {
+        realName: 'Enemy', source: 'stats', observedFinals: 1000, observedBeds: 500, finals: 990, beds: 525
+    });
     assert.strictEqual(unavailable.messages.length, 1);
     assert(unavailable.messages[0].includes('(Enemy)') && unavailable.messages[0].includes('Stats unavailable'));
+    assert(stripAnsi(unavailable.messages[0]).includes('Confirmed match:'));
+    assert(!/Finals:|Beds:|detected |diff /.test(stripAnsi(unavailable.messages[0])));
+    assert(stripAnsi(unavailable.messages[0]).endsWith('| Stats unavailable right now.'));
     assert.strictEqual(unavailable.commands.length, 0);
 
-    let current = true, finish;
-    const stale = harness({ lookup: () => new Promise(resolve => { finish = resolve; }) });
-    const announcing = stale.context.announceSuccessfulDenick('HiddenNick', { realName: 'Enemy', source: 'stats' }, { isCurrent: () => current });
-    current = false;
-    finish({ data: { player: {} } });
-    await announcing;
-    assert.strictEqual(stale.messages.length, 0, 'stale stats announcements must stay silent');
-    assert.strictEqual(stale.commands.length, 0);
+    const compared = harness({ lookup: async () => ({ data: { player: {
+        stats: { Bedwars: { final_kills_bedwars: 9999, beds_broken_bedwars: 9999 } }
+    } } }) });
+    await compared.context.announceSuccessfulDenick('HiddenNick', {
+        realName: 'Enemy', source: 'stats', observedFinals: 1000, observedBeds: 500, finals: 990, beds: 525
+    });
+    assert.strictEqual(compared.messages.length, 1, 'keep the compact single-line result');
+    const confirmation = stripAnsi(compared.messages[0]);
+    assert(confirmation.startsWith('[AutoDenick] Confirmed match:'));
+    assert(confirmation.includes('FKDR:') && confirmation.includes('WLR:') && confirmation.includes('WS:'));
+    assert(!/Finals:|Beds:|detected |diff /.test(confirmation));
+    assert(!confirmation.includes('9,999'), 'compare the verified candidate counts, not a later profile refresh');
+    assert.strictEqual(compared.commands.length, 1, 'existing party announcements are preserved');
+
+    for (const method of ['skin', 'stats']) {
+        let current = true, finish;
+        const stale = harness({ lookup: () => new Promise(resolve => { finish = resolve; }) });
+        const announcing = stale.context.announceSuccessfulDenick('HiddenNick', { realName: 'Enemy', source: method }, { isCurrent: () => current });
+        current = false;
+        finish({ data: { player: {} } });
+        await announcing;
+        assert.strictEqual(stale.messages.length, 0, 'stale denick announcements must stay silent');
+        assert.strictEqual(stale.commands.length, 0);
+    }
     console.log('Denick party announcement tests passed.');
 }
 

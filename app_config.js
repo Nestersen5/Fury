@@ -13,6 +13,9 @@ const {
 const { normalizeGamblerGeorgeReminderState } = require('./features/gambler_george_reminder.js');
 const { SNOOZE_DURATION } = require('./src/reminders/hypixelKeyReminder.js');
 const { BEDWARS_TAB_DEFAULTS, normalizeBedwarsTabSettings } = require('./src/session/bedwarsTabSettings.js');
+const { normalizeUrchinRequestSettings } = require('./features/urchin_client.js');
+const { normalizeHypixelRequestSettings } = require('./features/hypixel_api_client.js');
+const SERVER_DEFAULTS = require('./src/net/serverDefaults');
 
 const paths = {
     keys: dataPath('statmod_key.txt'),
@@ -118,6 +121,8 @@ const defaults = {
     keyMeta: { hypixelUpdatedAt: '', hypixelSavedAt: 0, hypixelSnoozedUntil: 0 },
     scan: { scanMode: 'threats', minFkdr: 2, minStars: 400, minSkywarsKdr: 1, minSkywarsWlr: 0.4, minSkywarsLevel: 15, countTags: true },
     features: {
+        ...normalizeUrchinRequestSettings(),
+        ...normalizeHypixelRequestSettings(),
         chatPrefixAccentHex: DEFAULT_CHAT_PREFIX_ACCENT_HEX,
         anticheatEnabled: true,
         anticheatScaffoldEnabled: true,
@@ -223,15 +228,7 @@ const defaults = {
         nametagOthersSuffixFallback: 'fkdr'
     },
     chatTriggers: { triggers: ['3/4', '2/4', '1/4', '1/2', '1/3', '2/3'] },
-    server: {
-        proxyDirectPort: 25565,
-        proxyFailoverPort: 25568,
-        proxyCustomPort: 0,
-        proxyDirectHost: 'mc.hypixel.net',
-        proxyFailoverHost: 'hypixel.fast',
-        proxyCustomHost: 'mc.hypixel.net',
-        healthPort: 3100
-    }
+    server: { ...SERVER_DEFAULTS }
 };
 
 function readJson(file, fallback) {
@@ -452,7 +449,7 @@ function loadFeatureSettings() {
         features.chatPrefixAccentHex,
         defaults.features.chatPrefixAccentHex
     );
-    Object.assign(features, normalizeSessionFeatureSettings(features));
+    Object.assign(features, normalizeSessionFeatureSettings(features), normalizeUrchinRequestSettings(features), normalizeHypixelRequestSettings(features));
     [
         ['nametagTeammatesPrefix', 'nametagTeammatesPrefixFallback'],
         ['nametagTeammatesSuffix', 'nametagTeammatesSuffixFallback'],
@@ -482,6 +479,8 @@ function saveFeatureSettings(features) {
             ? Boolean(current.bedwarsSidebarTeamColorsEnabled)
             : Boolean(next.accentBedwarsEventLabelsEnabled);
     writeJson(paths.features, {
+        ...normalizeUrchinRequestSettings(next),
+        ...normalizeHypixelRequestSettings(next),
         nickRoll: require('./src/nick/settings').normalizeSettings(next.nickRoll),
         chatPrefixAccentHex: normalizeChatPrefixAccentHex(
             next.chatPrefixAccentHex,

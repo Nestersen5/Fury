@@ -24,6 +24,18 @@ function apiCompletedGames(delta, mode) {
         + Math.max(0, Number(stats[definition.fields.losses]) || 0);
 }
 
+// A published result does not guarantee the combat counters have caught up.
+// Keep the observation until this API window includes at least what we saw.
+function apiCountsCoverObservations(delta, record) {
+    const definition = MODE_DEFINITIONS.find(entry => entry.mode === record.mode);
+    const observed = record.localModes?.find(entry => entry.mode === record.mode);
+    if (!definition || !observed) return true;
+    const stats = delta?.stats?.[definition.key] || {};
+    return FIELDS.every(field => ['wins', 'losses', 'games'].includes(field)
+        || !definition.fields[field] || !Number.isFinite(observed[field])
+        || (stats[definition.fields[field]] || 0) >= observed[field]);
+}
+
 function gameModes(record) {
     const observed = record.localModes;
     const definition = MODE_DEFINITIONS.find(entry => entry.mode === record.mode);
@@ -44,7 +56,7 @@ function gameModes(record) {
 // Replacing a game's counters never adds another game to the session. Legacy
 // sessions without live observations keep their existing API projection.
 function countsForGame(record) {
-    if (!(record.durationMs >= 1000) || record.metadata?.privateGame) return null;
+    if ((!(record.durationMs >= 1000) && !['win', 'loss'].includes(record.result)) || record.metadata?.privateGame) return null;
     const mode = gameModes(record)?.find(entry => entry.mode === record.mode);
     const counts = normalizeTotals();
     for (const field of FIELDS) {
@@ -90,4 +102,4 @@ function observedSessionDelta(session, apiDelta) {
         spanMs: Math.max(0, (session.endedAt || session.lastSeen) - session.startedAt) };
 }
 
-module.exports = { singleApiResult, apiCompletedGames, gameModes, observedSessionDelta, archiveObservedGames };
+module.exports = { singleApiResult, apiCompletedGames, apiCountsCoverObservations, gameModes, observedSessionDelta, archiveObservedGames };

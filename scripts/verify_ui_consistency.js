@@ -8,7 +8,7 @@ async function boot(){
  fs.mkdirSync(out,{recursive:true});const profile=fs.mkdtempSync(path.join(os.tmpdir(),'fury-consistency-fix-'));
  const [debug,cosmetic,blocked,direct,failover,health]=await h.unusedPorts(6),env=h.cleanEnvironment(profile,root,cosmetic,blocked);env.NODE_BINARY=process.execPath;
  fs.writeFileSync(path.join(profile,'features_config.json'),JSON.stringify({...require('../src/session/settings').SESSION_DEFAULTS,apiKillSwitchEnabled:true,gameRecapEnabled:true,sessionGoalWins:10,sessionRecapStyle:'compact'}));
- fs.writeFileSync(path.join(profile,'server_config.json'),JSON.stringify({proxyDirectPort:direct,proxyFailoverPort:failover,healthPort:health,proxyDirectHost:'mc.hypixel.net',proxyFailoverHost:'hypixel.fast'}));
+ fs.writeFileSync(path.join(profile,'server_config.json'),JSON.stringify({ proxyCustomPort: 0,proxyDirectPort:direct,proxyFailoverPort:failover,healthPort:health,proxyDirectHost:'mc.hypixel.net',proxyFailoverHost:'hypixel.fast'}));
  const large=phase==='history-large'?JSON.parse(fs.readFileSync(path.join(root,'session_data.json'),'utf8')):null;
  const largest=large&&Object.values(large.sessions.reduce((groups,s)=>{(groups[s.uuid]??=[]).push(s);return groups;},{})).sort((a,b)=>b.length-a.length)[0][0];
  const account=largest?{uuid:largest.uuid,name:largest.name}:{uuid:'a'.repeat(32),name:'ExampleAccount'},store=require('../src/reminders/rememberedAccount').createReminderAccountStore(path.join(profile,'launcher_data/reminders'));store.remember(account.uuid,account.name);

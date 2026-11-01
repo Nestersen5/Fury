@@ -9,6 +9,8 @@
     Var furyUserExeLease
     Var furyMachineExeLease
     Var furyTargetExeLease
+    Var furyUpdateParentPid
+    Var furyUpdateParentHandle
     Function furyHoldExecutable
       Exch $0
       StrCmp $0 "" fury_no_executable
@@ -25,6 +27,23 @@
     FunctionEnd
     Section "-Preserve Fury user data"
       SectionIn RO
+      ; electron-updater starts this installer immediately before quitting.
+      ; Wait before taking preservation leases; never force-kill a live Fury.
+      ReadEnvStr $furyUpdateParentPid "FURY_UPDATE_PARENT_PID"
+      StrCmp $furyUpdateParentPid "" fury_update_parent_done
+      IntCmp $furyUpdateParentPid 0 fury_update_parent_done fury_update_parent_done 0
+      System::Call 'kernel32::OpenProcess(i 0x100000, i 0, i $furyUpdateParentPid) p .r0'
+      StrCpy $furyUpdateParentHandle $0
+      StrCmp $furyUpdateParentHandle 0 fury_update_parent_done
+      System::Call 'kernel32::WaitForSingleObject(p $furyUpdateParentHandle, i 30000) i .r0'
+      StrCpy $1 $0
+      System::Call 'kernel32::CloseHandle(p $furyUpdateParentHandle)'
+      StrCmp $1 0 fury_update_parent_done
+      MessageBox MB_OK|MB_ICONSTOP "Fury is still closing. The update has stopped without replacing your installation. Close Fury and try again." /SD IDOK
+      SetErrorLevel 72
+      Quit
+      fury_update_parent_done:
+      System::Call 'kernel32::SetEnvironmentVariable(t "FURY_UPDATE_PARENT_PID", p 0)'
       ; The locked template elevates a silent per-machine upgrade in its next
       ; section. Only the inner instance may own leases that span removal.
       ${if} $hasPerMachineInstallation == "1"

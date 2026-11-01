@@ -83,9 +83,10 @@ function quietProfile(fkdr) {
 }
 
 async function runScan({ profiles, detectedNicks = [], scanMode = 'threats', scanChatLayout,
-    autoDenickResults = new Map(), getKnownDenick, onLookup, onResults, gameMode = 'BEDWARS' }) {
+    autoDenickResults = new Map(), getKnownDenick, onLookup, onResults, gameMode = 'BEDWARS',
+    lobbyEntries, myTeam = 'Red' }) {
     const lines = [];
-    const lobbyMap = new Map([
+    const lobbyMap = new Map(lobbyEntries || [
         ['samplename', { color: '§a', letter: 'G', team: 'Green', uuid: 'u1', inTab: true }],
         ['quietguy', { color: '§a', letter: 'G', team: 'Green', uuid: 'u2', inTab: true }]
     ]);
@@ -119,7 +120,7 @@ async function runScan({ profiles, detectedNicks = [], scanMode = 'threats', sca
         setLastScanResults: result => onResults?.(result)
     });
 
-    await runner.performFullScan({ username: 'Me' }, lobbyMap, detectedNickedPlayers, 'Red', {
+    await runner.performFullScan({ username: 'Me' }, lobbyMap, detectedNickedPlayers, myTeam, {
         gameMode,
         gameActive: true,
         gameRoster: new Set(['samplename', 'quietguy']),
@@ -190,7 +191,19 @@ async function runScan({ profiles, detectedNicks = [], scanMode = 'threats', sca
     const newOutput = await runScan({ profiles, scanMode: 'all' });
     const legacyOutput = await runScan({ profiles, scanMode: 'all', scanChatLayout: 'old' });
     assert.strictEqual(legacyOutput, newOutput, 'Legacy settings cannot restore the old format');
-    assert.ok(newOutput.includes('SCAN COMPLETE §r§7• 2 players'));
+    assert.ok(!newOutput.includes('SCAN COMPLETE'));
+    const layout = output => output.split('\n').map(line => line.startsWith('{') ? 'PLAYER' : line);
+    assert.deepStrictEqual(layout(newOutput), ['§a§lSCAN RESULTS§r', '§r ', '§a§lGREEN TEAM§r', 'PLAYER', 'PLAYER', '§r '],
+        'One blank line follows the heading and final player; same-team players remain adjacent');
+    const teamOutput = await runScan({ profiles, scanMode: 'all', myTeam: 'Blue', lobbyEntries: [
+        ['samplename', { color: '§c', letter: 'R', team: 'Red', uuid: 'u1', inTab: true }],
+        ['quietguy', { color: '§e', letter: 'Y', team: 'Yellow', uuid: 'u2', inTab: true }]
+    ] });
+    assert.deepStrictEqual(layout(teamOutput), ['§a§lSCAN RESULTS§r', '§r ', '§c§lRED TEAM§r', 'PLAYER',
+        '§r ', '§e§lYELLOW TEAM§r', 'PLAYER', '§r '], 'Team groups have exactly one blank line between them');
+    const skyLayout = await runScan({ profiles, scanMode: 'all', gameMode: 'SKYWARS' });
+    assert.deepStrictEqual(layout(skyLayout), ['§a§lSCAN RESULTS§r', '§r ', '§b§lPLAYERS§r', 'PLAYER', 'PLAYER', '§r '],
+        'SkyWars keeps one player group with the same heading and trailing spacing');
     assert.ok(newOutput.includes('§a§lGREEN TEAM§r'), 'New uses full colored team names');
     assert.ok(!newOutput.includes('---'), 'New has no divider lines');
     const playerRows = newOutput.split('\n').filter(line => line.startsWith('{')).map(line => JSON.parse(line));
