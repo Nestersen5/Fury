@@ -95,6 +95,27 @@
         "Auto Dodge no longer cancels a planned leave during the final Bed Wars countdown warning.",
         "Automatic skin and stats denicks no longer reveal party members in party chat."
       ]
+    },
+    {
+      "version": "1.1.4",
+      "features": [
+        "Mute repeated lobby messages until you disconnect, with Undo and a muted-player list.",
+        "Pick and claim Daily Reward cards in chat, with an optional auto-pick mode.",
+        "Report one player with /wdr without opening the confirmation menu, then see whether it succeeded.",
+        "Customize the BedWars scoreboard with six color styles, FKDR decimal digits and extra spacing.",
+        "Choose whether individual Share messages include monthly FKDR.",
+        "Share uses team summaries by default to keep party chat shorter, with individual messages also available."
+      ],
+      "improvements": [
+        "Fury keeps track of your party without filling chat with party lists, helping keep nicked teammates private.",
+        "Individual Share messages arrive as players finish scanning, without waiting for their teammates.",
+        "Party announcements for newly denicked players now include their tags and listed cheats."
+      ],
+      "fixes": [
+        "Nicked teammates who use an existing Minecraft name can now be saved automatically from your party.",
+        "Reconnecting quickly no longer crashes Fury while restoring your party.",
+        "Players removed from your party after disconnecting no longer stay on Fury's party list."
+      ]
     }
   ]
 }

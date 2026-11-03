@@ -96,6 +96,11 @@ require(${JSON.stringify(path.join(root, 'src/stats/fetch.js'))}).createStatsFet
             await delay(100);
             assert(messages.slice(start).some(message => message.includes('State:') && message.includes('Confirmed')));
         }, 'Confirming the multipart party response before testing an opponent');
+        assert(!messages.some(message => message.includes('Party Leader:')), "Fury's own /p list reply is read but not shown");
+        player.write('chat', { message: '/p list' });
+        await eventually(async () => assert.strictEqual(commands.filter(command => command === '/p list').length, 2), 'Sending the player\'s own /p list');
+        roster();
+        await eventually(async () => assert(messages.some(message => message.includes('Party Leader:'))), 'Showing a /p list the player typed');
         // Enter Auto Dodge through real chat packets and production tag shapes.
         for (const name of ['ExemptReplays', 'ExemptAccount', 'ExemptBlacklist', 'CleanCaution', 'DeniedCaution']) {
             chat('[MVP++] ' + name + ': hello');

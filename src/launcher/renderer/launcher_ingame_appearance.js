@@ -5,6 +5,7 @@ const colors = require('../../stats/colors');
 const {closestLegacyChatColor} = require('../../../features/minecraft_chat');
 const {formatBedwarsPrestige,formatSkyWarsLevel} = require('../../stats/format');
 const {appendGeneratorRowToFooter,getBedwarsGeneratorStats} = require('../../session/bedwarsGeneratorSchedule');
+const {buildLobbyBoard,splitRow,normalizeLobbyScoreboardStyle,normalizeLobbyScoreboardDecimals} = require('../../scoreboard/lobbyBoard');
 const palette = {0:'#000000',1:'#0000aa',2:'#00aa00',3:'#00aaaa',4:'#aa0000',5:'#aa00aa',6:'#ffaa00',7:'#aaaaaa',8:'#555555',9:'#5555ff',a:'#55ff55',b:'#55ffff',c:'#ff5555',d:'#ff55ff',e:'#ffff55',f:'#ffffff'};
 const mc = (text, color='f') => `<span style="color:${palette[color] || color}">${text}</span>`;
 const formatted = text => {
@@ -14,6 +15,20 @@ const formatted = text => {
         return part?mc(part,color):'';
     }).join('');
 };
+// Legacy text with bold/strikethrough, as the lobby board uses them.
+const richText = text => {
+    let color='f',bold=false,strike=false;
+    return String(text||'').split(/(§[0-9a-fklmnor])/i).map(part=>{
+        const code=/^§([0-9a-fklmnor])$/i.exec(part)?.[1]?.toLowerCase();
+        if(code){if(/[0-9a-f]/.test(code)){color=code;bold=strike=false;}else if(code==='r'){color='f';bold=strike=false;}else if(code==='l')bold=true;else if(code==='m')strike=true;return '';}
+        if(!part)return '';
+        const safe=part.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+        return `<span style="color:${palette[color]}"${bold||strike?` class="${bold?'ia-mc-bold':''}${strike?' ia-mc-strike':''}"`:''}>${safe}</span>`;
+    }).join('');
+};
+const LOBBY_SAMPLE_TITLE='§e§lBED WARS';
+const LOBBY_SAMPLE=['§711/02/26 §8L12A','','Level: §b312✫','','Progress: §b2.7k§7/§a5k','§8[§b■■■■■§7■■■■■§8]','','Tokens: §2123,456','Slumber Tickets: §b2,669§7/§b100,000','','Total Kills: §a12,345','Total Wins: §a1,234','','§ewww.hypixel.net'];
+const LOBBY_SAMPLE_STATS={finals:5000,deaths:1560,winstreak:7,dailyFinals:60,dailyDeaths:5};
 const statColor = (field, value) => {
     if (field==='finals') return 'b';
     if (field==='wins') return 'a';
@@ -186,8 +201,35 @@ function mount({document}) {
     const teams=[['R','Red','c'],['B','Blue','9'],['G','Green','a'],['Y','Yellow','e'],['A','Aqua','b'],['W','White','f'],['P','Pink','d'],['S','Gray','7']];
     for(const [letter,name,color] of teams){const r=el('div','ia-score-team');r.style.setProperty('--team-color',palette[color]);r.dataset.eliminated=String(['Blue','Green'].includes(name));r.innerHTML=`<span class="ia-team-letter">${letter} </span><span class="ia-team-name">${name}</span><span class="ia-team-alive">: ${mc('✓','a')}</span><span class="ia-team-eliminated">: ${mc('✗','c')}</span>${name==='Pink'?` ${mc('YOU','7')}`:''}`;boardSample.append(r);}
     const footer=el('p');footer.innerHTML=mc('www.hypixel.net','e');boardSample.append(footer);boardScene.append(boardSample);board.append(boardScene);event.append(chat);score.append(board);
-    names.replaceChildren(identity,event,score);
+    // Scoreboard tab: the custom lobby board, previewed through the same layout
+    // the proxy draws, then the existing in-game team color option.
+    const lobby=el('section','ia-preview-setting ia-lobby-setting'),lobbySettings=el('div','ia-lobby-settings');
+    const styleSelect=$('#bedwars-lobby-scoreboard-style'),styleRow=el('div','ia-setting-row'),styleCopy=el('div');
+    styleCopy.append(el('h3','','Colors'));
+    styleRow.append(styleCopy,styleSelect.closest('.stat-select-shell')||styleSelect);
+    const decimalsSelect=$('#bedwars-lobby-scoreboard-decimals'),decimalsRow=el('div','ia-setting-row');
+    const decimalsCopy=el('div');decimalsCopy.append(el('h3','','FKDR decimals'));
+    decimalsRow.append(decimalsCopy,decimalsSelect.closest('.stat-select-shell')||decimalsSelect);
+    lobbySettings.append(row('Custom lobby scoreboard','bedwars-lobby-scoreboard-enabled'),styleRow,decimalsRow,
+        el('p','ia-note','Your FKDR needs a Hypixel API key. How much it changed today also needs an Urchin API key.'));
+    const lobbyPanel=el('div','ia-live-panel'),lobbyScene=el('div','ia-score-scene'),lobbySample=el('div','ia-scoreboard ia-lobby-board');
+    lobbyPanel.append(el('h3','ia-section-title','Live preview'));lobbyScene.append(lobbySample);lobbyPanel.append(lobbyScene);
+    lobby.append(lobbySettings,lobbyPanel);
+    $('.fury-ingame-pane[data-ingame="scoreboard"]')?.replaceChildren(lobby,score);
+    // Last: this detaches the original options card the controls above came from.
+    names.replaceChildren(identity,event);
+    let lobbyPreviewKey='';
+    function updateLobbyPreview(){
+        const enabled=$('#bedwars-lobby-scoreboard-enabled').checked,style=normalizeLobbyScoreboardStyle(styleSelect.value);
+        const decimals=normalizeLobbyScoreboardDecimals(decimalsSelect.value);
+        const key=`${enabled}:${style}:${decimals}`;if(key===lobbyPreviewKey)return;lobbyPreviewKey=key;
+        const board=enabled?buildLobbyBoard({title:LOBBY_SAMPLE_TITLE,lines:LOBBY_SAMPLE,style,decimals,stats:LOBBY_SAMPLE_STATS}):{title:LOBBY_SAMPLE_TITLE,rows:LOBBY_SAMPLE};
+        // Fury rows as the client draws them (prefix + entry + suffix); Hypixel's sample as sent.
+        const rows=enabled?board.rows.map((text,index)=>{const part=splitRow(text,index);return part.prefix+part.entry+part.suffix;}):board.rows;
+        lobbySample.innerHTML=`<strong>${richText(board.title)}</strong>`+rows.map((text,i)=>`<div class="ia-lobby-row"><span>${richText(text)}</span><span class="ia-lobby-number">${rows.length-i}</span></div>`).join('');
+    }
     function update(){
+        updateLobbyPreview();
         const on=$('#accent-bedwars-event-labels-enabled').checked;
         chat.classList.toggle('ia-enhanced',on);caption.classList.toggle('ia-default',!on);caption.querySelector('span').textContent=on?'In-game accent color':'Default colors';
         board.classList.toggle('ia-enhanced',$('#bedwars-sidebar-team-colors-enabled').checked);

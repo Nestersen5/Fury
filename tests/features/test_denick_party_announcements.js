@@ -7,6 +7,7 @@ const { createPartyTracker } = require('../../src/net/session/partyTracking');
 const { getBedwarsScanStats, formatBedwarsScanLine, formatSkywarsScanLine, formatDenickAnnouncement, formatAutoDenickMatch } = require('../../src/stats/scanLine');
 const { stripAnsi, extractText, sendChat } = require('../../features/minecraft_chat');
 const { parseUrchinBatchTags } = require('../../src/stats/urchin');
+const { hasTag, formatTagDescriptor, formatLine, MAX_PC_LENGTH } = require('../../src/overlay/shareTags');
 const { formatSkyWarsLevel } = require('../../src/stats/format');
 const { createOverlayTagBuilder } = require('../../src/overlay/tags');
 const { buildOverlayTagComponents } = require('../../src/overlay/chat_overlay_annotation');
@@ -43,6 +44,7 @@ function harness({ broadcast = true, local = true, mode = 'BEDWARS', lookup } = 
         markDenickAnnounced: name => announced.add(name),
         sendChat: (_, message) => { rawMessages.push(message); messages.push(extractText(message)); },
         getBedwarsScanStats, formatDenickAnnouncement, formatAutoDenickMatch,
+        hasTag, formatTagDescriptor, MAX_PC_LENGTH,
         buildOverlayTags, buildOverlayTagComponents, isUrchinRequestFailed, shortUrchinStatusLabel, urchinStatusMessage,
         getPlayerData: lookup || (async () => ({ data: { player: {} }, fromCache: false })),
         rememberPlayerActiveCosmetics: name => cosmetics.push(name),
@@ -108,8 +110,40 @@ async function run() {
         assert.strictEqual(h.commands.length, 0);
     }
     for (const method of ['skin', 'stats']) {
+        const cases = [
+            [parseUrchinBatchTags([{ type: 'Closet', reason: 'scaffold' }]), 'Closet Cheater (Scaffold)'],
+            [parseUrchinBatchTags([{ type: 'Blatant', reason: 'scaffold, ab, lagrange, blink, velocity, ac' }]), 'Blatant Cheater (Scaffold, Auto Block, Lag Range, Blink, Auto Clicker, Velocity)'],
+            [parseUrchinBatchTags([{ type: 'Blatant', reason: 'scaffold, scaffold, double shifting' }]), 'Blatant Cheater (Scaffold (Doubleshifting))'],
+            [parseUrchinBatchTags([{ type: 'Caution', reason: 'closes games when losing\nTHIS TAG DOES NOT MEAN THE PLAYER IS CHEATING!' }]), 'Caution (closes games when losing)'],
+            [parseUrchinBatchTags([{ type: 'Legit' }]), 'Legit Sniper'],
+            [parseUrchinBatchTags([]), ''],
+            [undefined, ''],
+            [{ ok: false, tag: 'TIMEOUT', rawTags: [] }, ''],
+            [{ ...parseUrchinBatchTags([{ type: 'Closet', reason: 'scaffold' }]), ok: false }, '']
+        ];
+        for (const [urchin, descriptor] of cases) {
+            let lookups = 0;
+            const h = harness({ lookup: async () => { lookups++; return { data: { player, urchin } }; } });
+            await h.context.announceSuccessfulDenick('IcyBiM9', { realName: 'sk8terz', source: method });
+            assert.strictEqual(h.commands.length, 1);
+            const command = h.commands[0].command;
+            assert.strictEqual(command, `/pc [Denick] sk8terz is nicked as IcyBiM9 | 44★ FKDR 2.18 WLR 0.41 WS 3${descriptor ? ` | ${descriptor}` : ''}`, `${method}: tag and cheats in the party line`);
+            assert.strictEqual(lookups, 1, 'reuse the announcement profile without extra requests');
+            assert(!command.includes('Added by') && !command.includes('\n') && !command.includes('§'), 'party text excludes metadata, newlines and color codes');
+            if (descriptor) {
+                const share = formatLine({ name: 'sk8terz', team: 'RED', fkdr: 2.18, uTag: urchin.tag, urchinRaw: urchin }, 'BEDWARS', new Set(['tagged']));
+                assert(share.endsWith(descriptor), 'denick and /share use the same tag/cheat text');
+            }
+            assert.strictEqual(h.commands[0].options.priority, 85);
+            assert.strictEqual(h.commands[0].options.dedupeMs, 5000);
+        }
+        const long = harness({ lookup: async () => ({ data: { player, urchin: parseUrchinBatchTags([{ type: 'Z'.repeat(300), reason: 'scaffold' }]) } }) });
+        await long.context.announceSuccessfulDenick('IcyBiM9', { realName: 'sk8terz', source: method });
+        assert.strictEqual(long.commands[0].command.length, MAX_PC_LENGTH, 'long denick announcements include /pc in the shared chat limit');
+        assert(long.commands[0].command.endsWith('...'));
+
         for (const realName of ['fRiEnD', 'LEADER', 'Self']) {
-            const h = harness();
+            const h = harness({ lookup: async () => ({ data: { player, urchin: parseUrchinBatchTags([{ type: 'Closet', reason: 'scaffold' }]) } }) });
             await h.context.announceSuccessfulDenick('HiddenNick', { realName, source: method });
             assert.strictEqual(h.commands.length, 0, `${method}: party members must not be broadcast`);
             assert(h.messages.some(message => message.includes(realName)), 'local result remains visible');

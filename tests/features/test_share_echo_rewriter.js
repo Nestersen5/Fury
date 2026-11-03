@@ -2,8 +2,8 @@
 
 const assert = require('assert');
 const { createShareEchoRewriter, sliceFormattedByVisible } = require('../../src/overlay/shareEchoRewriter.js');
-const { formatLine, formatLineComponent, buildPreviewEntries } = require('../../src/overlay/shareTags.js');
-const { extractText } = require('../../features/minecraft_chat.js');
+const { formatLine, formatLineComponent, buildPreviewEntries, buildTeamSummaryPreviewEntries, createShareTagsBroadcaster, createSharePreviewPlayer, SEND_INTERVAL_MS, MAX_PC_LENGTH } = require('../../src/overlay/shareTags.js');
+const { extractText, sendChat } = require('../../features/minecraft_chat.js');
 
 // ---- formatLineComponent must reproduce formatLine's exact visible text ----
 
@@ -147,6 +147,138 @@ for (const fancy of [false, true]) {
     assert.ok(/\[NICK\]|NICK/.test(text), 'preview includes a nicked player');
     assert.ok(/Caution/.test(text), 'preview includes a caution tag');
     assert.ok(/KDR: /.test(text), 'preview includes a SkyWars KDR threat');
+}
+
+// Proposed summaries cover each total once, with no names or zero categories.
+const scenarios = buildTeamSummaryPreviewEntries();
+assert.deepStrictEqual(scenarios.map(scenario => scenario.playerCount), [1, 2, 3, 4, 5, 6, 7, 8]);
+for (const scenario of scenarios) {
+    const counts = scenario.entries.map(entry => {
+        assert.strictEqual(extractText(entry.component), entry.line);
+        assert.strictEqual(entry.component.color, 'white', 'summary text is plain white');
+        assert.ok(!entry.component.extra && !/§/.test(entry.component.text), 'no team or category colors');
+        const packets = [];
+        sendChat({ write: (name, data) => packets.push({ name, data }) }, entry.component);
+        assert.strictEqual(packets.length, 1, 'the production chat sender accepts each summary');
+        assert.strictEqual(packets[0].name, 'chat');
+        assert.strictEqual(packets[0].data.position, 0);
+        assert.strictEqual(extractText(JSON.parse(packets[0].data.message)), entry.line);
+        assert.ok(entry.line.length + '/pc '.length <= MAX_PC_LENGTH);
+        assert.ok(!/\b0 (?:cheaters?|nicked)\b/.test(entry.line), 'zero categories stay hidden');
+        assert.ok(!/\bthreats?\b/i.test(entry.line), 'FKDR replaces the threat label');
+        assert.ok(!/\d+\.\d+/.test(entry.line), 'summary FKDRs have no decimal digits');
+        const taggedAndNicked = [...entry.line.matchAll(/\b(\d+) (?:cheaters?|nicked)\b/g)].reduce((sum, match) => sum + Number(match[1]), 0);
+        return taggedAndNicked + [...entry.line.matchAll(/\b\d+ FKDR\b/g)].length;
+    });
+    assert.strictEqual(counts.reduce((sum, count) => sum + count, 0), scenario.playerCount);
+    assert.ok(counts.every(count => count <= 4), 'each team fits four players');
+    assert.deepStrictEqual(buildTeamSummaryPreviewEntries(scenario.playerCount), [scenario]);
+}
+assert.deepStrictEqual(scenarios[7].entries.map(entry => entry.line), [
+    'Red team has 2 cheaters (Scaffold, Auto Block), 1 nicked, 8 FKDR',
+    'Blue team has 2 nicked',
+    'Green team has 7 FKDR, 9 FKDR'
+]);
+assert.strictEqual(scenarios[0].entries[0].line, 'Red team has 1 cheater (Scaffold)');
+assert.strictEqual(scenarios[1].entries[0].line, 'Red team has 2 cheaters (Scaffold, Auto Block)', 'shared cheats are listed once per team');
+assert.ok(scenarios[7].entries.slice(1).every(entry => !/[()]/.test(entry.line)), 'teams without cheaters have no cheat brackets');
+for (const invalid of [0, 9, -1, 1.5, NaN, '8']) assert.deepStrictEqual(buildTeamSummaryPreviewEntries(invalid), []);
+
+// Execute the actual proxy preview branch. Network, API and persistence calls
+// fail the check, and neither real scan data nor sharing settings may change.
+{
+    const fs = require('fs'), vm = require('vm');
+    const source = fs.readFileSync(require.resolve('../../proxy.js'), 'utf8');
+    const branch = source.indexOf("} else if (sub === 'preview' || sub === 'test' || sub === 'demo') {");
+    const start = source.indexOf("                    if (arg2 === 'teams'", branch);
+    const end = source.indexOf("                } else if (sub === 'dest'", start);
+    assert.ok(branch >= 0 && start > branch && end > start);
+    const state = { shareTagsDestination: 'all', shareTagsColorLocal: false,
+        lastScanResults: { results: [{ name: 'RealPlayer', team: 'RED', isNicked: true }] } };
+    const before = JSON.stringify(state);
+    const forbidden = () => assert.fail('local previews must not send commands, fetch data or save');
+    const broadcaster = createShareTagsBroadcaster({ state, sendChat: forbidden,
+        getHypixelClient: forbidden, getLocalUsername: forbidden, saveFeatureConfig: forbidden,
+        sendHypixelCommand: forbidden, fetchMonthlySession: forbidden, fetchPlayerProfile: forbidden });
+    const messages = [];
+    const delivered = [];
+    const timers = new Map();
+    let now = 0, nextTimer = 0;
+    const localSend = message => { messages.push(message); delivered.push({ at: now, text: extractText(message) }); };
+    const sharePreviewPlayer = createSharePreviewPlayer({ sendChat: localSend,
+        setTimeoutImpl: (callback, delay) => { const id = ++nextTimer; timers.set(id, { callback, at: now + delay }); return id; },
+        clearTimeoutImpl: id => timers.delete(id) });
+    const advance = ms => {
+        const target = now + ms;
+        while (timers.size) {
+            const [id, timer] = [...timers].sort((a, b) => a[1].at - b[1].at)[0];
+            if (timer.at > target) break;
+            now = timer.at;
+            timers.delete(id);
+            timer.callback();
+        }
+        now = target;
+    };
+    let rankedDisplay = '§b[MVP§c+§b] §bTester';
+    const handle = vm.runInNewContext(`(function(args) {
+        const sub = args[1].toLowerCase(), arg2 = (args[2] || '').toLowerCase();
+        ${source.slice(start, end)}
+    })`, { shareTagsBroadcaster: broadcaster, sharePreviewPlayer, client: { username: 'Tester' },
+        resolveRankedPlayer: name => { assert.strictEqual(name, 'Tester'); return { display: rankedDisplay }; },
+        sendChat: (_client, message) => localSend(message) });
+    const run = args => { handle(args); advance(20000); };
+    assert.strictEqual(SEND_INTERVAL_MS, 400, 'preview uses the actual Share interval');
+    handle(['/share', 'test', '8']);
+    assert.strictEqual(delivered.filter(message => message.text.startsWith('Party >')).length, 1, 'first summary arrives immediately');
+    advance(399);
+    assert.strictEqual(delivered.filter(message => message.text.startsWith('Party >')).length, 1, 'no early second summary');
+    advance(1);
+    assert.strictEqual(delivered.filter(message => message.text.startsWith('Party >')).length, 2);
+    advance(400);
+    assert.deepStrictEqual(delivered.filter(message => message.text.startsWith('Party >')).map(message => message.at), [0, 400, 800]);
+    assert.strictEqual(timers.size, 0, 'no trailing timer after the last message');
+
+    messages.length = 0;
+    handle(['/share', 'test', '8']);
+    handle(['/share', 'test', '1']);
+    advance(1000);
+    assert.strictEqual(messages.filter(message => typeof message === 'object').length, 2, 'a new preview cancels older pending lines');
+    handle(['/share', 'test', '8']);
+    sharePreviewPlayer.stop();
+    const stoppedLength = messages.length;
+    advance(1000);
+    assert.strictEqual(messages.length, stoppedLength, 'connection cleanup cancels pending preview lines');
+    assert.strictEqual(timers.size, 0);
+    assert.ok(/function clearConnectionTimers\(\)\s*\{\s*sharePreviewPlayer\.stop\(\)/.test(source), 'disconnect and shutdown stop the preview');
+    for (let count = 1; count <= 8; count++) {
+        messages.length = 0;
+        run(['/share', 'test', String(count)]);
+        const lines = messages.filter(message => typeof message === 'object').map(extractText);
+        assert.deepStrictEqual(lines, scenarios[count - 1].entries.map(entry => `Party > [MVP+] Tester: ${entry.line}`));
+        assert.ok(messages.some(message => extractText(message).includes(`${count} flagged player`)));
+    }
+    for (const args of [['/share', 'preview', 'teams'], ['/share', 'test', 'all']]) {
+        messages.length = 0;
+        run(args);
+        assert.strictEqual(messages.filter(message => typeof message === 'object').length, scenarios.reduce((sum, scenario) => sum + scenario.entries.length, 0));
+    }
+    for (const args of [['/share', 'test', '0'], ['/share', 'test', '9'], ['/share', 'test', '2.5'], ['/share', 'test', 'bad'], ['/share', 'test', '8', 'extra'], ['/share', 'preview', 'teams', '9']]) {
+        messages.length = 0;
+        run(args);
+        assert.strictEqual(messages.length, 1);
+        assert.ok(extractText(messages[0]).includes('Usage:'));
+    }
+    messages.length = 0;
+    run(['/share', 'preview']);
+    assert.ok(messages.some(message => extractText(message).includes('Names are clickable')), 'original preview still works');
+    assert.ok(messages.some(message => extractText(message).startsWith('[MVP+] Tester: ')), 'original preview uses the actual ranked name too');
+    for (const display of ['§7Tester', null]) {
+        rankedDisplay = display;
+        messages.length = 0;
+        run(['/share', 'test', '1']);
+        assert.ok(messages.some(message => extractText(message) === 'Party > Tester: Red team has 1 cheater (Scaffold)'), 'unranked and unknown ranks keep the real username');
+    }
+    assert.strictEqual(JSON.stringify(state), before);
 }
 
 console.log('test_share_echo_rewriter: all assertions passed');

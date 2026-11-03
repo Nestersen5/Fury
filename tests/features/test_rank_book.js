@@ -82,15 +82,15 @@ const annotator = createReplayResultAnnotator({
 });
 const item = replayItem(['§72026-09-18 14:50', '§7Duration: 10:00', '§7Server: §amini1A', '§eClick to view replay!']);
 const out = annotator.rewriteClientbound('set_slot', { windowId: 4, slot: 10, item });
-assert.deepStrictEqual(loreOf(out.item).slice(3, 10), [
-    '', '§7Result: §a§lVictory', '', '§7With:', '§8- §a[VIP] Fresh', '§8- §b[MVP] Stale', '§8- §fUnknown'
+assert.deepStrictEqual(loreOf(out.item).slice(3, 11), [
+    '', '§7Result: §a§lVictory', '', '§7With:', '§8- §a[VIP] Fresh', '§8- §fSomeNick', '§8- §b[MVP] Stale', '§8+1 more'
 ]);
 assert.deepStrictEqual(reported, [['Stale', 'Unknown']], 'stale and unknown ranks are looked up, nicks are not');
 
 // Once the lookups land, the redraw hook shows the new rank.
-ranks.Unknown = { realName: 'Unknown', display: '§6[MVP§0++§6] Unknown', stale: false };
+ranks.Stale = { realName: 'Stale', display: '§6[MVP§0++§6] Stale', stale: false };
 annotator.invalidate();
-assert.strictEqual(loreOf(annotator.annotate(item))[9], '§8- §6[MVP§0++§6] Unknown');
+assert.strictEqual(loreOf(annotator.annotate(item))[9], '§8- §6[MVP§0++§6] Stale');
 
 // Setting off: menus pass through untouched.
 enabled = false;

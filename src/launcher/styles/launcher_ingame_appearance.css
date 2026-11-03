@@ -139,6 +139,15 @@ html.fury-redesign .ia-page .nametag-preview-mode {position:absolute!important;i
 .ia-page .ia-score-team[data-eliminated=true] .ia-team-alive {display:none;}
 .ia-page .ia-team-eliminated {display:none;}
 .ia-page .ia-live-panel:not(.ia-enhanced) .ia-score-team[data-eliminated=true] .ia-team-eliminated {display:inline;}
+.ia-page .ia-lobby-settings {align-self:center;min-width:0;}
+.ia-page .ia-lobby-settings >.ia-setting-row+.ia-setting-row {border-top:1px solid var(--fury-border);}
+html.fury-redesign .ia-page .ia-lobby-settings >.ia-setting-row >.stat-select-shell {width:55%;min-width:0;flex:none;}
+.ia-page .ia-lobby-settings >.ia-note {margin:0 22px 20px;}
+.ia-page .ia-lobby-board {padding:10px 14px;}
+.ia-page .ia-lobby-row {display:flex;justify-content:space-between;gap:14px;white-space:pre;min-height:1.55em;}
+.ia-page .ia-lobby-number {color:#ff5555;}
+.ia-page .ia-mc-bold {font-weight:bold;}
+.ia-page .ia-mc-strike {text-decoration:line-through;}
 @container (max-width:800px) {
  html.fury-redesign .ia-page .tablist-editor-layout,html.fury-redesign .ia-page .world-label-designer,.ia-page .ia-preview-setting {grid-template-columns:1fr!important;}
  html.fury-redesign .ia-page .tablist-preview-shell {grid-column:1;grid-row:1;}

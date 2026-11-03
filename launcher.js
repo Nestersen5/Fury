@@ -1256,19 +1256,25 @@ function settingChanges(before, after) {
         ['Party Broadcasts', 'anticheatPartyBroadcastEnabled']
     ]) add(label, before.features?.[key], after.features?.[key]);
     add('Ender Dust reminder threshold', before.features?.enderDustReminderThreshold, after.features?.enderDustReminderThreshold);
+    add('Lobby scoreboard colors', before.features?.bedwarsLobbyScoreboardStyle || 'classic', after.features?.bedwarsLobbyScoreboardStyle || 'classic');
+    add('Lobby scoreboard FKDR decimal digits', before.features?.bedwarsLobbyScoreboardDecimals ?? 4, after.features?.bedwarsLobbyScoreboardDecimals ?? 4);
     addList('Chat triggers', before.chatTriggers?.triggers || [], after.chatTriggers?.triggers || []);
+    add('Lobby spam sensitivity', before.features?.lobbySpamSensitivity || 'balanced', after.features?.lobbySpamSensitivity || 'balanced');
     [
         ['Tab stats', 'tabStatsEnabled'],
         ['Tab resource timers', 'tabResourcesEnabled'],
         ['Tab phase timers', 'tabPhasesEnabled'],
         ['Auto share tags to party', 'shareTagsAuto'],
         ['Fancy share lines', 'shareTagsFancy'],
+        ['Team share summaries', 'shareTagsTeamSummary'],
         ['Recolor own share lines', 'shareTagsColorLocal'],
+        ['Include monthly FKDR in share', 'shareTagsMonthlyFkdr'],
         ['Live share keeps team order', 'shareTagsGroupByTeam'],
         ['Share tagged players', 'shareTagsIncludeTagged'],
         ['Share nicked players', 'shareTagsIncludeNicks'],
         ['Share stat threats', 'shareTagsIncludeThreats'],
         ['Quick Maths', 'quickMathsEnabled'],
+        ['Detect lobby spam', 'lobbySpamEnabled'],
         ['Auto dodge', 'autoDodgeEnabled'],
         ['Dodge tagged players', 'autoDodgeTaggedPlayers'],
         ['Dodge nicked players', 'autoDodgeNickedPlayers'],
@@ -1284,6 +1290,7 @@ function settingChanges(before, after) {
         ['Lobby stats triggers', 'lobbyChatStatsTriggerEnabled'],
         ['BedWars chat event labels', 'accentBedwarsEventLabelsEnabled'],
         ['BedWars scoreboard team colors', 'bedwarsSidebarTeamColorsEnabled'],
+        ['Custom lobby scoreboard', 'bedwarsLobbyScoreboardEnabled'],
         ['Pregame chat stats', 'pregameChatStatsEnabled'],
         ['Queue time messages', 'queueTimeEnabled'],
         ['Queue time to party chat', 'queueTimePartyChatEnabled'],
@@ -1913,6 +1920,19 @@ handleLauncherRequest('profiles:import', async (event) => {
     return { ok: true, profile: imported.profile, profiles: profileState() };
 });
 handleLauncherRequest('session:action', (event, action) => historyMutation(() => runSessionAction(action)));
+handleLauncherRequest('lobby-spam:manage', async (event, request = {}) => {
+    const account = selectedLauncherAccount();
+    if (!account || request.accountKey !== account.key) return { ok: false, error: 'The selected account changed. Try again.' };
+    if (!['list', 'unmute', 'clear'].includes(request.action)) return { ok: false, error: 'Unknown lobby mute action.' };
+    const settings = loadAllSettings();
+    try {
+        const response = await axios.post(`http://127.0.0.1:${settings.server.healthPort}/lobby-spam`,
+            { account, sessionId: request.sessionId, action: request.action, name: request.name }, { timeout: 2000 });
+        return response.data;
+    } catch (error) {
+        return { ok: false, error: error?.response?.data?.error || 'Could not reach your Minecraft connection. Try again.' };
+    }
+});
 handleLauncherRequest('denick:add-manual', (event, entry = {}) => {
     return addManualDenickMapping(entry.nick, entry.realIGN, 'launcher');
 });
@@ -1998,6 +2018,8 @@ handleLauncherRequest('settings:save-features', async (event, settings) => {
     const features = {
         ...before.features,
         nickRoll,
+        lobbySpamEnabled: settings?.features?.lobbySpamEnabled ?? before.features.lobbySpamEnabled,
+        lobbySpamSensitivity: settings?.features?.lobbySpamSensitivity ?? before.features.lobbySpamSensitivity,
         anticheatEnabled: settings?.features?.anticheatEnabled ?? before.features?.anticheatEnabled,
         anticheatScaffoldEnabled: settings?.features?.anticheatScaffoldEnabled ?? before.features?.anticheatScaffoldEnabled,
         anticheatTeamAlertsEnabled: settings?.features?.anticheatTeamAlertsEnabled ?? before.features?.anticheatTeamAlertsEnabled,
@@ -2006,7 +2028,9 @@ handleLauncherRequest('settings:save-features', async (event, settings) => {
         autoScanOnGameStart: true,
         shareTagsAuto: settings?.features?.shareTagsAuto ?? before.features?.shareTagsAuto,
         shareTagsFancy: settings?.features?.shareTagsFancy ?? before.features?.shareTagsFancy,
+        shareTagsTeamSummary: settings?.features?.shareTagsTeamSummary ?? before.features?.shareTagsTeamSummary,
         shareTagsColorLocal: settings?.features?.shareTagsColorLocal ?? before.features?.shareTagsColorLocal,
+        shareTagsMonthlyFkdr: settings?.features?.shareTagsMonthlyFkdr ?? before.features?.shareTagsMonthlyFkdr,
         shareTagsGroupByTeam: settings?.features?.shareTagsGroupByTeam ?? before.features?.shareTagsGroupByTeam,
         shareTagsIncludeTagged: settings?.features?.shareTagsIncludeTagged ?? before.features?.shareTagsIncludeTagged,
         shareTagsIncludeNicks: settings?.features?.shareTagsIncludeNicks ?? before.features?.shareTagsIncludeNicks,
@@ -2041,6 +2065,9 @@ handleLauncherRequest('settings:save-features', async (event, settings) => {
         lobbyChatStatsTriggerEnabled: settings?.features?.lobbyChatStatsTriggerEnabled ?? before.features?.lobbyChatStatsTriggerEnabled,
         accentBedwarsEventLabelsEnabled: settings?.features?.accentBedwarsEventLabelsEnabled ?? before.features?.accentBedwarsEventLabelsEnabled,
         bedwarsSidebarTeamColorsEnabled: settings?.features?.bedwarsSidebarTeamColorsEnabled ?? before.features?.bedwarsSidebarTeamColorsEnabled,
+        bedwarsLobbyScoreboardEnabled: settings?.features?.bedwarsLobbyScoreboardEnabled ?? before.features?.bedwarsLobbyScoreboardEnabled,
+        bedwarsLobbyScoreboardStyle: settings?.features?.bedwarsLobbyScoreboardStyle ?? before.features?.bedwarsLobbyScoreboardStyle,
+        bedwarsLobbyScoreboardDecimals: settings?.features?.bedwarsLobbyScoreboardDecimals ?? before.features?.bedwarsLobbyScoreboardDecimals,
         pregameChatStatsEnabled: settings?.features?.pregameChatStatsEnabled ?? before.features?.pregameChatStatsEnabled,
         queueTimeEnabled: settings?.features?.queueTimeEnabled ?? before.features?.queueTimeEnabled ?? true,
         queueTimePartyChatEnabled: settings?.features?.queueTimePartyChatEnabled ?? before.features?.queueTimePartyChatEnabled ?? false,

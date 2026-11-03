@@ -3,8 +3,8 @@
 // /share broadcaster.
 //
 // Takes the results array produced by performFullScan (cached on
-// state.lastScanResults) and posts one /pc line per eligible player so
-// party teammates see what tags, nicks, and stat threats are around.
+// state.lastScanResults) and posts individual lines or optional BedWars team
+// summaries so party teammates see what tags, nicks and stat threats are around.
 
 const { stripAnsi, extractText, LEGACY_COLOR_NAMES } = require('../../features/minecraft_chat.js');
 const { getFkdrColor, getKdrColor } = require('../stats/colors.js');
@@ -658,14 +658,133 @@ const PREVIEW_ROWS = [
 
 // Returns [{ note, gameMode, line, component }] for every preview scenario,
 // rendered at the requested style (fancy = star level + icons).
-function buildPreviewEntries(fancy = false) {
+function buildPreviewEntries(fancy = false, includeMonthlyFkdr = true) {
     const includeSet = new Set(SHARE_CATEGORIES);
-    return PREVIEW_ROWS.map(({ note, gameMode, row }) => ({
-        note,
-        gameMode,
-        line: formatLine(row, gameMode, includeSet, fancy),
-        component: formatLineComponent(row, gameMode, includeSet, fancy)
-    }));
+    return PREVIEW_ROWS.map(({ note, gameMode, row }) => {
+        const previewRow = includeMonthlyFkdr ? row : { ...row, monthlyFkdr: undefined };
+        return { note, gameMode,
+            line: formatLine(previewRow, gameMode, includeSet, fancy),
+            component: formatLineComponent(previewRow, gameMode, includeSet, fancy) };
+    });
+}
+
+function teamSummaryCategory(row, includeSet) {
+    const tagged = includeSet.has('tagged') && hasTag(row);
+    const category = tagged ? nametagTagCategory(tagLabels(row)[0]) : '';
+    if (tagged && (['blatant_cheater', 'closet_cheater', 'confirmed_cheater'].includes(category)
+        || /\bcheater\b/i.test(tagLabels(row)[0]))) return 'cheaters';
+    if (includeSet.has('nicks') && row.isNicked) return 'nicks';
+    if (tagged) return ({ caution: 'caution', legit_sniper: 'legitSnipers', sniper: 'snipers', blacklisted: 'blacklisted' })[category] || 'tagged';
+    if (includeSet.has('threats') && row.isThreat) return 'fkdrs';
+    return '';
+}
+
+function buildTeamSummaryEntries(rows, includeSet = new Set(SHARE_CATEGORIES), colorLocal = false) {
+    const teams = new Map(), seen = new Set(), entries = [];
+    for (const row of rows) {
+        if (!row || row.lookupFailed) continue;
+        const name = cleanText(row.name).toLowerCase();
+        const category = teamSummaryCategory(row, includeSet);
+        if (!category || (name && seen.has(name))) continue;
+        if (name) seen.add(name);
+        const team = normalizeTeamLabel(row.team);
+        if (!BEDWARS_TEAM_ORDER.includes(team)) {
+            // Without a known team, keep the existing individual message rather
+            // than implying that unrelated players belong to one team.
+            const line = formatLine(row, 'BEDWARS', includeSet);
+            entries.push({ line, component: { text: line, color: 'white' } });
+            continue;
+        }
+        if (!teams.has(team)) teams.set(team, { cheaters: 0, nicks: 0, caution: 0, legitSnipers: 0, snipers: 0, blacklisted: 0, tagged: 0, fkdrs: [], cheats: new Set() });
+        const counts = teams.get(team);
+        if (category === 'fkdrs') counts.fkdrs.push(row.fkdr);
+        else counts[category]++;
+        if (category === 'cheaters') detectedCheats(row).forEach(cheat => counts.cheats.add(cheat));
+    }
+    const fallbacks = entries.splice(0);
+    for (const [team, counts] of teams) {
+        const parts = [];
+        if (counts.nicks) parts.push(`${counts.nicks} nicked`);
+        for (const [key, single, plural] of [['caution', 'caution', 'caution'], ['legitSnipers', 'legit sniper', 'legit snipers'],
+            ['snipers', 'sniper', 'snipers'], ['blacklisted', 'blacklisted', 'blacklisted'], ['tagged', 'tagged', 'tagged']]) {
+            if (counts[key]) parts.push(`${counts[key]} ${counts[key] === 1 ? single : plural}`);
+        }
+        parts.push(...counts.fkdrs.map(fkdr => fkdr !== null && fkdr !== undefined && Number.isFinite(Number(fkdr))
+            ? `${numberText(fkdr, 0)} FKDR`
+            : 'FKDR unavailable'));
+        const cheats = [...counts.cheats];
+        let omitted = 0;
+        const buildEntry = () => {
+            const rest = parts.slice();
+            if (counts.cheaters) {
+                const labels = [...cheats, ...(omitted ? [`+${omitted} more`] : [])];
+                rest.unshift(`${counts.cheaters} ${counts.cheaters === 1 ? 'cheater' : 'cheaters'}${labels.length ? ` (${labels.join(', ')})` : ''}`);
+            }
+            const teamText = `${titleCaseWords(team)} team`, body = ` has ${rest.join(', ')}`;
+            const line = teamText + body;
+            return { line, component: colorLocal
+                ? { text: '', color: 'white', extra: [seg(teamText, teamColorName(team)), seg(body, 'white')] }
+                : { text: line, color: 'white' } };
+        };
+        let entry = buildEntry();
+        while (entry.line.length > MAX_PC_LENGTH - CHAT_PREFIX_LENGTH && cheats.length) {
+            cheats.pop(); omitted++;
+            entry = buildEntry();
+        }
+        entries.push(entry);
+    }
+    return entries.concat(fallbacks);
+}
+
+// Fake fixtures never enter scans or live sharing; previews use the same
+// formatter as actual team summaries.
+const TEAM_SUMMARY_PREVIEW_PLAYERS = [
+    { team: 'RED', kind: 'cheaters', uTag: 'Blatant - scaffold' },
+    { team: 'RED', kind: 'cheaters', uTag: 'Closet - scaffold, autoblock' },
+    { team: 'RED', kind: 'nicks' },
+    { team: 'RED', kind: 'threats', fkdr: 8.4 },
+    { team: 'BLUE', kind: 'nicks' },
+    { team: 'BLUE', kind: 'nicks' },
+    { team: 'GREEN', kind: 'threats', fkdr: 6.5 },
+    { team: 'GREEN', kind: 'threats', fkdr: 9.2 }
+];
+
+function buildTeamSummaryPreviewEntries(playerCount = null, includeSet = new Set(SHARE_CATEGORIES), colorLocal = false) {
+    if (playerCount !== null && (!Number.isInteger(playerCount) || playerCount < 1 || playerCount > 8)) return [];
+    const scenarios = playerCount === null ? [1, 2, 3, 4, 5, 6, 7, 8] : [playerCount];
+    return scenarios.map(count => {
+        return {
+            playerCount: count,
+            entries: buildTeamSummaryEntries(TEAM_SUMMARY_PREVIEW_PLAYERS.slice(0, count).map((player, index) => ({
+                ...player, name: `Preview${index}`, isNicked: player.kind === 'nicks', isThreat: player.kind === 'threats'
+            })), includeSet, colorLocal)
+        };
+    });
+}
+
+// Local preview frames share live /share's message interval, with one owned
+// timer. A new preview replaces the old one; the connection stops it on exit.
+function createSharePreviewPlayer({ sendChat, setTimeoutImpl = setTimeout, clearTimeoutImpl = clearTimeout }) {
+    let pending = [];
+    let timer = null;
+    function stop() {
+        if (timer !== null) clearTimeoutImpl(timer);
+        timer = null;
+        pending = [];
+    }
+    function next() {
+        timer = null;
+        const frame = pending.shift();
+        if (!frame) return;
+        frame.forEach(sendChat);
+        if (pending.length) timer = setTimeoutImpl(next, SEND_INTERVAL_MS);
+    }
+    function play(frames) {
+        stop();
+        pending = frames.slice();
+        next();
+    }
+    return { play, stop };
 }
 
 function createShareTagsBroadcaster(deps) {
@@ -806,11 +925,13 @@ function createShareTagsBroadcaster(deps) {
     }
 
     async function enrichMonthlyFkdr(row, gameMode) {
+        if (state.shareTagsMonthlyFkdr === false) return row?.monthlyFkdr === undefined ? row : { ...row, monthlyFkdr: undefined };
         const realName = denickedRealName(row);
         if (gameMode !== 'BEDWARS' || !row || (row.isNicked && !realName) || Number.isFinite(Number(row.monthlyFkdr))) return row;
         if (typeof fetchMonthlySession !== 'function') return row;
         try {
             const data = await fetchMonthlySession(realName || row.name);
+            if (state.shareTagsMonthlyFkdr === false) return { ...row, monthlyFkdr: undefined };
             const monthlyFkdr = monthlyFkdrFromSessionData(data);
             return Number.isFinite(monthlyFkdr) ? { ...row, monthlyFkdr } : row;
         } catch (e) {
@@ -819,6 +940,10 @@ function createShareTagsBroadcaster(deps) {
     }
 
     async function buildLinesForRows(rows, gameMode, includeSet) {
+        if (state.shareTagsTeamSummary === true && gameMode === 'BEDWARS') {
+            const colorLocal = Boolean(state.shareTagsColorLocal);
+            return buildTeamSummaryEntries(rows, includeSet, colorLocal).map(entry => colorLocal ? entry : { line: entry.line, component: null });
+        }
         const fancy = Boolean(state.shareTagsFancy);
         const colorLocal = Boolean(state.shareTagsColorLocal);
         const denickEnriched = await Promise.all(rows.map(row => enrichDenickedRow(row, gameMode)));
@@ -862,12 +987,14 @@ function createShareTagsBroadcaster(deps) {
     }
 
     // Live streaming sink used during a scan so /share can start sending before
-    // the whole scan finishes. Each team is emitted together when its members
-    // resolve, in completion order (first team ready first).
+    // the whole scan finishes. Each eligible player enters the queue as soon
+    // as their row resolves. Team-summary mode waits for that team's callback,
+    // while other completed teams can send without waiting for the full scan.
     // One serialized queue drains at SEND_INTERVAL_MS with the global line cap,
     // overlapping sends with the remaining lookups. Guards mirror broadcast().
     function createStream(client, opts = {}) {
         const gameMode = opts.gameMode || 'BEDWARS';
+        const teamSummary = state.shareTagsTeamSummary === true && gameMode === 'BEDWARS';
         const includeSet = includeSetFromList(opts.includeSet || opts.include || null, stateIncludeSet());
         const isStillActive = typeof opts.isStillActive === 'function' ? opts.isStillActive : () => true;
         const fancy = Boolean(state.shareTagsFancy);
@@ -884,6 +1011,7 @@ function createShareTagsBroadcaster(deps) {
         const dest = destinationPrefix();
         const queue = [];
         const seen = new Set();
+        const pendingSummaryRows = new Map(), completedSummaryTeams = new Set();
         let totalEligible = 0;
         let sent = 0;
         let ended = false;
@@ -896,11 +1024,36 @@ function createShareTagsBroadcaster(deps) {
         function accept(row) {
             if (!row || !isEligible(row, includeSet)) return;
             const key = String(row.name || '').toLowerCase();
+            if (teamSummary) {
+                if (!completedSummaryTeams.has(normalizeTeamLabel(row.team))) pendingSummaryRows.set(key, row);
+                return;
+            }
             if (seen.has(key)) return;
             seen.add(key);
             totalEligible += 1;
             queue.push(row);
             if (wake) { wake(); wake = null; }
+        }
+
+        function acceptSummaryRows(rows) {
+            const grouped = new Map();
+            for (const row of rows) {
+                if (!isEligible(row, includeSet)) continue;
+                const team = normalizeTeamLabel(row.team), key = String(row.name || '').toLowerCase();
+                if (completedSummaryTeams.has(team) || seen.has(key)) continue;
+                seen.add(key);
+                if (!grouped.has(team)) grouped.set(team, []);
+                grouped.get(team).push(row);
+            }
+            for (const [team, teamRows] of grouped) {
+                const entries = buildTeamSummaryEntries(teamRows, includeSet, colorLocal);
+                if (BEDWARS_TEAM_ORDER.includes(team)) completedSummaryTeams.add(team);
+                entries.forEach(entry => { totalEligible++; queue.push(colorLocal ? entry : { line: entry.line, component: null }); });
+            }
+            for (const [key, row] of pendingSummaryRows) {
+                if (seen.has(key) || completedSummaryTeams.has(normalizeTeamLabel(row.team))) pendingSummaryRows.delete(key);
+            }
+            if (wake && queue.length) { wake(); wake = null; }
         }
 
         (async function pump() {
@@ -913,9 +1066,9 @@ function createShareTagsBroadcaster(deps) {
                 }
                 if (sent >= MAX_LINES_PER_BROADCAST) break;
                 const row = queue.shift();
-                const item = await buildItem(row, gameMode, includeSet, fancy, colorLocal);
+                const item = teamSummary ? row : await buildItem(row, gameMode, includeSet, fancy, colorLocal);
                 if (!isStillActive()) break;
-                const result = await sendOutgoingCommand(hypixelClient, `${dest} ${item.line}`, { priority: 90 });
+                const result = await sendOutgoingCommand(hypixelClient, `${dest} ${item.line}`, { priority: 90, shouldSend: isStillActive });
                 if (!result?.sent) break;
                 sent += 1;
                 if (item.component && typeof registerLocalEcho === 'function') {
@@ -937,13 +1090,26 @@ function createShareTagsBroadcaster(deps) {
         })();
 
         return {
-            onRow() {},
+            onRow: accept,
             onTeam(_teamLabel, rows) {
+                if (teamSummary) {
+                    const team = normalizeTeamLabel(_teamLabel);
+                    const latest = new Map([...pendingSummaryRows].filter(([, row]) => normalizeTeamLabel(row.team) === team));
+                    (rows || []).forEach(row => { if (row) latest.set(String(row.name || '').toLowerCase(), row); });
+                    // The final team callback wins over an earlier individual
+                    // row, including a later failure or eligibility change.
+                    acceptSummaryRows([...latest.values()]);
+                    latest.forEach((_row, key) => pendingSummaryRows.delete(key));
+                    return;
+                }
+                // Retain team callbacks for existing callers; rows already
+                // accepted individually are deduplicated by accept().
                 const eligible = (rows || []).filter(row => isEligible(row, includeSet));
                 eligible.sort((a, b) => (b.sortValue || 0) - (a.sortValue || 0));
                 eligible.forEach(accept);
             },
             end() {
+                if (teamSummary && !ended && isStillActive()) acceptSummaryRows([...pendingSummaryRows.values()]);
                 if (!ended) { ended = true; resolveEnded(); if (wake) { wake(); wake = null; } }
                 return donePromise;
             }
@@ -1012,9 +1178,11 @@ function createShareTagsBroadcaster(deps) {
             return { sent: 0, reason: 'no-hypixel-client' };
         }
 
-        const truncated = rows.length > MAX_LINES_PER_BROADCAST;
-        const rowsToSend = truncated ? rows.slice(0, MAX_LINES_PER_BROADCAST) : rows;
-        const toSend = await buildLinesForRows(rowsToSend, snapshot.gameMode, includeSet);
+        const teamSummary = state.shareTagsTeamSummary === true && snapshot.gameMode === 'BEDWARS';
+        const built = await buildLinesForRows(teamSummary ? rows : rows.slice(0, MAX_LINES_PER_BROADCAST), snapshot.gameMode, includeSet);
+        const totalLines = teamSummary ? built.length : rows.length;
+        const truncated = totalLines > MAX_LINES_PER_BROADCAST;
+        const toSend = built.slice(0, MAX_LINES_PER_BROADCAST);
 
         sendLocal(client, `§b§lShare §8» §7Broadcasting §f${toSend.length}§7 line(s) to party (${describeIncludeSet(includeSet)}).`);
 
@@ -1038,7 +1206,7 @@ function createShareTagsBroadcaster(deps) {
         }
 
         if (truncated) {
-            const remaining = rows.length - MAX_LINES_PER_BROADCAST;
+            const remaining = totalLines - MAX_LINES_PER_BROADCAST;
             await new Promise(resolve => setTimeout(resolve, SEND_INTERVAL_MS));
             await sendOutgoingCommand(hypixelClient, `${destinationPrefix()} +${remaining} more (run /scan locally)`, { priority: 90 });
         }
@@ -1085,6 +1253,16 @@ function createShareTagsBroadcaster(deps) {
         if (typeof saveFeatureConfig === 'function') saveFeatureConfig();
     }
 
+    function setTeamSummary(on) {
+        state.shareTagsTeamSummary = Boolean(on);
+        if (typeof saveFeatureConfig === 'function') saveFeatureConfig();
+    }
+
+    function setMonthlyFkdr(on) {
+        state.shareTagsMonthlyFkdr = Boolean(on);
+        if (typeof saveFeatureConfig === 'function') saveFeatureConfig();
+    }
+
     function setIncludeSet(list) {
         const wanted = includeSetFromList(list, new Set());
         state.shareTagsIncludeTagged = wanted.has('tagged');
@@ -1101,28 +1279,41 @@ function createShareTagsBroadcaster(deps) {
             threats: state.shareTagsIncludeThreats,
             destination: state.shareTagsDestination === 'all' ? 'all' : 'party',
             fancy: Boolean(state.shareTagsFancy),
+            teamSummary: state.shareTagsTeamSummary === true,
             colorLocal: Boolean(state.shareTagsColorLocal),
+            monthlyFkdr: state.shareTagsMonthlyFkdr !== false,
             groupByTeam: true
         };
     }
 
     function getPreview() {
-        return buildPreviewEntries(Boolean(state.shareTagsFancy));
+        if (state.shareTagsTeamSummary === true) return buildTeamSummaryPreviewEntries(8, stateIncludeSet(), Boolean(state.shareTagsColorLocal))[0].entries.map(entry => ({ ...entry, note: 'Team summary', gameMode: 'BEDWARS' }));
+        return buildPreviewEntries(Boolean(state.shareTagsFancy), state.shareTagsMonthlyFkdr !== false);
     }
 
-    return { broadcast, createStream, setAuto, setDestination, setIncludeFlag, setIncludeSet, setColorLocal, setFancy, getPreview, getSettings, normalizeIncludeName };
+    function getTeamSummaryPreview(count = null) {
+        return buildTeamSummaryPreviewEntries(count, new Set(SHARE_CATEGORIES), Boolean(state.shareTagsColorLocal));
+    }
+
+    return { broadcast, createStream, setAuto, setDestination, setIncludeFlag, setIncludeSet, setColorLocal, setFancy, setTeamSummary, setMonthlyFkdr, getPreview, getTeamSummaryPreview, getSettings, normalizeIncludeName };
 }
 
 module.exports = {
     createShareTagsBroadcaster,
+    createSharePreviewPlayer,
     normalizeIncludeName,
     includeSetFromList,
     monthlyFkdrFromSessionData,
     labelForTagText,
     detectedCheats,
+    hasTag,
+    formatTagDescriptor,
     formatLine,
     formatLineComponent,
     buildPreviewEntries,
+    buildTeamSummaryPreviewEntries,
+    buildTeamSummaryEntries,
     shareStatsFromProfile,
-    SEND_INTERVAL_MS
+    SEND_INTERVAL_MS,
+    MAX_PC_LENGTH
 };

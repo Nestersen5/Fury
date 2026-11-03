@@ -27,6 +27,7 @@ const SETTING_LABELS = {
     autoDodgeMinStars: 'Dodge Min Stars',
     shareTagsAuto: 'Auto Share',
     shareTagsFancy: 'Fancy Share',
+    shareTagsTeamSummary: 'Team Share Summaries',
     shareTagsIncludeTagged: 'Share Tagged',
     shareTagsIncludeNicks: 'Share Nicks',
     shareTagsIncludeThreats: 'Share Threats',

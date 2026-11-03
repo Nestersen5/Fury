@@ -7,7 +7,10 @@
 //
 // Design (deliberately minimal on /p list traffic):
 // - Chat lines (join/leave/promote/kick/etc) update the roster instantly and
-//   are the primary source of truth.
+//   are the primary source of truth. Joining a party also lists everyone in
+//   it ("You'll be partying with"), and party chat names a member by real IGN.
+// - The reply to a /p list Fury sends itself is parsed but hidden from the
+//   player; a /p list the player types is shown as usual.
 // - "/p list" is only ever requested:
 //     1. Once, immediately, the first time we detect we're in a party with no
 //        prior roster ("You have joined X's party!") - we have zero member
@@ -24,6 +27,13 @@ const PARTY_LIST_COMMAND_DELAY_MS = 1_000;
 const TICK_INTERVAL_MS = 300;
 const CONNECT_REFRESH_DELAY_MS = 750;
 const RECONNECT_GRACE_MS = 5_000;
+// Hypixel sends a reply's border, header and rows within a few milliseconds.
+// A held border that is not followed by a party list is released after this.
+const HELD_BORDER_MS = 250;
+// "You'll be partying with" follows the join line in the same burst.
+const JOIN_ROSTER_WINDOW_MS = 5_000;
+// A /p list the player typed answers Fury's pending one too.
+const PLAYER_LIST_COMMAND_GRACE_MS = 5_000;
 
 // If the player reconnects within this grace window of their last disconnect,
 // the roster almost certainly hasn't changed - skip the connect-time /p list.
@@ -35,7 +45,7 @@ function isWithinReconnectGrace(lastDisconnectAt) {
 
 const PARTY_JOINED_PATTERN = /^(.+?) joined the party\.$/;
 const PARTY_LEFT_PATTERN = /^(.+?) has left the party\.$/;
-const PARTY_REMOVED_PATTERN = /^(.+?) has been removed from the party\.$/;
+const PARTY_REMOVED_PATTERN = /^(.+?) (?:has been removed from the party|was removed from your party because they disconnected)\.$/;
 const PARTY_TRANSFERRED_PATTERN = /^The party was transferred to (.+?) by (.+?)$/;
 const PARTY_DISBANDED_BY_PLAYER_PATTERN = /^(.+?) has disbanded the party!$/;
 const PARTY_DISCONNECTED_PATTERN = /^(.+?) has disconnected, they have 5 minutes to rejoin before they are removed from the party\.$/;
@@ -50,8 +60,20 @@ const PARTY_LIST_MEMBERS_PATTERN = /^Party Members:\s*(.+)$/;
 const YOU_WERE_KICKED_PATTERN = /^You have been kicked from the party by (.+?)$/;
 const PARTY_LEADER_DISCONNECTED_PATTERN = /^The party leader, (.+?) has disconnected, they have 5 minutes to rejoin before the party is disbanded\.$/;
 const PARTY_LEADER_REJOINED_PATTERN = /^The party leader (.+?) has rejoined\.$/;
-const YOU_JOINED_PARTY_PATTERN = /^You have joined (.+?)'s party!$/;
+// Leaders whose names end in "s" are written "[MVP++] FortuneCks' party!".
+const YOU_JOINED_PARTY_PATTERN = /^You have joined (.+?)'s? party!$/;
 const YOU_LEFT_PARTY_PATTERN = /^You left the party\.$/;
+// Sent right after the join line; lists everyone except the leader and you.
+// Large parties end with "and 21 other players!", so that list is partial.
+const PARTYING_WITH_PATTERN = /^You['’]ll be partying with: (.+)$/;
+const PARTYING_WITH_MORE_PATTERN = /\s+and \d+ other players?!$/;
+// Party chat always shows the sender's real IGN, even while they are nicked.
+const PARTY_CHAT_SENDER_PATTERN = /^Party > (?:\[[^\]]+\] )?([A-Za-z0-9_]{1,16}): /;
+const PARTY_LIST_HEADER_PATTERN = /^Party Members(?: \(\d+\))?$/;
+const CHAT_BORDER_PATTERN = /^-{10,}$/;
+const NOT_IN_PARTY_LINE = 'You are not currently in a party.';
+const PLAYER_PARTY_LIST_COMMAND_PATTERN = /^\/(?:(?:p|party)\s+list|pl)(?:\s|$)/i;
+const VALID_NAME_PATTERN = /^[A-Za-z0-9_]{1,16}$/;
 
 function createPartyTracker(deps) {
     const {
@@ -86,6 +108,11 @@ function createPartyTracker(deps) {
     let pendingModerators = new Set();
     let pendingMembers = new Set();
     let lastPartyListLineTime = 0;
+
+    let joinedPartyAt = 0;
+    let playerListCommandAt = 0;
+    // The reply to a /p list Fury sent itself: read, but not shown to the player.
+    let hiddenReply = null;
 
     function normalizePlayerName(raw) {
         if (raw == null) return '';
@@ -212,6 +239,16 @@ function createPartyTracker(deps) {
         touchUpdate(true);
     }
 
+    function partyListStillNeeded() {
+        // Chat may confirm the roster (or the player may ask themselves)
+        // while Fury's request waits, which makes the request unnecessary.
+        if (hasUsableState() || Date.now() - playerListCommandAt < PLAYER_LIST_COMMAND_GRACE_MS) {
+            awaitingPartyListResponse = false;
+            return false;
+        }
+        return true;
+    }
+
     function requestPartyListRefresh() {
         const now = Date.now();
         if (awaitingPartyListResponse) return;
@@ -225,9 +262,109 @@ function createPartyTracker(deps) {
         // Slight delay before actually sending /p list, so a burst of ambiguous
         // chat events collapses into a single request instead of firing instantly.
         setTimeout(() => {
+            if (!partyListStillNeeded()) return;
             partyListRequestStartTime = Date.now();
-            requestPartyListCommand();
+            requestPartyListCommand({
+                // Runs at the moment the command queue sends it.
+                shouldSend: () => {
+                    if (!partyListStillNeeded()) return false;
+                    beginHiddenReply();
+                    return true;
+                }
+            });
         }, PARTY_LIST_COMMAND_DELAY_MS);
+    }
+
+    function clearHeldBorder() {
+        if (!hiddenReply?.held) return null;
+        const held = hiddenReply.held;
+        clearTimeout(hiddenReply.heldTimer);
+        hiddenReply.held = null;
+        hiddenReply.heldTimer = null;
+        return held;
+    }
+
+    function endHiddenReply() {
+        const held = clearHeldBorder();
+        hiddenReply = null;
+        return held ? [held] : [];
+    }
+
+    function beginHiddenReply() {
+        endHiddenReply().forEach(packet => deps.forwardChat?.(packet));
+        hiddenReply = {
+            until: Date.now() + PARTY_LIST_RESPONSE_TIMEOUT_MS,
+            started: false,
+            held: null,
+            heldTimer: null
+        };
+    }
+
+    function holdBorder(packet) {
+        const reply = hiddenReply;
+        reply.held = packet;
+        reply.heldTimer = setTimeout(() => {
+            if (hiddenReply !== reply || reply.held !== packet) return;
+            reply.held = null;
+            reply.heldTimer = null;
+            deps.forwardChat?.(packet);
+        }, HELD_BORDER_MS);
+    }
+
+    function isPartyListRow(line) {
+        return line === ''
+            || PARTY_LIST_LEADER_PATTERN.test(line)
+            || PARTY_LIST_MODERATORS_PATTERN.test(line)
+            || PARTY_LIST_MEMBERS_PATTERN.test(line);
+    }
+
+    function isHidingChat() {
+        return hiddenReply !== null;
+    }
+
+    // Decides whether a clientbound chat line belongs to the hidden reply.
+    // Returns { forward, release }: `release` holds earlier packets that must
+    // reach the player before this one. Parsing is unaffected either way.
+    function filterClientboundChat(rawText, packet) {
+        if (!hiddenReply) return { forward: true, release: [] };
+        const lines = stripFormatting(String(rawText || '')).split('\n').map(line => line.trim());
+        const allBorders = lines.every(line => CHAT_BORDER_PATTERN.test(line));
+
+        if (!hiddenReply.started) {
+            if (Date.now() > hiddenReply.until) return { forward: true, release: endHiddenReply() };
+            if (allBorders) {
+                // Could open the list or any other bordered message; wait for
+                // the next line to decide.
+                const release = clearHeldBorder();
+                holdBorder(packet);
+                return { forward: false, release: release ? [release] : [] };
+            }
+            const opensReply = lines.some(line => PARTY_LIST_HEADER_PATTERN.test(line) || line === NOT_IN_PARTY_LINE);
+            const onlyReply = lines.every(line => CHAT_BORDER_PATTERN.test(line) || PARTY_LIST_HEADER_PATTERN.test(line)
+                || line === NOT_IN_PARTY_LINE || isPartyListRow(line));
+            if (opensReply && onlyReply) {
+                clearHeldBorder();
+                hiddenReply.started = true;
+                if (lines.length > 1 && CHAT_BORDER_PATTERN.test(lines[lines.length - 1])) endHiddenReply();
+                return { forward: false, release: [] };
+            }
+            const release = clearHeldBorder();
+            return { forward: true, release: release ? [release] : [] };
+        }
+
+        if (allBorders) {
+            endHiddenReply();
+            return { forward: false, release: [] };
+        }
+        if (lines.every(isPartyListRow) && Date.now() <= hiddenReply.until) return { forward: false, release: [] };
+        return { forward: true, release: endHiddenReply() };
+    }
+
+    function observeOwnCommand(message) {
+        if (!PLAYER_PARTY_LIST_COMMAND_PATTERN.test(String(message || '').trim())) return;
+        // The player wants to see this reply; stop hiding and let it through.
+        playerListCommandAt = Date.now();
+        endHiddenReply().forEach(packet => deps.forwardChat?.(packet));
     }
 
     function refreshIfUncertain() {
@@ -264,7 +401,7 @@ function createPartyTracker(deps) {
     }
 
     function handlePartyListLines(stripped) {
-        if (stripped === 'Party Members') {
+        if (PARTY_LIST_HEADER_PATTERN.test(stripped)) {
             parsingPartyList = true;
             awaitingPartyListResponse = true;
             lastPartyListLineTime = Date.now();
@@ -308,7 +445,46 @@ function createPartyTracker(deps) {
 
         if (handlePartyListLines(stripped)) return;
 
-        if (stripped === 'You are not currently in a party.') {
+        // Checked first so a party message quoting a party event cannot be
+        // mistaken for the event itself.
+        const partyChat = stripped.match(PARTY_CHAT_SENDER_PATTERN);
+        if (partyChat) {
+            const sender = partyChat[1];
+            if (!isTrackedName(sender)) {
+                // Only Hypixel prints "Party >" lines, so the sender is a member.
+                // A confirmed "not in a party" is now wrong; refresh the rest.
+                if (!inParty) uncertain = true;
+                inParty = true;
+                initialized = true;
+                addToMembersIfMissing(sender);
+                ensureSelfIncluded();
+                touchUpdate(false);
+            }
+            return;
+        }
+
+        const partyingWith = stripped.match(PARTYING_WITH_PATTERN);
+        if (partyingWith) {
+            const listed = partyingWith[1].trim();
+            const partial = PARTYING_WITH_MORE_PATTERN.test(listed);
+            const names = listed.replace(PARTYING_WITH_MORE_PATTERN, '')
+                .split(',')
+                .map(normalizePlayerName)
+                .filter(name => VALID_NAME_PATTERN.test(name));
+            inParty = true;
+            initialized = true;
+            names.forEach(addToMembersIfMissing);
+            ensureSelfIncluded();
+            // Together with the join line this is the whole party, so the
+            // join's /p list is no longer needed.
+            const confirmsJoin = !partial && Boolean(leaderName) && Date.now() - joinedPartyAt < JOIN_ROSTER_WINDOW_MS;
+            if (confirmsJoin) uncertain = false;
+            joinedPartyAt = 0;
+            touchUpdate(confirmsJoin);
+            return;
+        }
+
+        if (stripped === NOT_IN_PARTY_LINE) {
             clearAndMarkKnownNotInParty();
             return;
         }
@@ -333,6 +509,7 @@ function createPartyTracker(deps) {
                 leaderName = leader;
                 moderators = new Set();
                 members = new Set();
+                joinedPartyAt = Date.now();
                 ensureSelfIncluded();
                 touchUpdate(false);
                 requestPartyListRefresh();
@@ -589,6 +766,10 @@ function createPartyTracker(deps) {
 
     function isTrackedMember(player) {
         refreshIfUncertain();
+        return isTrackedName(player);
+    }
+
+    function isTrackedName(player) {
         const normalized = normalizePlayerName(player);
         if (!normalized) return false;
         const lower = normalized.toLowerCase();
@@ -640,9 +821,37 @@ function createPartyTracker(deps) {
     }
 
     function stop() {
+        clearHeldBorder();
+        hiddenReply = null;
         if (!tickHandle) return;
         clearInterval(tickHandle);
         tickHandle = null;
+    }
+
+    // Kept by the caller for a quick reconnect of the same account, so the
+    // party is not forgotten for a few seconds of disconnection.
+    function exportState() {
+        if (!initialized) return null;
+        return {
+            inParty,
+            leaderName,
+            moderators: Array.from(moderators),
+            members: Array.from(members)
+        };
+    }
+
+    function restoreState(state) {
+        if (!state || initialized) return false;
+        inParty = Boolean(state.inParty);
+        leaderName = state.leaderName || null;
+        moderators = new Set(Array.isArray(state.moderators) ? state.moderators : []);
+        members = new Set(Array.isArray(state.members) ? state.members : []);
+        initialized = true;
+        // Party changes during the disconnect were missed; the first check
+        // that needs certainty refreshes it with a hidden /p list.
+        uncertain = true;
+        touchUpdate(false);
+        return true;
     }
 
     // Called when the underlying connection reaches the Hypixel PLAY state.
@@ -678,7 +887,12 @@ function createPartyTracker(deps) {
         isUncertain,
         isTrackedMember,
         getStatusSnapshot,
-        requestPartyListRefresh
+        requestPartyListRefresh,
+        isHidingChat,
+        filterClientboundChat,
+        observeOwnCommand,
+        exportState,
+        restoreState
     };
 }
 

@@ -77,7 +77,7 @@ require(${JSON.stringify(path.join(REPOSITORY_ROOT, 'src/accounts/connectionAuth
         player.on('chat', data => messages.push(data.message));
         await eventually(async () => { assertRunning(child); assert(positioned); }, 'Connecting the Minecraft client');
         await command('/fury', 'launcher', true);
-        await command('/help overlay', '/tabstats', true);
+        await command('/help overlay 2', '/tabstats', true);
         await command('/help stats 2', '/reminder', true);
         for (const input of ['/denick', '/denick help']) {
             const output = await command(input, 'Ghosts bed effect + matching final kills.', true);

@@ -2,6 +2,8 @@
 const assert = require('assert');
 const { canAutoSaveTeammateNick } = require('../../src/denick/teammateAutoSave');
 const { createPartyTracker } = require('../../src/net/session/partyTracking');
+const { isRosterProfileMismatch } = require('../../src/stats/pregameIdentity');
+const { createStatsLookup } = require('../../src/stats/lookup');
 const valid = {
     enabled: true, singleMatch: { nick: 'NewNick', realName: 'Friend' }, sameContext: true,
     unresolved: [], allRankChecksSucceeded: true, disconnectedMembers: [],
@@ -31,7 +33,8 @@ const source = fs.readFileSync(require.resolve('../../proxy.js'), 'utf8');
 const build = source.slice(source.indexOf('        async function buildPartyDenickReview()'), source.indexOf('        function confirmPartyDenickReview('));
 const undo = source.slice(source.indexOf('        async function handlePartyDenickCommand('), source.indexOf('        const ENDER_DUST_REMINDER_TEST_SCENARIOS'));
 const controller = source.slice(source.indexOf('        function handleDenickControllerCommand('), source.indexOf('        function handleTabStatsCommand('));
-async function exercise({ rankFailure = false, changeParty = false } = {}) {
+const rosterLookup = source.slice(source.indexOf('        async function getStatsProfileForRosterPlayer('), source.indexOf('        function leaveBedwarsPregame('));
+async function exercise({ rankFailure = false, changeParty = false, nameCollision = false } = {}) {
     const messages = [], saved = new Map(), undoEntries = new Map();
     let removed = 0;
     let persisted = 0;
@@ -55,13 +58,27 @@ async function exercise({ rankFailure = false, changeParty = false } = {}) {
         sendPartyDenickReview: () => {}, announceKnownPregameDenickToParty: () => {},
         removeDenickMapping: (_, nick) => { saved.delete(nick); removed++; return { removed: true }; }
     };
+    if (nameCollision) {
+        const helpers = createStatsLookup({ getPlayerData: async () => null, makeUrchinData: () => ({}), makePingData: () => ({}) });
+        const accountUuid = 'a'.repeat(32), tabUuid = 'b'.repeat(32);
+        context.isRosterProfileMismatch = isRosterProfileMismatch;
+        context.makeFallbackPlayerProfile = helpers.makeFallbackPlayerProfile;
+        context.isKnownNickedPlayer = () => false;
+        context.getCachedOrPendingPregameChatProfile = async () => null;
+        context.getPlayerDataWithNickDetection = async () => ({ data: {
+            isNicked: false, player: { uuid: accountUuid, displayname: 'NewNick', achievements: { bedwars_level: 0 } }
+        } });
+        context.lobbyPlayers.set('NewNick', { uuid: tabUuid, inTab: true });
+    }
     vm.createContext(context);
     vm.runInContext(`${build}\n${undo}\n${controller}`, context);
+    if (nameCollision) vm.runInContext(rosterLookup, context);
     await context.buildPartyDenickReview({ automatic: true });
     if (rankFailure || changeParty) {
         assert.strictEqual(saved.size, 0, 'failed checks or changed party cannot save');
         return;
     }
+    assert(saved.has('NewNick'), 'The only unknown nick must be saved even when its name belongs to another account');
     assert.strictEqual(saved.get('NewNick').realName, 'Friend');
     assert(messages[0].extra[0].text.includes('Saved §fNewNick §8→ §fFriend'));
     assert.strictEqual(messages[0].extra[1].clickEvent.value, '/denick party undo 1');
@@ -83,5 +100,6 @@ async function exercise({ rankFailure = false, changeParty = false } = {}) {
     await exercise();
     await exercise({ rankFailure: true });
     await exercise({ changeParty: true });
+    await exercise({ nameCollision: true });
     console.log('Teammate nickname auto-save tests passed.');
 })().catch(error => { console.error(error); process.exitCode = 1; });

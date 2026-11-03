@@ -102,6 +102,7 @@ function createHealthServer(deps) {
                 connectionReady: Boolean(activeUser?.upstreamReady),
                 connectedAccount: activeUser?.name || null,
                 connectedUuid: activeUser?.client?.uuid || activeUser?.uuid || null,
+                lobbySpam: activeUser?.getLobbySpamState?.() || null,
                 cacheSize: globalCache.size,
                 scanMode: state.scanMode,
                 threatConfig: state.threatConfig,
@@ -147,6 +148,20 @@ function createHealthServer(deps) {
                 // only while its Session History page is open.
                 ...sessionReply
             });
+        });
+
+        app.post('/lobby-spam', (req, res) => {
+            const user = getActiveUser();
+            if (!validateSessionAccount(req, res, user)) return;
+            if (!req.body?.account || !user?.manageLobbySpam || !user?.upstreamReady
+                || req.body.sessionId !== user.getLobbySpamState().sessionId) {
+                res.status(409).json({ ok: false, error: 'Your Minecraft connection changed. Refresh the mute list and try again.' });
+                return;
+            }
+            if (!['list', 'unmute', 'clear'].includes(req.body.action)) {
+                res.status(400).json({ ok: false, error: 'Unknown lobby mute action.' }); return;
+            }
+            res.json(user.manageLobbySpam(req.body.action, req.body.name));
         });
 
         app.post('/session/start', async (req, res) => {

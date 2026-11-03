@@ -46,7 +46,7 @@ const games = [
         metadata: { serverId: 'm144AN' } },
     // Result and K/F/B known only from chat events (API delta still pending).
     { at: Date.parse('2026-01-10T15:10:00Z'), durationMs: 600000, result: null, mode: 'BEDWARS',
-        teammates: ['A1', 'B2', 'Me', 'C3', 'D4'],
+        teammates: ['D4', 'C3', 'Me', 'B2', 'A1'],
         events: [
             { type: 'kill', actor: 'me' }, { type: 'kill', actor: 'Me' }, { type: 'kill', actor: 'A1' },
             { type: 'final_kill', actor: 'Me' }, { type: 'bed_break', actor: 'A1' }, { type: 'defeat' }
@@ -146,7 +146,7 @@ assert.deepStrictEqual(loreOf(oldOut.item).slice(4, 9), ['', '§7Result: §a§lV
 
 const ranked = replayItem(['§72026-09-19 08:00', '§7Duration: 10:00', '§7Server: §amini8R', '§7Players: §a16', '§eClick to view replay!']);
 assert.deepStrictEqual(loreOf(annotator.rewriteClientbound('set_slot', { windowId: 5, slot: 15, item: ranked }).item).slice(7, 11), [
-    '§7With:', '§8- §b[MVP§c+§b] Ranked', '§8- §a[VIP] OldReal', '§8- §6[MVP§0++§6] NewReal'
+    '§7With:', '§8- §6[MVP§0++§6] NewReal', '§8- §a[VIP] OldReal', '§8- §b[MVP§c+§b] Ranked'
 ]);
 const bare = replayItem(['§72026-09-19 09:00', '§7Duration: 10:00', '§7Server: §amini8S', '§7Players: §a16', '§eClick to view replay!']);
 assert.deepStrictEqual(loreOf(annotator.rewriteClientbound('set_slot', { windowId: 5, slot: 16, item: bare }).item).slice(7, 10), [
@@ -158,6 +158,43 @@ const broken = createReplayResultAnnotator({ getGames: () => games, resolvePlaye
 assert.deepStrictEqual(loreOf(broken.rewriteClientbound('set_slot', { windowId: 5, slot: 16, item: bare }).item).slice(7, 10), [
     '§7With:', '§8- §fBareNick', '§8- §fMe2'
 ]);
+
+// Both screenshot orders, older roster-only games and mixed-case names use
+// the same alphabetical order on initial packets and rank refreshes.
+{
+    const roster = [
+        { name: 'tortugos', team: 'Red', display: '§b[MVP§0+§b] tortugos' },
+        { name: 'Leaaap', team: 'Red', display: '§a[VIP] Leaaap' },
+        { name: 'Haudraufienix', team: 'Red', display: '§6[MVP§0++§6] Haudraufienix' }
+    ];
+    const expected = ['§7With:', ...[roster[2], roster[1], roster[0]].map(player => `§8- ${player.display}`)];
+    for (const teammates of [
+        ['Leaaap', 'Haudraufienix', 'tortugos'],
+        ['Leaaap', 'tortugos', 'Haudraufienix'],
+        []
+    ]) {
+        const recordedOrder = teammates.slice();
+        const record = { ...games[0], teammates, roster, metadata: { ...games[0].metadata, team: 'Red' } };
+        const renderer = createReplayResultAnnotator({ getGames: () => [record], getSelfName: () => 'Me' });
+        const item = replayItem(LORE);
+        const listOf = item => {
+            const lore = loreOf(item);
+            const start = lore.indexOf('§7With:');
+            return lore.slice(start, start + 4);
+        };
+        assert.deepStrictEqual(listOf(renderer.rewriteClientbound('window_items', { windowId: 3, items: [item] }).items[0]), expected);
+        assert.deepStrictEqual(listOf(renderer.rewriteClientbound('set_slot', { windowId: 3, slot: 0, item }).item), expected);
+        renderer.invalidate();
+        assert.deepStrictEqual(listOf(renderer.annotate(item)), expected);
+        assert.deepStrictEqual(record.teammates, recordedOrder, 'sorting leaves saved teammate order untouched');
+    }
+    const renderer = createReplayResultAnnotator({
+        getGames: () => [{ ...games[0], teammates: ['Zebra', 'alpha', 'Bravo'] }]
+    });
+    const lore = loreOf(renderer.annotate(replayItem(LORE)));
+    const start = lore.indexOf('§7With:');
+    assert.deepStrictEqual(lore.slice(start, start + 4), ['§7With:', '§8- §falpha', '§8- §fBravo', '§8- §fZebra']);
+}
 
 const duel = replayItem(['§72026-02-01 07:00', '§7Duration: 05:00', '§7Server: §amini3C', '§eClick to view replay!']);
 const duelOut = annotator.rewriteClientbound('set_slot', { windowId: 5, slot: 12, item: duel });

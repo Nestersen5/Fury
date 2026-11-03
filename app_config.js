@@ -1,6 +1,12 @@
 const fs = require('fs');
 const { dataPath } = require('./src/storage/runtimePaths.js');
 const {
+    DEFAULT_LOBBY_SCOREBOARD_STYLE,
+    DEFAULT_LOBBY_SCOREBOARD_DECIMALS,
+    normalizeLobbyScoreboardStyle,
+    normalizeLobbyScoreboardDecimals
+} = require('./src/scoreboard/lobbyBoard.js');
+const {
     NAMETAG_STAT_TYPES,
     normalizeNametagStat: normalizeNametagStatType,
     normalizeNametagFallback,
@@ -121,6 +127,8 @@ const defaults = {
     keyMeta: { hypixelUpdatedAt: '', hypixelSavedAt: 0, hypixelSnoozedUntil: 0 },
     scan: { scanMode: 'threats', minFkdr: 2, minStars: 400, minSkywarsKdr: 1, minSkywarsWlr: 0.4, minSkywarsLevel: 15, countTags: true },
     features: {
+        ...require('./src/chat/lobbySpamSettings').normalizeLobbySpamSettings(),
+        dailyReward: require('./src/rewards/settings').normalizeSettings(),
         ...normalizeUrchinRequestSettings(),
         ...normalizeHypixelRequestSettings(),
         chatPrefixAccentHex: DEFAULT_CHAT_PREFIX_ACCENT_HEX,
@@ -133,6 +141,9 @@ const defaults = {
         anticheatPartyBroadcastEnabled: true,
         accentBedwarsEventLabelsEnabled: true,
         bedwarsSidebarTeamColorsEnabled: true,
+        bedwarsLobbyScoreboardEnabled: true,
+        bedwarsLobbyScoreboardStyle: DEFAULT_LOBBY_SCOREBOARD_STYLE,
+        bedwarsLobbyScoreboardDecimals: DEFAULT_LOBBY_SCOREBOARD_DECIMALS,
         tabStatsEnabled: true,
         autoScanOnGameStart: true,
         autoGamblerEnabled: false,
@@ -196,7 +207,9 @@ const defaults = {
         sessionGoalGames: 2,
         shareTagsAuto: true,
         shareTagsFancy: false,
+        shareTagsTeamSummary: true,
         shareTagsColorLocal: true,
+        shareTagsMonthlyFkdr: true,
         shareTagsIncludeTagged: true,
         shareTagsIncludeNicks: true,
         shareTagsIncludeThreats: false,
@@ -403,6 +416,8 @@ function loadFeatureSettings() {
         autoSaveSharedNicknamesEnabled: true
     };
     delete features.nametagSourcePriority;
+    Object.assign(features, require('./src/chat/lobbySpamSettings').normalizeLobbySpamSettings(features));
+    features.dailyReward = require('./src/rewards/settings').normalizeSettings(features.dailyReward);
     // Overlay additions follow launcher visibility; ignore retired switches.
     delete features.socialOverlayAddsEnabled;
     delete features.overlayMentionAddsEnabled;
@@ -418,6 +433,10 @@ function loadFeatureSettings() {
     if (savedFeatures.bedwarsSidebarTeamColorsEnabled === undefined) {
         features.bedwarsSidebarTeamColorsEnabled = Boolean(features.accentBedwarsEventLabelsEnabled);
     }
+    features.bedwarsLobbyScoreboardEnabled = features.bedwarsLobbyScoreboardEnabled === true;
+    features.shareTagsTeamSummary = features.shareTagsTeamSummary === true;
+    features.bedwarsLobbyScoreboardStyle = normalizeLobbyScoreboardStyle(features.bedwarsLobbyScoreboardStyle);
+    features.bedwarsLobbyScoreboardDecimals = normalizeLobbyScoreboardDecimals(features.bedwarsLobbyScoreboardDecimals);
     features.autoDodgeLeaveMode = features.autoDodgeLeaveMode === 'instant' ? 'instant' : 'before_start';
     features.autoDodgeDelaySeconds = normalizeDodgeDelaySeconds(
         features.autoDodgeDelaySeconds,
@@ -479,9 +498,11 @@ function saveFeatureSettings(features) {
             ? Boolean(current.bedwarsSidebarTeamColorsEnabled)
             : Boolean(next.accentBedwarsEventLabelsEnabled);
     writeJson(paths.features, {
+        ...require('./src/chat/lobbySpamSettings').normalizeLobbySpamSettings(next),
         ...normalizeUrchinRequestSettings(next),
         ...normalizeHypixelRequestSettings(next),
         nickRoll: require('./src/nick/settings').normalizeSettings(next.nickRoll),
+        dailyReward: require('./src/rewards/settings').normalizeSettings(next.dailyReward),
         chatPrefixAccentHex: normalizeChatPrefixAccentHex(
             next.chatPrefixAccentHex,
             defaults.features.chatPrefixAccentHex
@@ -490,6 +511,9 @@ function saveFeatureSettings(features) {
             ? Boolean(next.accentBedwarsEventLabelsEnabled)
             : defaults.features.accentBedwarsEventLabelsEnabled,
         bedwarsSidebarTeamColorsEnabled,
+        bedwarsLobbyScoreboardEnabled: next.bedwarsLobbyScoreboardEnabled === true,
+        bedwarsLobbyScoreboardStyle: normalizeLobbyScoreboardStyle(next.bedwarsLobbyScoreboardStyle),
+        bedwarsLobbyScoreboardDecimals: normalizeLobbyScoreboardDecimals(next.bedwarsLobbyScoreboardDecimals),
         anticheatEnabled: next.anticheatEnabled !== undefined ? Boolean(next.anticheatEnabled) : defaults.features.anticheatEnabled,
         anticheatScaffoldEnabled: next.anticheatScaffoldEnabled !== undefined ? Boolean(next.anticheatScaffoldEnabled) : defaults.features.anticheatScaffoldEnabled,
         anticheatAutoblockEnabled: false, // Fixed; ignore legacy saved toggles.
@@ -629,9 +653,13 @@ function saveFeatureSettings(features) {
         shareTagsFancy: next.shareTagsFancy !== undefined
             ? Boolean(next.shareTagsFancy)
             : defaults.features.shareTagsFancy,
+        shareTagsTeamSummary: next.shareTagsTeamSummary === true,
         shareTagsColorLocal: next.shareTagsColorLocal !== undefined
             ? Boolean(next.shareTagsColorLocal)
             : defaults.features.shareTagsColorLocal,
+        shareTagsMonthlyFkdr: next.shareTagsMonthlyFkdr !== undefined
+            ? Boolean(next.shareTagsMonthlyFkdr)
+            : defaults.features.shareTagsMonthlyFkdr,
         shareTagsIncludeTagged: next.shareTagsIncludeTagged !== undefined
             ? Boolean(next.shareTagsIncludeTagged)
             : defaults.features.shareTagsIncludeTagged,

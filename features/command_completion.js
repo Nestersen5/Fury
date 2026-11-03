@@ -2,18 +2,20 @@
 
 const { NAMETAG_STAT_TYPES } = require('../src/overlay/nametags.js');
 const { SCAFFOLD_CLIP_SUGGESTIONS } = require('../src/recorder/scaffoldClipLabels.js');
+const { LOBBY_SCOREBOARD_STYLES } = require('../src/scoreboard/lobbyBoard.js');
 const { FURY_HELP_TOPICS } = require('./fury_menu.js');
 const { HELP_CATEGORIES, HELP_SECTIONS, HELP_PAGE_SIZE } = require('./help_command.js');
 
 const PROXY_COMMANDS = [
     '/quickbuy', '/qb', '/hotbar', '/hb', '/quickbuyandhotbar', '/qbahb',
-    '/stats', '/s', '/daily', '/weekly', '/monthly', '/yearly', '/reminder', '/reminders',
+    '/stats', '/s', '/daily', '/weekly', '/monthly', '/yearly', '/reminder', '/reminders', '/dailyreward',
     '/session', '/ses', '/recap', '/clip', '/recordcheat', '/rc',
     '/profile', '/profiles', '/preset', '/presets',
     '/info', '/general', '/ping', '/urchin', '/urchinrate', '/hypixelrate', '/sw', '/duels',
-    '/scan', '/share', '/anticheat', '/scafdetect', '/scaffolddetect',
+    '/scan', '/share', '/wdr', '/anticheat', '/scafdetect', '/scaffolddetect',
     '/ol', '/chattrigger', '/chattriggers', '/ctriggers',
     '/chatstats', '/lobbychatstats', '/lf',
+    '/lobbyspam',
     '/autododge', '/dodge', '/cancel', '/c', '/autododgetest',
     '/partycheck',
     '/scanmode', '/scanconfig', '/overlay',
@@ -395,11 +397,22 @@ function createProxyTabCompleter(options = {}) {
         const hiddenProxyCommand = HIDDEN_PROXY_COMMANDS.includes(cmd);
         if (!visibleProxyCommand && !hiddenProxyCommand) return null;
 
+        if (cmd === '/wdr') {
+            if (args.length !== 2) return [];
+            return uniqueTabMatches([...completeFromList(['help', 'status', 'cancel'], args[1] || ''), ...completePlayers(args[1] || '')]);
+        }
+
         if (cmd === '/activecosmetics') return args.length === 2 ? completePlayers(args[1] || '') : [];
         if (cmd === '/hotkeydebug') {
             return args.length === 2
                 ? completeFromList(['on', 'off', 'status', 'enable', 'disable'], args[1] || '')
                 : [];
+        }
+        if (cmd === '/dailyreward') {
+            if (args.length === 2) return completeFromList(['status', 'open', 'on', 'off', 'others', 'mode'], args[1] || '');
+            if (args.length === 3 && args[1] === 'others') return completeFromList(['on', 'off'], args[2] || '');
+            if (args.length === 3 && args[1] === 'mode') return completeFromList(['manual', 'auto'], args[2] || '');
+            return [];
         }
         if (cmd === '/nickroll') {
             return args.length === 2 ? completeFromList(['start', 'stop', 'status', 'words'], args[1] || '') : [];
@@ -467,10 +480,13 @@ function createProxyTabCompleter(options = {}) {
             if (sub === 'set') {
                 const setting = String(args[2] || '').toLowerCase().replace(/[_-]+/g, '');
                 if (args.length === 3) {
-                    return completeFromList(['eventlabels', 'teamcolors', 'boundary', 'retention', 'recapstyle', 'goal'], args[2] || '');
+                    return completeFromList(['eventlabels', 'teamcolors', 'lobbyboard', 'lobbystyle', 'boundary', 'retention', 'recapstyle', 'goal'], args[2] || '');
                 }
-                if (['eventlabels', 'teamcolors', 'socialadds'].includes(setting) && args.length === 4) {
+                if (['eventlabels', 'teamcolors', 'socialadds', 'lobbyboard'].includes(setting) && args.length === 4) {
                     return completeFromList(['on', 'off'], args[3] || '');
+                }
+                if (setting === 'lobbystyle' && args.length === 4) {
+                    return completeFromList(LOBBY_SCOREBOARD_STYLES.map(style => style.id), args[3] || '');
                 }
                 if (setting === 'boundary' && args.length === 4) return completeFromList(['30', '60', '180', '360'], args[3] || '');
                 if (setting === 'retention' && args.length === 4) return completeFromList(['0', '50', '100', '250', '1000'], args[3] || '');
@@ -604,6 +620,10 @@ function createProxyTabCompleter(options = {}) {
             const chosen = args.slice(1, -1).map(value => String(value || '').toLowerCase());
             return completeFromList(lfModes.filter(mode => !chosen.includes(mode)), args[args.length - 1] || '');
         }
+        if (cmd === '/lobbyspam') {
+            if (args.length === 2) return completeFromList(['mute', 'unmute', 'list', 'clear'], args[1] || '');
+            return [];
+        }
         if (cmd === '/chatstats' || cmd === '/lobbychatstats') {
             const sub = (args[1] || '').toLowerCase();
             if (args.length === 2) return completeFromList(['on', 'off', 'status', 'source', 'only', 'all', 'mention', 'dm', 'trigger'], args[1] || '');
@@ -707,9 +727,15 @@ function createProxyTabCompleter(options = {}) {
             return [];
         }
         if (cmd === '/share' || cmd === '/sharetags' || cmd === '/st') {
-            if (args.length === 2) return completeFromList(['tag', 'tags', 'threat', 'threats', 'nick', 'nicks', 'all', 'auto', 'include', 'dest', 'style', 'color', 'preview', 'status', 'info'], args[1] || '');
+            if (args.length === 2) return completeFromList(['tag', 'tags', 'threat', 'threats', 'nick', 'nicks', 'all', 'auto', 'include', 'dest', 'style', 'color', 'monthly', 'summary', 'preview', 'test', 'status', 'info'], args[1] || '');
             const sub = (args[1] || '').toLowerCase();
+            if (['preview', 'test', 'demo'].includes(sub)) {
+                if (args.length === 3) return completeFromList(sub === 'test' ? ['1', '2', '3', '4', '5', '6', '7', '8', 'all', 'teams'] : ['teams'], args[2] || '');
+                if (args.length === 4 && args[2].toLowerCase() === 'teams') return completeFromList(['1', '2', '3', '4', '5', '6', '7', '8', 'all'], args[3] || '');
+            }
             if (sub === 'auto' && args.length === 3) return completeFromList(['on', 'off'], args[2] || '');
+            if (sub === 'monthly' && args.length === 3) return completeFromList(['on', 'off'], args[2] || '');
+            if (sub === 'summary' && args.length === 3) return completeFromList(['on', 'off'], args[2] || '');
             if ((sub === 'color' || sub === 'colour') && args.length === 3) return completeFromList(['on', 'off'], args[2] || '');
             if ((sub === 'dest' || sub === 'destination') && args.length === 3) return completeFromList(['party', 'all'], args[2] || '');
             if ((sub === 'style' || sub === 'format') && args.length === 3) return completeFromList(['compact', 'detailed'], args[2] || '');

@@ -9,7 +9,7 @@ const { BoundedTtlMap } = require('./src/util/bounded_ttl_map.js');
 const { FastQueue } = require('./src/util/fast_queue.js');
 const { InFlightDeduper } = require('./src/util/in_flight_deduper.js');
 const { JsonFileCache } = require('./src/storage/json_file_cache.js');
-const { createPregameIdentityLookup, shouldHidePregamePartyMember } = require('./src/stats/pregameIdentity');
+const { createPregameIdentityLookup, shouldHidePregamePartyMember, isRosterProfileMismatch } = require('./src/stats/pregameIdentity');
 const {
     isLobbyChatAnnotationEligible,
     classifySocialOverlayText,
@@ -164,6 +164,17 @@ const { classifyPartyOverview } = require('./src/party/overview.js');
 const { createEntityTracker } = require('./src/net/session/entityTracking.js');
 const { createDenickTracker } = require('./src/net/session/denickTracking.js');
 const { createScoreboardState } = require('./src/net/session/scoreboard.js');
+const { createLobbySidebar } = require('./src/scoreboard/lobbySidebar');
+const {
+    buildBedwarsSidebar,
+    normalizeLobbyScoreboardStyle,
+    normalizeLobbyScoreboardDecimals,
+    readOwnBedwarsStats,
+    readDailyBedwarsDelta,
+    LOBBY_SCOREBOARD_STYLES,
+    DEFAULT_LOBBY_SCOREBOARD_STYLE,
+    DEFAULT_LOBBY_SCOREBOARD_DECIMALS
+} = require('./src/scoreboard/lobbyBoard');
 const { DEFAULT_COMMAND_GAP_MS, createHypixelCommandQueue } = require('./src/net/hypixelCommandQueue.js');
 const { state } = require('./src/state/runtimeState.js');
 const { installApiKillSwitch } = require('./src/net/apiKillSwitch.js');
@@ -277,6 +288,7 @@ const configLoader = createConfigLoader({
 
 let activeUser = null; // Define this here at the top!
 let lastPartyDisconnectAt = 0; // survives across reconnects, unlike the per-connection partyTracker
+let lastPartySnapshot = null; // { uuid, state } of the last connection's party, for quick reconnects
 let applyLiveFeatureSettings = null;
 let lastMatchSnapshot = null;
 // /anticheat (alias /scafdetect) and the launcher share saved controls.
@@ -526,6 +538,10 @@ let lobbyChatStatsDmEnabled = true;
 let lobbyChatStatsTriggerEnabled = true;
 let accentBedwarsEventLabelsEnabled = true;
 let bedwarsSidebarTeamColorsEnabled = true;
+// Custom Bed Wars lobby sidebar; enabled by default unless saved otherwise.
+let bedwarsLobbyScoreboardEnabled = true;
+let bedwarsLobbyScoreboardStyle = DEFAULT_LOBBY_SCOREBOARD_STYLE;
+let bedwarsLobbyScoreboardDecimals = DEFAULT_LOBBY_SCOREBOARD_DECIMALS;
 // Heartbeat from the launcher: auto-adds only run while an overlay view (the
 // launcher's overlay tab or the floating overlay window) is actually on screen.
 // The launcher refreshes this on every /health poll; if polls stop (launcher
@@ -920,6 +936,9 @@ function loadFeatureConfig(options = {}) {
     lobbyChatStatsTriggerEnabled = features.lobbyChatStatsTriggerEnabled;
     accentBedwarsEventLabelsEnabled = features.accentBedwarsEventLabelsEnabled;
     bedwarsSidebarTeamColorsEnabled = features.bedwarsSidebarTeamColorsEnabled;
+    bedwarsLobbyScoreboardEnabled = features.bedwarsLobbyScoreboardEnabled === true;
+    bedwarsLobbyScoreboardStyle = normalizeLobbyScoreboardStyle(features.bedwarsLobbyScoreboardStyle);
+    bedwarsLobbyScoreboardDecimals = normalizeLobbyScoreboardDecimals(features.bedwarsLobbyScoreboardDecimals);
     pregameChatStatsEnabled = features.pregameChatStatsEnabled;
     queueTimeEnabled = features.queueTimeEnabled;
     queueTimePartyChatEnabled = features.queueTimePartyChatEnabled;
@@ -947,6 +966,9 @@ function loadFeatureConfig(options = {}) {
     nametagStarBracketsEnabled = features.nametagStarBracketsEnabled !== false;
     nametagTagDisplayMode = normalizeNametagTagDisplayMode(features.nametagTagDisplayMode, 'acronyms');
     state.apiKillSwitchEnabled = features.apiKillSwitchEnabled;
+    state.dailyReward = features.dailyReward;
+    state.lobbySpamEnabled = features.lobbySpamEnabled;
+    state.lobbySpamSensitivity = features.lobbySpamSensitivity;
     proxyHealthWarningsEnabled = features.proxyHealthWarningsEnabled;
     state.denickRealIgnNametags = features.denickRealIgnNametags;
     state.denickRealSkin = features.denickRealSkin;
@@ -973,7 +995,9 @@ function loadFeatureConfig(options = {}) {
     state.sessionGoalMinutes = features.sessionGoalMinutes;
     state.shareTagsAuto = features.shareTagsAuto;
     state.shareTagsFancy = features.shareTagsFancy;
+    state.shareTagsTeamSummary = features.shareTagsTeamSummary;
     state.shareTagsColorLocal = features.shareTagsColorLocal;
+    state.shareTagsMonthlyFkdr = features.shareTagsMonthlyFkdr;
     state.shareTagsIncludeTagged = features.shareTagsIncludeTagged;
     state.shareTagsIncludeNicks = features.shareTagsIncludeNicks;
     state.shareTagsIncludeThreats = features.shareTagsIncludeThreats;
@@ -1008,6 +1032,8 @@ function loadFeatureConfig(options = {}) {
 
 function currentFeatureConfigSnapshot() {
     return {
+        lobbySpamEnabled: state.lobbySpamEnabled,
+        lobbySpamSensitivity: state.lobbySpamSensitivity,
         ...getUrchinRequestSettings(),
         ...getHypixelRequestSettings(),
         chatPrefixAccentHex: getChatPrefixAccent()?.sourceHex || '#e5b35d',
@@ -1035,6 +1061,9 @@ function currentFeatureConfigSnapshot() {
         lobbyChatStatsTriggerEnabled,
         accentBedwarsEventLabelsEnabled,
         bedwarsSidebarTeamColorsEnabled,
+        bedwarsLobbyScoreboardEnabled,
+        bedwarsLobbyScoreboardStyle,
+        bedwarsLobbyScoreboardDecimals,
         pregameChatStatsEnabled,
         queueTimeEnabled,
         queueTimePartyChatEnabled,
@@ -1087,7 +1116,9 @@ function currentFeatureConfigSnapshot() {
         sessionGoalMinutes: state.sessionGoalMinutes,
         shareTagsAuto: state.shareTagsAuto,
         shareTagsFancy: state.shareTagsFancy,
+        shareTagsTeamSummary: state.shareTagsTeamSummary,
         shareTagsColorLocal: state.shareTagsColorLocal,
+        shareTagsMonthlyFkdr: state.shareTagsMonthlyFkdr,
         shareTagsIncludeTagged: state.shareTagsIncludeTagged,
         shareTagsIncludeNicks: state.shareTagsIncludeNicks,
         shareTagsIncludeThreats: state.shareTagsIncludeThreats,
@@ -1137,6 +1168,7 @@ const handleApiKillSwitchCommand = createApiKillSwitchCommandHandler({
     getEnabled: () => state.apiKillSwitchEnabled,
     setEnabled: (enabled) => {
         state.apiKillSwitchEnabled = Boolean(enabled);
+        activeUser?.syncDailyRewards?.();
         activeUser?.refreshPartyCoordination?.();
         saveFeatureConfig();
     }
@@ -1503,6 +1535,8 @@ const healthServer = createHealthServer({
     appendDenickHistory,
     flushDenickHistory: denickHistory.flush,
     getFeatures: () => ({
+        lobbySpamEnabled: state.lobbySpamEnabled,
+        lobbySpamSensitivity: state.lobbySpamSensitivity,
         chatPrefixAccentHex: getChatPrefixAccent()?.sourceHex || '#e5b35d',
         tabStatsEnabled,
         autoScanOnGameStart,
@@ -1535,6 +1569,9 @@ const healthServer = createHealthServer({
         lobbyChatStatsTriggerEnabled,
         accentBedwarsEventLabelsEnabled,
         bedwarsSidebarTeamColorsEnabled,
+        bedwarsLobbyScoreboardEnabled,
+        bedwarsLobbyScoreboardStyle,
+        bedwarsLobbyScoreboardDecimals,
         pregameChatStatsEnabled,
         queueTimeEnabled,
         queueTimePartyChatEnabled,
@@ -1558,7 +1595,9 @@ const healthServer = createHealthServer({
         replayDetailsEnabled: state.replayDetailsEnabled,
         shareTagsAuto: state.shareTagsAuto,
         shareTagsFancy: state.shareTagsFancy,
+        shareTagsTeamSummary: state.shareTagsTeamSummary,
         shareTagsColorLocal: state.shareTagsColorLocal,
+        shareTagsMonthlyFkdr: state.shareTagsMonthlyFkdr,
         shareTagsIncludeTagged: state.shareTagsIncludeTagged,
         shareTagsIncludeNicks: state.shareTagsIncludeNicks,
         shareTagsIncludeThreats: state.shareTagsIncludeThreats,
@@ -1618,6 +1657,9 @@ const healthServer = createHealthServer({
         nametagOthersSuffixFallback,
         accentBedwarsEventLabelsEnabled,
         bedwarsSidebarTeamColorsEnabled,
+        bedwarsLobbyScoreboardEnabled,
+        bedwarsLobbyScoreboardStyle,
+        bedwarsLobbyScoreboardDecimals,
         sessionTrackingEnabled: state.sessionTrackingEnabled,
         sessionBoundaryMinutes: state.sessionBoundaryMinutes,
         sessionRetention: state.sessionRetention,
@@ -1976,6 +2018,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         resetUrchinOutageWarning();
 
         let lobbyPlayers = new Map();
+        const sharePreviewPlayer = createSharePreviewPlayer({ sendChat: message => sendChat(client, message) });
         const scoreboardState = createScoreboardState();
         const {
             scoreboardTeamRegistry,
@@ -2403,12 +2446,24 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 chatController.text(' ', panel.colors.quiet),
                 ...panel.pick('All', settings.destination === 'all', '/share dest all', 'Send broadcasts via /all (lobby chat).')
             ]);
+            panel.section('Sharing method');
             panel.row([
-                panel.label('Line style'),
-                ...panel.pick('Compact', !settings.fancy, '/share style compact', 'Use compact, plain-text-friendly lines.'),
+                ...panel.pick('Individual players', !settings.teamSummary, '/share summary off', 'Send a message for each included player.'),
                 chatController.text(' ', panel.colors.quiet),
-                ...panel.pick('Detailed', settings.fancy, '/share style detailed', 'Include star levels, icons, and separators in your local rendering.')
+                ...panel.pick('Team summaries', settings.teamSummary, '/share summary on', 'Send one message per BedWars team when its scan finishes.')
             ]);
+            if (!settings.teamSummary) {
+                panel.section('Individual players');
+                panel.row([
+                    panel.label('Player style'),
+                    ...panel.pick('Compact', !settings.fancy, '/share style compact', 'Use compact, plain-text-friendly lines.'),
+                    chatController.text(' ', panel.colors.quiet),
+                    ...panel.pick('Detailed', settings.fancy, '/share style detailed', 'Include star levels, icons, and separators in your local rendering.')
+                ]);
+                panel.toggleRow('Monthly FKDR', settings.monthlyFkdr, '/share monthly on', '/share monthly off',
+                    'Include monthly FKDR in BedWars share messages. Fetching it can slightly delay sharing.');
+            }
+            panel.section('Common settings');
             panel.toggleRow('Local color', settings.colorLocal, '/share color on', '/share color off',
                 'Recolor your own echoed share lines locally; recipients still receive plain text.');
 
@@ -2441,7 +2496,9 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             ]);
             panel.row([
                 panel.label('Preview'),
-                ...panel.action('Show samples', '/share preview', 'Show colored sample lines (tags, cheaters, nicks, caution, threats) in your chat. Sends nothing.')
+                ...panel.action('Show samples', '/share preview', 'Show colored sample lines (tags, cheaters, nicks, caution, threats) in your chat. Sends nothing.'),
+                chatController.text(' ', panel.colors.quiet),
+                ...panel.action('Team samples', '/share preview teams', 'Preview team summaries for 1–8 example players. Sends nothing.')
             ]);
             panel.close();
         }
@@ -2535,6 +2592,20 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 if (enabled === null) return false;
                 bedwarsSidebarTeamColorsEnabled = enabled;
                 finishFurySetting('play', `BedWars team colors are now ${enabled ? '§aon' : '§coff'}§7.`);
+                return true;
+            }
+            if (['lobbyboard', 'lobbyscoreboard'].includes(key)) {
+                const enabled = parseFuryToggle(value);
+                if (enabled === null) return false;
+                bedwarsLobbyScoreboardEnabled = enabled;
+                finishFurySetting('play', `The custom lobby scoreboard is now ${enabled ? '§aon' : '§coff'}§7.`);
+                return true;
+            }
+            if (['lobbystyle', 'lobbyboardstyle'].includes(key)) {
+                const style = LOBBY_SCOREBOARD_STYLES.find(entry => entry.id === value);
+                if (!style) return false;
+                bedwarsLobbyScoreboardStyle = style.id;
+                finishFurySetting('play', `Lobby scoreboard colors are now §f${style.name}§7.`);
                 return true;
             }
             if (['socialadds', 'autoadds', 'social'].includes(key)) {
@@ -3274,20 +3345,33 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         };
         enderDustReminder.start();
 
+        // Restoring a quick reconnect can synchronously call onUpdate.
+        let partyCoordinationUpdateQueued = false;
         const partyTracker = createPartyTracker({
             onUpdate: () => queuePartyCoordinationUpdate(),
             stripFormatting: (text) => stripAnsi(text),
             getSelfName: () => client.username,
-            requestPartyListCommand: () => {
+            requestPartyListCommand: ({ shouldSend } = {}) => {
                 if (hypixelClient.state !== mc.states.PLAY) return;
                 void sendHypixelCommand('/p list', {
                     priority: 70,
                     dedupeKey: 'party-list',
-                    dedupeMs: 10_000
+                    dedupeMs: 10_000,
+                    shouldSend
                 });
+            },
+            // Releases a held chat border that turned out not to open the
+            // hidden /p list reply.
+            forwardChat: packet => {
+                if (client.state === mc.states.PLAY) client.write('chat', packet);
             },
             sendChat: message => sendChat(client, message)
         });
+        // A quick reconnect of the same account keeps the known party.
+        if (reconnectedWithinPartyGrace && lastPartySnapshot && lastPartySnapshot.uuid === client.uuid) {
+            partyTracker.restoreState(lastPartySnapshot.state);
+        }
+        lastPartySnapshot = null;
         activeUser.isPartyMember = (name) => partyTracker.isTrackedMember(name);
         // true/false when the tracker is confident, null while uncertain -
         // /share only skips party broadcasts on a confident "not in a party".
@@ -3306,7 +3390,6 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         const partyArrivalTabNames = new Map();
         let partyArrivalWorldStartedAt = Date.now();
         let partyCoordination = null;
-        let partyCoordinationUpdateQueued = false;
         let partyCoordinationWorld = 0;
         let partyCoordinationWorldServerId = null;
         let nicknameDuelsSession = null;
@@ -3895,13 +3978,53 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         // forward path — send a nick there and the renamed player belongs to no
         // team at all, which is why they rendered as plain white text with no
         // team prefix.
+        // Custom Bed Wars sidebar owner; created below, read through this binding
+        // by every team packet sent to the client.
+        let lobbySidebar = null;
         function writeScoreboardTeamPacket(payload, { applySidebarTeamColors = false } = {}) {
             const renamedForClient = denickDisplayNames.rewriteTeamPacket(payload);
             const displayedToClient = applySidebarTeamColors
                 ? rewriteBedwarsSidebarTeamColorsForClient(renamedForClient)
                 : renamedForClient;
             client.write('scoreboard_team', displayedToClient);
+            lobbySidebar?.observeClientTeam(displayedToClient);
         }
+
+        // Custom Bed Wars sidebar (src/scoreboard): the restyled lobby board, and
+        // Hypixel's pregame/in-game boards one space in from the edge. Own stats are read at
+        // most once a minute, when the board appears: lifetime finals/deaths from
+        // Hypixel and today's numbers from Urchin, so FKDR can show how far it
+        // moved today. Without a key or after a failure the FKDR rows are left out.
+        const LOBBY_SCOREBOARD_STATS_REUSE_MS = 60 * 1000;
+        let lobbyScoreboardStats = null;
+        let lobbyScoreboardStatsAt = 0;
+        let lobbyScoreboardStatsRequest = 0;
+        let lobbyScoreboardClosed = false;
+        async function loadLobbyScoreboardStats() {
+            if (Date.now() - lobbyScoreboardStatsAt < LOBBY_SCOREBOARD_STATS_REUSE_MS) return;
+            if (state.apiKillSwitchEnabled || !hasHypixelApiKeyConfigured()) return;
+            const request = ++lobbyScoreboardStatsRequest;
+            lobbyScoreboardStatsAt = Date.now();
+            const name = client.username;
+            const [profile, daily] = await Promise.all([
+                getPlayerData(name, { forceRefresh: true, preferCache: false, apiPriority: 'background' }).catch(() => null),
+                keys.urchin ? fetchUrchinSession(name, 'daily').catch(() => null) : null
+            ]);
+            if (lobbyScoreboardClosed || request !== lobbyScoreboardStatsRequest) return;
+            const own = readOwnBedwarsStats(profile?.data?.player);
+            if (!own) { lobbyScoreboardStatsAt = 0; return; }
+            const today = readDailyBedwarsDelta(daily);
+            lobbyScoreboardStats = { ...own, dailyFinals: today?.finals ?? null, dailyDeaths: today?.deaths ?? null };
+            lobbySidebar.refresh();
+        }
+        lobbySidebar = createLobbySidebar({
+            write: (name, data) => client.write(name, data),
+            writeTeam: payload => writeScoreboardTeamPacket(payload),
+            buildBoard: input => (bedwarsLobbyScoreboardEnabled
+                ? buildBedwarsSidebar({ ...input, style: bedwarsLobbyScoreboardStyle, decimals: bedwarsLobbyScoreboardDecimals, stats: lobbyScoreboardStats })
+                : null),
+            onShow: () => { loadLobbyScoreboardStats().catch(() => {}); }
+        });
         const rememberKnownDenickInSession = (name, realName, source = 'history', options = {}) => {
             if (!denickTracker.rememberKnownDenickInSession(name, realName, source)) return false;
             cleanupDenickAliasDuplicate(realName, `known_denick_${source}`);
@@ -4144,8 +4267,11 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             const fkdr = ratioValue(bedwars.final_kills_bedwars, bedwars.final_deaths_bedwars);
             const wlr = ratioValue(bedwars.wins_bedwars, bedwars.losses_bedwars);
             const winstreak = numberOr(bedwars.winstreak, 0);
-            const message = `[Denick] ${realName} is nicked as ${nick} | ${Math.round(stars)}★ FKDR ${fkdr.toFixed(2)} WLR ${wlr.toFixed(2)} WS ${winstreak}`;
-            void sendHypixelCommand(`/pc ${message}`, {
+            const tagRow = { uTag: data.urchin?.tag, urchinRaw: data.urchin };
+            const tags = data.urchin?.ok !== false && hasTag(tagRow) ? ` | ${formatTagDescriptor(tagRow)}` : '';
+            const message = `/pc [Denick] ${realName} is nicked as ${nick} | ${Math.round(stars)}★ FKDR ${fkdr.toFixed(2)} WLR ${wlr.toFixed(2)} WS ${winstreak}${tags}`;
+            const command = message.length > MAX_PC_LENGTH ? `${message.slice(0, MAX_PC_LENGTH - 3)}...` : message;
+            void sendHypixelCommand(command, {
                 priority: 85,
                 dedupeKey: `denick-party:${nick}:${realName}`,
                 dedupeMs: 5_000
@@ -5673,6 +5799,42 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             log: (...parts) => console.log(...parts)
         });
 
+        const dailyRewards = require('./src/rewards/dailyRewards').createDailyRewards({
+            transport: require('./src/rewards/page').createTransport(axios),
+            menuMonitor,
+            sendChat: message => sendChat(client, message),
+            sendUpstream: (name, data) => {
+                if (hypixelClient.state === mc.states.PLAY) hypixelClient.write(name, data);
+            },
+            sendClient: (name, data) => client.write(name, data),
+            getSettings: () => state.dailyReward,
+            saveSettings: next => { saveFeatureSettings({ dailyReward: next }); state.dailyReward = next; },
+            isCurrent: () => !proxyStopping && activeUser?.client === client
+                && hypixelClient.state === mc.states.PLAY && client.state === mc.states.PLAY,
+            isApiPaused: () => state.apiKillSwitchEnabled
+        });
+        activeUser.syncDailyRewards = () => dailyRewards.syncSettings();
+
+        const { createLobbySpam, lobbyKeyForSidebar } = require('./src/chat/lobbySpam');
+        const lobbySpam = createLobbySpam({
+            getSettings: () => state,
+            getLobbyKey: () => {
+                const key = lobbyKeyForSidebar(lobbySidebar.getSidebarLines(), {
+                    // Supported-game flags can outlive a transfer to the main
+                    // lobby. Positive current-world lobby evidence owns this gate.
+                    replay: inReplayViewer
+                });
+                // This ID is reset on every world change and populated only by
+                // server-ID packets from that world, unlike a lingering sidebar.
+                return key && partyCoordinationWorldServerId?.toLowerCase() === key ? key : null;
+            },
+            isOwnName: isOwnPlayerName,
+            isKnownPlayer: name => lobbyPlayers.get(name)?.inTab === true,
+            sendChat: message => sendChat(client, message)
+        });
+        activeUser.getLobbySpamState = () => lobbySpam.snapshot();
+        activeUser.manageLobbySpam = (action, name) => lobbySpam.manage(action, name);
+
         const { createQuickBuyTrace } = require('./src/menu/quickBuyTrace');
         const quickBuyTrace = createQuickBuyTrace({
             dir: dataPath('packet_logs', 'quickbuy_trace'),
@@ -5685,6 +5847,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         });
         const rawQuickBuyTransport = hypixelClient.write.bind(hypixelClient);
         let layoutPreview = null;
+        let watchdogReport = null;
         const quickBuyTransport = (name, data, origin = 'quickbuy-automation') => {
             if (layoutPreview && !layoutPreview.allowOutbound(name, data)) return;
             const result = rawQuickBuyTransport(name, data);
@@ -5710,6 +5873,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             sendChat: message => sendChat(client, message),
             disconnect: reason => { client.end(reason); hypixelClient.end(reason); },
             canStart: () => {
+                if (watchdogReport?.isBusy()) return 'Wait for reports to finish or use /wdr cancel';
                 if (layoutPreview?.isBusy()) return 'Close the layout preview first';
                 if (gameActive || bedwarsPregameActive || currentGamemode !== 'BEDWARS') {
                     return 'Quick Buy editing is available only in a Bed Wars lobby';
@@ -5733,6 +5897,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             sendChat: message => sendChat(client, message),
             disconnect: reason => { client.end(reason); hypixelClient.end(reason); },
             canStart: () => {
+                if (watchdogReport?.isBusy()) return 'Wait for reports to finish or use /wdr cancel.';
                 if (quickBuy.isBusy()) return 'Wait for layout editing to finish.';
                 if (hypixelClient.state !== mc.states.PLAY || client.state !== mc.states.PLAY) return 'Wait for the server connection to be ready.';
                 if (menuMonitor.getWindow() || menuMonitor.getDebugState().menuNavStep !== 'idle') return 'Close your current menu first.';
@@ -5743,12 +5908,34 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             if (quickBuy.allowOutbound(name, data)) return quickBuyTransport(name, data, 'relay-or-proxy-feature');
         };
 
+        watchdogReport = require('./src/menu/watchdogReport').createWatchdogReport({
+            menuMonitor,
+            sendCommand: sendHypixelCommand,
+            sendUpstream: (name, data) => {
+                if (hypixelClient.state === mc.states.PLAY) quickBuyTransport(name, data, 'watchdog-report');
+                if (name === 'close_window') {
+                    menuMonitor.setHold(false);
+                    menuMonitor.observeClientPacket(data, { name });
+                }
+            },
+            sendClient: (name, data) => client.write(name, data),
+            sendChat: message => sendChat(client, message),
+            canStart: () => {
+                if (hypixelClient.state !== mc.states.PLAY || client.state !== mc.states.PLAY) return 'Wait for the server connection to be ready.';
+                if (quickBuy.isBusy() || layoutPreview.isBusy() || killMessageLogger.isBusy()) return 'Finish the current menu operation first.';
+                if (nickRoll.isBusy()) return 'Stop the nickname reroller first.';
+                if (menuMonitor.getWindow() || menuMonitor.getDebugState().menuNavStep !== 'idle') return 'Close your current menu first.';
+                return null;
+            }
+        });
+
         const nickRoll = require('./src/nick/reroller').createNickReroller({
             sendCommand: sendHypixelCommand,
             playSound: playSelfSound,
             sendChat: message => sendChat(client, message),
             getSettings: () => require('./app_config').loadFeatureSettings().nickRoll,
             canStart: () => {
+                if (watchdogReport.isBusy()) return 'Wait for reports to finish or use /wdr cancel.';
                 if (hypixelClient.state !== mc.states.PLAY) return 'Server connection is not ready.';
                 if (gameActive || bedwarsPregameActive) return 'Use the reroller in a lobby.';
                 if (quickBuy.isBusy() || layoutPreview.isBusy() || killMessageLogger.isBusy()) return 'Finish the current menu operation first.';
@@ -7725,8 +7912,21 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 }
                 settledNickVerifiedAt.set(key, Date.now());
             }
-            return await getCachedOrPendingPregameChatProfile(name, options.lookup?.onPrimaryProfile)
-                || await getPlayerDataWithNickDetection(name, options.lookup || {});
+            // A nick can also be somebody else's real IGN. Compare against the
+            // current tab identity before using either primary or final stats,
+            // just as pregame chat does; never change the account's shared cache.
+            const validateIdentity = profile => {
+                const info = lobbyPlayers.get(name);
+                return info?.inTab !== false && isRosterProfileMismatch(profile, info?.uuid)
+                    ? makeFallbackPlayerProfile(name, { isNicked: true, status: '§cNicked Account' })
+                    : profile;
+            };
+            const onPrimaryProfile = options.lookup?.onPrimaryProfile;
+            const lookup = typeof onPrimaryProfile === 'function'
+                ? { ...options.lookup, onPrimaryProfile: profile => onPrimaryProfile(validateIdentity(profile)) }
+                : options.lookup || {};
+            return validateIdentity(await getCachedOrPendingPregameChatProfile(name, lookup.onPrimaryProfile)
+                || await getPlayerDataWithNickDetection(name, lookup));
         }
 
         function leaveBedwarsPregame(options = {}) {
@@ -9721,8 +9921,8 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             const scanSessionId = gameSessionId;
             const scanStillActive = () => scanSessionId === gameSessionId && isScanActiveInGame();
 
-            // Open a live /share stream so results broadcast team-by-team (or
-            // player-by-player) as they resolve, rather than waiting for the
+            // Open a live /share stream so each eligible player broadcasts as
+            // their result resolves, without waiting for their team or the
             // whole scan. Used for auto-share and for a manual /share that has
             // to run its own scan first. Cancel any previous stream.
             const shareRequest = share || (state.shareTagsAuto ? { source: 'auto' } : null);
@@ -11888,7 +12088,10 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 unsubscribe();
             }
             if (!cached) return false;
-            writeTabDisplayName(info.uuid, buildTabStatsDisplay(name, cached.profile, info, currentGamemode, {
+            const profile = !cached.denickResult?.realName && isRosterProfileMismatch(cached.profile, info.uuid)
+                ? makeFallbackPlayerProfile(name, { isNicked: true, status: '§cNicked Account' })
+                : cached.profile;
+            writeTabDisplayName(info.uuid, buildTabStatsDisplay(name, profile, info, currentGamemode, {
                 denickResult: cached.denickResult
             }));
             tabStatsAppliedNames.add(name);
@@ -12018,7 +12221,10 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         });
 
         applyLiveFeatureSettings = () => {
+            lobbySpam.syncSettings();
+            dailyRewards.syncSettings();
             nicknameSharing.request();
+            lobbySidebar.refresh();
             if (!quickMathsEnabled) quickMathsSession.reset();
             partyArrivalCheck.setEnabled(partySplitWarningsEnabled);
             queuePartyCoordinationUpdate();
@@ -12134,9 +12340,11 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             if (proxyStopping) return;
             quickBuyTrace.observe('client', meta.name, data);
             bookTrace.observe('client', meta.name, data);
+            if (watchdogReport.observeClient(data, meta)) return;
             nickRoll.observeClient(data, meta);
             if (layoutPreview.observeClient(data, meta)) return;
             if (quickBuy.observeClient(data, meta)) return;
+            dailyRewards.observeClient(data, meta);
             killMessageLogger.observeClient(data, meta);
             if (packetDebugLoggingEnabled && meta.name === 'custom_payload') {
                 logCustomPayloadPacket('Client -> Hypixel', data);
@@ -12192,6 +12400,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             if (meta.state !== mc.states.PLAY || client.state !== mc.states.PLAY) return;
             if (meta.name === 'tab_complete') data = chatTabCompletion.serverResponse(data);
             if (meta.name === 'login' || meta.name === 'respawn') {
+                lobbySpam.resetWorld();
                 // New world: entity ids restart, so strikes must not carry
                 // over (e.g. from one replay into the next).
                 clearAnticheatDetectors();
@@ -12243,13 +12452,27 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             // client never sees an action number it did not send.
             const swallowedByQuickBuy = quickBuy.observeServer(data, meta);
             const swallowedBySharedMenuMonitor = menuMonitor.observeServerPacket(data, meta);
-            const swallowedByMenuMonitor = swallowedBySharedMenuMonitor || swallowedByQuickBuy || swallowedByLayoutPreview || swallowedByNickRoll;
+            const swallowedByReport = watchdogReport.observeServer(data, meta);
+            const swallowedByDailyReward = dailyRewards.observeServer(data, meta);
+            const swallowedByMenuMonitor = swallowedBySharedMenuMonitor || swallowedByReport || swallowedByQuickBuy || swallowedByLayoutPreview || swallowedByNickRoll || swallowedByDailyReward;
+            // Hypixel's sidebar display packet is held back while the custom
+            // lobby board is shown; its scores and teams still go through.
+            const heldBySidebar = lobbySidebar.observeServer(meta.name, data);
 
             let forwardedToClient = false;
             // /lf owns the action bar while it is on; the packet is still parsed below.
             const hiddenByLookingFor = meta.name === 'chat' && Number(data.position) === 2 && lookingForTriggers.isActive();
-            const hiddenGeorgeDialogue = hiddenByLookingFor;
-            if (meta.name !== 'player_info' && !swallowedByMenuMonitor && !hiddenGeorgeDialogue) {
+            // The reply to Fury's own /p list is still parsed below, just not shown.
+            let hiddenPartyListReply = false;
+            if (meta.name === 'chat' && Number(data.position || 0) !== 2 && partyTracker.isHidingChat()) {
+                try {
+                    const filtered = partyTracker.filterClientboundChat(extractText(JSON.parse(data.message)), data);
+                    filtered.release.forEach(packet => client.write('chat', packet));
+                    hiddenPartyListReply = !filtered.forward;
+                } catch (_) { /* Unreadable chat is forwarded unchanged. */ }
+            }
+            const hiddenGeorgeDialogue = hiddenByLookingFor || hiddenPartyListReply;
+            if (meta.name !== 'player_info' && !swallowedByMenuMonitor && !hiddenGeorgeDialogue && !heldBySidebar) {
                 // Real-IGN rendering is display-only: the client gets a
                 // rewritten COPY, while `data` keeps Hypixel's nick for every
                 // downstream system (roster, chat parsing, denick tracking).
@@ -12262,6 +12485,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                     : meta.name === 'scoreboard_team'
                         ? rewriteBedwarsSidebarTeamColorsForClient(renamedForClient)
                         : replayResults.rewriteClientbound(meta.name, renamedForClient);
+                if (meta.name === 'chat') displayedToClient = dailyRewards.rewriteClientbound(displayedToClient, data);
                 if (meta.name === 'playerlist_header') {
                     if (isBedwarsTabFooterActive()) {
                         displayedToClient = {
@@ -12282,8 +12506,14 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                         queueBedwarsGeneratorFooterRefresh(1000 - getBedwarsGeneratorElapsedMs() % 1000);
                     }
                 }
-                client.write(meta.name, displayedToClient);
+                if (meta.name === 'chat') displayedToClient = lobbySpam.rewriteClientbound(displayedToClient, data);
+                if (displayedToClient) {
+                    client.write(meta.name, displayedToClient);
+                }
+                // Locally muted chat is consumed too; the fallback below must
+                // not send its original packet after the other observers run.
                 forwardedToClient = true;
+                if (meta.name === 'scoreboard_team') lobbySidebar.observeClientTeam(displayedToClient);
             }
             // /recordcheat tap: runs after the packet is already forwarded, so
             // recording adds zero delivery latency. No-op when not recording.
@@ -12689,13 +12919,16 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 }
             }
 
-            if (!forwardedToClient && !swallowedByMenuMonitor && !hiddenGeorgeDialogue) client.write(meta.name, data);
+            if (!forwardedToClient && !swallowedByMenuMonitor && !hiddenGeorgeDialogue && !heldBySidebar) client.write(meta.name, data);
             // Hot-path cost: one Set lookup for non-effect packets.
             cosmeticEffectRecorder.observeServerPacket(data, meta);
         });
 
         function clearConnectionTimers() {
+            sharePreviewPlayer.stop();
             statsLookupRetryController.abort();
+            lobbyScoreboardClosed = true;
+            lobbySidebar?.dispose();
             if (generatorFooterRefreshTimer) clearTimeout(generatorFooterRefreshTimer);
             generatorFooterRefreshTimer = null;
             recapDelivery.clear();
@@ -12703,6 +12936,9 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             connectionTimersCleared = true;
             clearAutoDenickRetryTimers();
             cosmeticEffectRecorder.dispose();
+            watchdogReport.dispose();
+            dailyRewards.dispose();
+            lobbySpam.dispose();
             quickBuy.dispose();
             layoutPreview.dispose();
             quickBuyTrace.dispose();
@@ -12804,6 +13040,8 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             drainConnection();
             hypixelClient.end();
             lastPartyDisconnectAt = Date.now();
+            const partyState = partyTracker.exportState();
+            lastPartySnapshot = client.uuid && partyState ? { uuid: client.uuid, state: partyState } : null;
             if (activeUser?.client === client) {
                 activeUser = null;
                 applyLiveFeatureSettings = null;
@@ -12869,7 +13107,21 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
 
         async function handleClientChat(packet) {
             const msg = packet.message;
+            if (/^\/lobbyspam(?:\s|$)/i.test(msg)) {
+                lobbySpam.command(msg.trim().split(/\s+/).slice(1));
+                return;
+            }
+            if (/^\/wdr(?:\s|$)/i.test(msg)) {
+                watchdogReport.command(msg.trim().split(/\s+/));
+                return;
+            }
+            watchdogReport.observeCommand(msg);
             quickMathsSession.observeCommand(msg);
+            partyTracker.observeOwnCommand(msg);
+            if (/^\/dailyreward(?:\s|$)/i.test(msg)) {
+                dailyRewards.command(msg.trim().split(/\s+/).slice(1).map((part, index) => index === 0 ? part.toLowerCase() : part));
+                return;
+            }
             if (/^\/nickroll(?:\s|$)/i.test(msg)) {
                 nickRoll.command(msg.trim().split(/\s+/));
                 return;
@@ -12931,6 +13183,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             if (cmd === '/stats' || cmd === '/s') {
                 const target = args[1] || client.username;
                 const mode = findModeDef('BEDWARS', args[2] || 'overall');
+                sendChat(client, `§8[§bStats§8] §7Fetching §f${target} §7data...`);
                 await runStatsLookupCommand(client, cmd, target, (profile) => {
                     rememberPlayerActiveCosmetics(target, profile.data, 'stats_command');
                     renderBedwarsStats(client, profile.data, mode, { detailed: false, isCached: profile.fromCache });
@@ -13218,6 +13471,20 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                     } else {
                         sendChat(client, '§b§lShare §8» §7Usage: §f/share auto on|off');
                     }
+                } else if (sub === 'summary') {
+                    if (arg2 === 'on' || arg2 === 'off') {
+                        shareTagsBroadcaster.setTeamSummary(arg2 === 'on');
+                        renderShareController();
+                    } else {
+                        sendChat(client, '§b§lShare §8» §7Usage: §f/share summary on|off');
+                    }
+                } else if (sub === 'monthly') {
+                    if (arg2 === 'on' || arg2 === 'off') {
+                        shareTagsBroadcaster.setMonthlyFkdr(arg2 === 'on');
+                        renderShareController();
+                    } else {
+                        sendChat(client, '§b§lShare §8» §7Usage: §f/share monthly on|off');
+                    }
                 } else if (sub === 'color' || sub === 'colour') {
                     if (arg2 === 'on' || arg2 === 'off') {
                         shareTagsBroadcaster.setColorLocal(arg2 === 'on');
@@ -13236,12 +13503,36 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                         sendChat(client, '§b§lShare §8» §7Usage: §f/share style compact|detailed');
                     }
                 } else if (sub === 'preview' || sub === 'test' || sub === 'demo') {
+                    if (arg2 === 'teams' || (sub === 'test' && arg2)) {
+                        const countArg = arg2 === 'teams' ? (args[3] || 'all').toLowerCase() : arg2;
+                        if (args.length > (arg2 === 'teams' ? 4 : 3) || (countArg !== 'all' && !/^[1-8]$/.test(countArg))) {
+                            sendChat(client, '§b§lShare Preview §8» §7Usage: §f/share test <1-8|all> §7or §f/share preview teams [1-8|all]');
+                            return;
+                        }
+                        sendChat(client, '§b§lShare Preview §8» §7Team summary examples. Only you can see these; live sharing is unchanged.');
+                        const previewName = client.username || 'You';
+                        const previewDisplayName = resolveRankedPlayer(previewName).display || `§7${previewName}`;
+                        const previewPrefix = `§9Party §f> ${previewDisplayName}§f: `;
+                        const frames = [];
+                        for (const scenario of shareTagsBroadcaster.getTeamSummaryPreview(countArg === 'all' ? null : Number(countArg))) {
+                            scenario.entries.forEach((entry, index) => {
+                                const frame = [];
+                                if (index === 0) frame.push(`§b§lShare Preview §8» §f${scenario.playerCount} §7${scenario.playerCount === 1 ? 'flagged player' : 'flagged players'}`);
+                                frame.push({ text: '', extra: [{ text: previewPrefix }, entry.component] });
+                                frames.push(frame);
+                            });
+                        }
+                        sharePreviewPlayer.play(frames);
+                        return;
+                    }
+                    sharePreviewPlayer.stop();
                     const previewSettings = shareTagsBroadcaster.getSettings();
                     const previewName = client.username || 'You';
+                    const previewDisplayName = resolveRankedPlayer(previewName).display || `§7${previewName}`;
                     const previewPrefix = previewSettings.destination === 'all'
-                        ? `§7${previewName}§f: `
-                        : `§9Party §f> §7${previewName}§f: `;
-                    sendChat(client, `§b§lShare Preview §8» §7Sample lines in the §f${previewSettings.fancy ? 'fancy' : 'plain'}§7 style (your party still sees plain text).`);
+                        ? `${previewDisplayName}§f: `
+                        : `§9Party §f> ${previewDisplayName}§f: `;
+                    sendChat(client, `§b§lShare Preview §8» §7Sample lines in the §f${previewSettings.teamSummary ? 'team summary' : previewSettings.fancy ? 'fancy' : 'plain'}§7 style (your party still sees plain text).`);
                     if (!previewSettings.colorLocal) {
                         sendChat(client, '§b§lShare Preview §8» §eLocal color is OFF — enable it with §f/share color on§e to see this coloring in real games.');
                     }
@@ -13255,7 +13546,9 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                             ]
                         });
                     }
-                    sendChat(client, '§b§lShare Preview §8» §7Names are §fclickable§7 (→ /urchin). Nothing was sent to chat.');
+                    sendChat(client, previewSettings.teamSummary
+                        ? '§b§lShare Preview §8» §7Nothing was sent to party chat.'
+                        : '§b§lShare Preview §8» §7Names are §fclickable§7 (→ /urchin). Nothing was sent to chat.');
                     return;
                 } else if (sub === 'dest' || sub === 'destination') {
                     if (arg2 === 'party' || arg2 === 'all') {
@@ -14954,7 +15247,7 @@ const shareEchoRewriter = createShareEchoRewriter({
     getLocalUsername: () => activeUser?.client?.username || ''
 });
 
-const { createShareTagsBroadcaster } = require('./src/overlay/shareTags.js');
+const { createShareTagsBroadcaster, createSharePreviewPlayer, hasTag, formatTagDescriptor, MAX_PC_LENGTH } = require('./src/overlay/shareTags.js');
 const shareTagsBroadcaster = createShareTagsBroadcaster({
     state,
     sendChat,

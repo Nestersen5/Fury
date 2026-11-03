@@ -5,6 +5,15 @@ function normalizeUuid(value) {
     return /^[a-f0-9]{32}$/.test(uuid) ? uuid : null;
 }
 
+// A successful username lookup can belong to somebody else who owns that IGN.
+// Only compare valid identities; missing data and API failures prove nothing.
+function isRosterProfileMismatch(profile, rosterUuid) {
+    if (profile?.error || profile?.data?.lookupFailed || profile?.data?.isNicked) return false;
+    const visibleUuid = normalizeUuid(rosterUuid);
+    const lookupUuid = normalizeUuid(profile?.data?.player?.uuid);
+    return Boolean(visibleUuid && lookupUuid && visibleUuid !== lookupUuid);
+}
+
 function shouldHidePregamePartyMember(name, { isPartyMember, getKnownDenick }) {
     if (isPartyMember(name)) return true;
     const known = getKnownDenick(name);
@@ -45,14 +54,12 @@ function createPregameIdentityLookup({ lookupNick, lookupReal, getKnownDenick, g
         // The denicked list or roster may have arrived while the request ran.
         const updatedKnown = savedIdentity(name);
         if (updatedKnown) return resolveSaved(updatedKnown);
-        const rosterUuid = normalizeUuid(getRosterUuid(name));
-        const lookupUuid = normalizeUuid(profile?.data?.player?.uuid);
         if (isDetectedNick(name) || profile?.data?.isNicked
-            || (rosterUuid && lookupUuid && rosterUuid !== lookupUuid)) {
+            || isRosterProfileMismatch(profile, getRosterUuid(name))) {
             return makeFallback(name, { isNicked: true });
         }
         return profile;
     };
 }
 
-module.exports = { createPregameIdentityLookup, shouldHidePregamePartyMember };
+module.exports = { createPregameIdentityLookup, shouldHidePregamePartyMember, isRosterProfileMismatch };

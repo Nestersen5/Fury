@@ -318,6 +318,7 @@ async function tabRestoreTests() {
     await h.clock.until(500);
     let eligible = true, denick = null;
     const context = vm.createContext({ currentGamemode: 'BEDWARS', gameRoster: new Set(['Fixture']),
+        isRosterProfileMismatch: require('../../src/stats/pregameIdentity').isRosterProfileMismatch,
         lobbyPlayers: new Map([['Fixture', { uuid }]]), tabStatsAppliedNames: new Set(),
         isTabStatsActiveInGame: () => true, isDenickAliasDuplicate: () => false,
         isEligibleForCurrentGameRoster: () => eligible, cachedTabStatsProfileForPlayer: () => null,

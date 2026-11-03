@@ -29,6 +29,15 @@ function mount({document,node,button}){
     flow.append(mode,$('.share-threshold-panel'));
     const sharing=$('.share-settings-module'),preferences=node('div','fury-share-preferences'),preview=node('div','fury-share-preview'),shareBody=node('div','fury-share-body');
     sharing.querySelectorAll(':scope >.share-option-row').forEach(row=>preferences.append(row));
+    const summaryInput=preferences.querySelector('#share-tags-team-summary'),methodRow=summaryInput.closest('.share-option-row');
+    summaryInput.setAttribute('aria-label','Use team summaries');
+    const individualOptions=node('section','fury-share-method-panel'),commonOptions=node('section','fury-share-common');
+    individualOptions.id='share-individual-options';
+    individualOptions.setAttribute('aria-label','Individual player options');commonOptions.setAttribute('aria-label','Common settings');
+    individualOptions.append(preferences.querySelector('#share-tags-monthly-fkdr').closest('.share-option-row'),preferences.querySelector('#share-tags-fancy').closest('.share-option-row'));
+    commonOptions.append(preferences.querySelector('#share-tags-color-local').closest('.share-option-row'));
+    individualOptions.hidden=summaryInput.checked;
+    preferences.append(methodRow,individualOptions,commonOptions);
     preview.append($('.share-include-panel'),$('.party-chat-preview'));shareBody.append(preferences,preview);sharing.append(shareBody);
     flow.append(sharing,$('.kill-switch-card'));scan.append(flow);oldScan.classList.add('fury-removed');
     // Session controls follow their workflow instead of two long narrow columns.
@@ -168,6 +177,16 @@ function mount({document,node,button}){
         sources.append(choice);
     }
     statsPanel.append(sourceHeading,sources);
+    const spamPanel=overlaySection('Spam detection');spamPanel.classList.add('lobby-spam-settings');
+    overlayRow(spamPanel,'lobby-spam-enabled','Detect lobby spam','Offer a Mute button for repeated public messages in lobbies. Never active in pregame or matches.','lobby-spam-title');
+    for(const id of ['lobby-spam-sensitivity','lobby-spam-manage']){
+        const row=document.getElementById(id).closest('.feature-card'),copy=row.firstElementChild;
+        row.className='fury-overlay-row settings-search-item';copy.classList.add('fury-overlay-copy');
+        const title=copy.querySelector('h3');if(title){const heading=node('h4','');heading.textContent=title.textContent;title.replaceWith(heading);}
+        const caption=copy.querySelector(':scope >label');if(caption){const heading=node('h4','');heading.textContent=caption.textContent;caption.replaceWith(heading);}
+        const description=copy.querySelector('.note');if(description){const note=node('small','');note.textContent=description.textContent;description.replaceWith(note);}
+        spamPanel.append(row);
+    }
     const queuePanel=overlaySection('Queue time');queuePanel.id='queue-time-settings';
     overlayRow(queuePanel,'queue-time-enabled','Show queue time','Show folds and queue time when a game starts.').classList.add('queue-time-row');
     overlayRow(queuePanel,'queue-time-party-chat-enabled','Send to party chat','Off: only visible to you').classList.add('queue-time-row');
@@ -202,9 +221,9 @@ function mount({document,node,button}){
                 label.classList.remove('fury-toggle-legacy');card.append(icon,caption,label);
                 input.setAttribute('aria-label',title);
             }
-            else if(label.querySelector('.fury-chip-label')?.textContent.trim()==='Enabled'){
+            else if(input.dataset.offLabel||label.querySelector('.fury-chip-label')?.textContent.trim()==='Enabled'){
                 label.classList.add('fury-binary-choice');
-                label.append(node('span','fury-binary-off','Off'),node('span','fury-binary-on','On'));
+                label.append(node('span','fury-binary-off',input.dataset.offLabel||'Off'),node('span','fury-binary-on',input.dataset.onLabel||'On'));
                 label.querySelector('.fury-binary-off').dataset.checked='false';label.querySelector('.fury-binary-on').dataset.checked='true';
                 label.addEventListener('click',event=>{
                     const segment=event.target.closest('[data-checked]');if(!segment)return;event.preventDefault();

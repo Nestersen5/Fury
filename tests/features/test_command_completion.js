@@ -118,8 +118,12 @@ const completer = createProxyTabCompleter({
 
 assert(!PROXY_COMMANDS.includes('/autogambler'), 'Retired command is absent');
 assert(PROXY_COMMANDS.includes('/nickroll'));
-assert(!PROXY_COMMANDS.includes('/wdr'), 'Background reports are withheld from this release');
-assert.strictEqual(completer('/wdr DemoPlayer_'), null, 'Native report completion stays server-controlled');
+assert(PROXY_COMMANDS.includes('/wdr'));
+assert(completer('/wd').includes('/wdr'));
+assert.deepStrictEqual(completer('/wdr sta'), ['status']);
+assert.deepStrictEqual(completer('/wdr Demo'), ['DemoPlayer_']);
+assert.deepStrictEqual(completer('/wdr DemoPlayer_ Ne'), [], 'No second player suggestion');
+assert.deepStrictEqual(completer('/wdr DemoPlayer_ '), [], 'One completed player ends the command');
 assert.strictEqual(completer('/watchdogreport DemoPlayer_ fly'), null, 'Original server command stays server-controlled');
 assert.deepStrictEqual(completer('/nickroll st'), ['start', 'stop', 'status']);
 assert.deepStrictEqual(completer('/nickroll filter digits e'), []);
@@ -157,6 +161,10 @@ assert.deepStrictEqual(completer('/share auto '), ['on', 'off']);
 assert(completer('/share i').includes('include'), '/share should tab-complete include controller command');
 assert.deepStrictEqual(completer('/share style '), ['compact', 'detailed']);
 assert.deepStrictEqual(completer('/share dest '), ['party', 'all']);
+assert.deepStrictEqual(completer('/share preview '), ['teams']);
+assert.deepStrictEqual(completer('/share test '), ['1', '2', '3', '4', '5', '6', '7', '8', 'all', 'teams']);
+assert.deepStrictEqual(completer('/share preview teams '), ['1', '2', '3', '4', '5', '6', '7', '8', 'all']);
+assert.deepStrictEqual(completer('/st test 8'), ['8']);
 assert.deepStrictEqual(completer('/overlay a'), ['all']);
 assert.deepStrictEqual(completer('/overlay source d'), []);
 assert.deepStrictEqual(completer('/overlay source p'), ['pregame']);
@@ -170,6 +178,10 @@ assert.deepStrictEqual(completer('/nametags threats prefixfallback f'), ['fkdr',
 assert(completer('/dodge i').includes('include'), '/dodge should complete include subcommand');
 assert(completer('/dodge p').includes('preset'), '/dodge should complete preset subcommand');
 assert.deepStrictEqual(completer('/dodge preset all_'), ['all_on']);
+assert.deepStrictEqual(completer('/share mon'), ['monthly']);
+assert.deepStrictEqual(completer('/share monthly '), ['on', 'off']);
+assert.deepStrictEqual(completer('/share summary '), ['on', 'off']);
+assert.deepStrictEqual(completer('/st monthly o'), ['on', 'off']);
 assert.deepStrictEqual(completer('/dodge include n'), ['nicks']);
 assert.deepStrictEqual(completer('/dodge include nicks '), ['on', 'off']);
 assert.deepStrictEqual(completer('/dodge threat f'), ['fkdr']);

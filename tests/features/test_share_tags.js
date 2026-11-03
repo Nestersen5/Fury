@@ -373,6 +373,42 @@ assert.strictEqual(state.shareTagsIncludeThreats, true);
     assert.strictEqual(monthlyFetches, 1, 'monthly FKDR should fetch once for the sent BedWars line');
     assert.strictEqual(monthlyPartyChat[0].packet.message, '/pc [RED] QuasiDig2073: FKDR: 2.30 MFKDR: 2.50 - Blatant Cheater (Scaffold, Auto Block, Lag Range, Blink)');
 
+    assert.strictEqual(monthlyBroadcaster.getSettings().monthlyFkdr, true, 'existing settings keep monthly FKDR enabled');
+    monthlyBroadcaster.setMonthlyFkdr(false);
+    assert.strictEqual(monthlyBroadcaster.getSettings().monthlyFkdr, false);
+    const cachedMonthlyRow = { ...taggedRow, monthlyFkdr: 9.99 };
+    state.lastScanResults = { at: Date.now(), gameMode: 'BEDWARS', results: [cachedMonthlyRow] };
+    const withoutMonthly = await monthlyBroadcaster.broadcast({}, { source: 'manual', includeSet: ['tag'] });
+    assert.strictEqual(withoutMonthly.sent, 1);
+    assert.strictEqual(monthlyFetches, 1, 'disabled monthly sharing makes no extra request');
+    assert(!monthlyPartyChat.at(-1).packet.message.includes('MFKDR'), 'disabled also hides monthly values already in the scan');
+    assert.strictEqual(cachedMonthlyRow.monthlyFkdr, 9.99, 'share preference never mutates scan data');
+    assert(monthlyBroadcaster.getPreview().every(entry => !entry.line.includes('MFKDR')));
+    monthlyBroadcaster.setMonthlyFkdr(true);
+    assert(monthlyBroadcaster.getPreview().some(entry => entry.line.includes('MFKDR')));
+    state.lastScanResults = { at: Date.now(), gameMode: 'BEDWARS', results: [taggedRow] };
+    await monthlyBroadcaster.broadcast({}, { source: 'manual', includeSet: ['tag'] });
+    assert.strictEqual(monthlyFetches, 2, 'turning it back on restores monthly lookup');
+    assert(monthlyPartyChat.at(-1).packet.message.includes('MFKDR: 2.50'));
+
+    const fs = require('fs'), os = require('os'), path = require('path');
+    const config = require('../../app_config');
+    const previousPath = config.paths.features;
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'fury-share-monthly-'));
+    try {
+        config.paths.features = path.join(directory, 'features.json');
+        const initial = config.loadFeatureSettings();
+        assert.strictEqual(initial.shareTagsMonthlyFkdr, true);
+        for (const value of [false, true]) {
+            config.saveFeatureSettings({ ...initial, shareTagsMonthlyFkdr: value });
+            assert.strictEqual(config.loadFeatureSettings().shareTagsMonthlyFkdr, value, 'monthly choice persists');
+            assert.strictEqual(require('../../src/profiles/profileStore').filterPresetSettings({ shareTagsMonthlyFkdr: value }).shareTagsMonthlyFkdr, value, 'share profiles include the choice');
+        }
+    } finally {
+        config.paths.features = previousPath;
+        fs.rmSync(directory, { recursive: true, force: true });
+    }
+
     const liveDenickPartyChat = [];
     let liveDenickFetches = 0;
     const liveDenickState = {

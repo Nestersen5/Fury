@@ -165,12 +165,13 @@ function mount({ document, invoke, clipboard, nativeImage, navigate, settingsPag
     const inGameTabs=node('nav','fury-ingame-tabs');inGameTabs.setAttribute('role','tablist');inGameTabs.setAttribute('aria-label','In-game appearance');display.querySelector('.feature-section-title').after(inGameTabs);
     const tablist=$('.tablist-designer').closest('.settings-subgroup'),world=$('.world-label-designer').closest('.settings-subgroup');
     const names=node('div','fury-ingame-pane');display.append(names);
+    const scoreboard=node('div','fury-ingame-pane');display.append(scoreboard);
     const real=$('#real-identity-options');if(real)names.append(real);
     const colors=$('.bedwars-event-accent-card');if(colors)names.append(colors);
     const eventPreview=node('div','fury-event-preview','<h3>Chat & scoreboard preview</h3><div><span>Original</span><strong>FINAL KILL!</strong></div><div><span>Your accent</span><strong>FINAL KILL!</strong></div>');names.append(eventPreview);
-    [tablist,world,names].forEach((pane,i)=>{pane.classList.add('fury-ingame-pane');pane.dataset.ingame=['tablist','nametags','colors'][i];pane.id=`fury-ingame-${pane.dataset.ingame}-panel`;pane.setAttribute('role','tabpanel');pane.setAttribute('aria-labelledby',`fury-ingame-${pane.dataset.ingame}-tab`);});
-    function showIngame(key){[tablist,world,names].forEach(p=>p.classList.toggle('fury-ingame-active',p.dataset.ingame===key));inGameTabs.querySelectorAll('button').forEach(b=>{const selected=b.dataset.ingame===key;b.classList.toggle('active',selected);if(b.getAttribute('aria-selected')!==String(selected))b.setAttribute('aria-selected',String(selected));b.tabIndex=selected?0:-1;});if(display.classList.contains('active'))settingsPage('display',false);}
-    for(const [key,label] of [['tablist','Tab list'],['nametags','Nametags'],['colors','Names & colors']]){const b=button(label,()=>showIngame(key));b.dataset.ingame=key;b.id=`fury-ingame-${key}-tab`;b.setAttribute('role','tab');b.setAttribute('aria-controls',`fury-ingame-${key}-panel`);inGameTabs.append(b);}showIngame('tablist');
+    [tablist,world,names,scoreboard].forEach((pane,i)=>{pane.classList.add('fury-ingame-pane');pane.dataset.ingame=['tablist','nametags','colors','scoreboard'][i];pane.id=`fury-ingame-${pane.dataset.ingame}-panel`;pane.setAttribute('role','tabpanel');pane.setAttribute('aria-labelledby',`fury-ingame-${pane.dataset.ingame}-tab`);});
+    function showIngame(key){[tablist,world,names,scoreboard].forEach(p=>p.classList.toggle('fury-ingame-active',p.dataset.ingame===key));inGameTabs.querySelectorAll('button').forEach(b=>{const selected=b.dataset.ingame===key;b.classList.toggle('active',selected);if(b.getAttribute('aria-selected')!==String(selected))b.setAttribute('aria-selected',String(selected));b.tabIndex=selected?0:-1;});if(display.classList.contains('active'))settingsPage('display',false);}
+    for(const [key,label] of [['tablist','Tab list'],['nametags','Nametags'],['colors','Names & colors'],['scoreboard','Scoreboard']]){const b=button(label,()=>showIngame(key));b.dataset.ingame=key;b.id=`fury-ingame-${key}-tab`;b.setAttribute('role','tab');b.setAttribute('aria-controls',`fury-ingame-${key}-panel`);inGameTabs.append(b);}showIngame('tablist');
     inGameTabs.addEventListener('keydown',event=>{
         const choices=[...inGameTabs.querySelectorAll('button')],index=choices.indexOf(event.target);
         if(index<0||!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
@@ -324,11 +325,13 @@ function mount({ document, invoke, clipboard, nativeImage, navigate, settingsPag
     const nicks = require('./launcher_redesign_nicks').mount({ document, node, button, escape });
     const nickroll = require('./launcher_nickroll').mount({ document, invoke, refresh });
     const refinedSettings = require('./launcher_settings_refinement').mount({document,node,button});
+    const lobbySpam = require('./launcher_lobby_spam').mount({document,node,button,invoke,getState});
     const inGameAppearance = require('./launcher_ingame_appearance').mount({document});
     require('./launcher_segmented_controls').mount(document);
     const onboarding=require('./launcher_onboarding').mount({document,node,button,invoke,clipboard,navigate,getState,refresh,skin:avatar});
     function update(next){onboarding.update();renderAccounts();renderLogs();convertChecks();fitOverlay();pages.update(next);
         nickroll.update(next);
+        lobbySpam.update(next);
         $('#proxy-start').hidden=Boolean(next.services?.proxy?.running);$('#proxy-stop').hidden=!next.services?.proxy?.running;
         const proxyRunning=Boolean(next.services?.proxy?.running);
         connectionStatus.textContent=proxyRunning?'Proxy running':'Proxy stopped';connectionStatus.classList.toggle('running',proxyRunning);

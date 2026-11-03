@@ -126,12 +126,14 @@ function teammatesOf(game, selfName, resolvePlayer = null) {
         seen.add(realName.toLowerCase());
         const savedDisplay = sameName(saved.realName || name, realName) ? saved.display : null;
         const display = live?.display || savedDisplay || null;
-        shown.push(display || `§f${realName}`);
+        shown.push({ name: realName.toLowerCase(), display: display || `§f${realName}` });
         const denicked = !sameName(realName, name);
         const nicked = !denicked && Boolean(live?.nicked || saved.nicked);
         if (!nicked && (!display || live?.stale)) missing.push(realName);
     }
-    return { shown, missing };
+    // Sort resolved IGNs before the display limit, ignoring ranks and case.
+    shown.sort((a, b) => a.name.localeCompare(b.name));
+    return { shown: shown.map(player => player.display), missing };
 }
 
 function statsLine(counts) {

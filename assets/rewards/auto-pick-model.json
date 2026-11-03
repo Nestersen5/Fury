@@ -1,0 +1,1088 @@
+{
+  "version": "reward-clear-winner-2026-10-29-v3",
+  "savedAt": "2026-10-29",
+  "source": "clear-winner.html (Reward Preference Quiz); logic in auto-pick-model-v3.js",
+  "decisionRule": {
+    "auto": "Pick card X only if X is strictly better than BOTH other cards (directly or transitively through recorded relations).",
+    "manualTie": "Several best cards are declared equal -> user chooses.",
+    "manualUnknown": "Best cards are not ranked against each other -> user chooses.",
+    "manualConflict": "Contradictory relations -> user chooses (currently none).",
+    "notUsed": "No rarity score, no amount extrapolation, no conversion rates. Cosmetics assumed not owned. Housing and Legacy rewards excluded."
+  },
+  "rarities": [
+    "Common",
+    "Rare",
+    "Epic",
+    "Legendary"
+  ],
+  "rewards": [
+    {
+      "id": "exp10000",
+      "name": "Hypixel EXP",
+      "amount": 10000,
+      "rarity": "Common",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "exp20000",
+      "name": "Hypixel EXP",
+      "amount": 20000,
+      "rarity": "Rare",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "exp40000",
+      "name": "Hypixel EXP",
+      "amount": 40000,
+      "rarity": "Epic",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "exp100000",
+      "name": "Hypixel EXP",
+      "amount": 100000,
+      "rarity": "Legendary",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "dust10",
+      "name": "Mystery Dust",
+      "amount": 10,
+      "rarity": "Common",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "dust20",
+      "name": "Mystery Dust",
+      "amount": 20,
+      "rarity": "Rare",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "dust40",
+      "name": "Mystery Dust",
+      "amount": 40,
+      "rarity": "Epic",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "dust100",
+      "name": "Mystery Dust",
+      "amount": 100,
+      "rarity": "Legendary",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "dust30",
+      "name": "Mystery Dust",
+      "amount": 30,
+      "rarity": "Rare",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "dust60",
+      "name": "Mystery Dust",
+      "amount": 60,
+      "rarity": "Epic",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "dust120",
+      "name": "Mystery Dust",
+      "amount": 120,
+      "rarity": "Legendary",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "souls100",
+      "name": "SkyWars Souls",
+      "amount": 100,
+      "rarity": "Rare",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "souls250",
+      "name": "SkyWars Souls",
+      "amount": 250,
+      "rarity": "Epic",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "reward1",
+      "name": "Reward Tokens",
+      "amount": 1,
+      "rarity": "Rare",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "reward3",
+      "name": "Reward Tokens",
+      "amount": 3,
+      "rarity": "Epic",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "reward14",
+      "name": "Reward Tokens",
+      "amount": 14,
+      "rarity": "Legendary",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "classic20",
+      "name": "Classic Tokens",
+      "amount": 20,
+      "rarity": "Rare",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "classic50",
+      "name": "Classic Tokens",
+      "amount": 50,
+      "rarity": "Epic",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "classic100",
+      "name": "Classic Tokens",
+      "amount": 100,
+      "rarity": "Legendary",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "arcade20000",
+      "name": "Arcade Coins",
+      "amount": 20000,
+      "rarity": "Common",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "arcade40000",
+      "name": "Arcade Coins",
+      "amount": 40000,
+      "rarity": "Rare",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "arcade100000",
+      "name": "Arcade Coins",
+      "amount": 100000,
+      "rarity": "Epic",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "arcade200000",
+      "name": "Arcade Coins",
+      "amount": 200000,
+      "rarity": "Legendary",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "arena4000",
+      "name": "Arena Coins",
+      "amount": 4000,
+      "rarity": "Common",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "arena8000",
+      "name": "Arena Coins",
+      "amount": 8000,
+      "rarity": "Rare",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "arena20000",
+      "name": "Arena Coins",
+      "amount": 20000,
+      "rarity": "Epic",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "arena40000",
+      "name": "Arena Coins",
+      "amount": 40000,
+      "rarity": "Legendary",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "blitz3000",
+      "name": "Blitz SG Coins",
+      "amount": 3000,
+      "rarity": "Common",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "blitz6000",
+      "name": "Blitz SG Coins",
+      "amount": 6000,
+      "rarity": "Rare",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "blitz15000",
+      "name": "Blitz SG Coins",
+      "amount": 15000,
+      "rarity": "Epic",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "blitz30000",
+      "name": "Blitz SG Coins",
+      "amount": 30000,
+      "rarity": "Legendary",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "cvc4000",
+      "name": "Cops and Crims Coins",
+      "amount": 4000,
+      "rarity": "Common",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "cvc8000",
+      "name": "Cops and Crims Coins",
+      "amount": 8000,
+      "rarity": "Rare",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "cvc20000",
+      "name": "Cops and Crims Coins",
+      "amount": 20000,
+      "rarity": "Epic",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "cvc40000",
+      "name": "Cops and Crims Coins",
+      "amount": 40000,
+      "rarity": "Legendary",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "mega3000",
+      "name": "Mega Walls Coins",
+      "amount": 3000,
+      "rarity": "Common",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "mega6000",
+      "name": "Mega Walls Coins",
+      "amount": 6000,
+      "rarity": "Rare",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "mega15000",
+      "name": "Mega Walls Coins",
+      "amount": 15000,
+      "rarity": "Epic",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "mega30000",
+      "name": "Mega Walls Coins",
+      "amount": 30000,
+      "rarity": "Legendary",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "paint6000",
+      "name": "Paintball Coins",
+      "amount": 6000,
+      "rarity": "Common",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "paint12000",
+      "name": "Paintball Coins",
+      "amount": 12000,
+      "rarity": "Rare",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "paint30000",
+      "name": "Paintball Coins",
+      "amount": 30000,
+      "rarity": "Epic",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "paint60000",
+      "name": "Paintball Coins",
+      "amount": 60000,
+      "rarity": "Legendary",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "quake3000",
+      "name": "Quakecraft Coins",
+      "amount": 3000,
+      "rarity": "Common",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "quake6000",
+      "name": "Quakecraft Coins",
+      "amount": 6000,
+      "rarity": "Rare",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "quake15000",
+      "name": "Quakecraft Coins",
+      "amount": 15000,
+      "rarity": "Epic",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "quake30000",
+      "name": "Quakecraft Coins",
+      "amount": 30000,
+      "rarity": "Legendary",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "swcoin4000",
+      "name": "SkyWars Coins",
+      "amount": 4000,
+      "rarity": "Common",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "swcoin8000",
+      "name": "SkyWars Coins",
+      "amount": 8000,
+      "rarity": "Rare",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "swcoin20000",
+      "name": "SkyWars Coins",
+      "amount": 20000,
+      "rarity": "Epic",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "swcoin40000",
+      "name": "SkyWars Coins",
+      "amount": 40000,
+      "rarity": "Legendary",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "smash3000",
+      "name": "Smash Heroes Coins",
+      "amount": 3000,
+      "rarity": "Common",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "smash6000",
+      "name": "Smash Heroes Coins",
+      "amount": 6000,
+      "rarity": "Rare",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "smash15000",
+      "name": "Smash Heroes Coins",
+      "amount": 15000,
+      "rarity": "Epic",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "smash30000",
+      "name": "Smash Heroes Coins",
+      "amount": 30000,
+      "rarity": "Legendary",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "tkr3000",
+      "name": "Turbo Kart Racers Coins",
+      "amount": 3000,
+      "rarity": "Common",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "tkr6000",
+      "name": "Turbo Kart Racers Coins",
+      "amount": 6000,
+      "rarity": "Rare",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "tkr15000",
+      "name": "Turbo Kart Racers Coins",
+      "amount": 15000,
+      "rarity": "Epic",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "tkr30000",
+      "name": "Turbo Kart Racers Coins",
+      "amount": 30000,
+      "rarity": "Legendary",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "vamp6000",
+      "name": "VampireZ Coins",
+      "amount": 6000,
+      "rarity": "Common",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "vamp12000",
+      "name": "VampireZ Coins",
+      "amount": 12000,
+      "rarity": "Rare",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "vamp30000",
+      "name": "VampireZ Coins",
+      "amount": 30000,
+      "rarity": "Epic",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "vamp60000",
+      "name": "VampireZ Coins",
+      "amount": 60000,
+      "rarity": "Legendary",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "walls3000",
+      "name": "Walls Coins",
+      "amount": 3000,
+      "rarity": "Common",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "walls6000",
+      "name": "Walls Coins",
+      "amount": 6000,
+      "rarity": "Rare",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "walls15000",
+      "name": "Walls Coins",
+      "amount": 15000,
+      "rarity": "Epic",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "walls30000",
+      "name": "Walls Coins",
+      "amount": 30000,
+      "rarity": "Legendary",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "warlords3000",
+      "name": "Warlords Coins",
+      "amount": 3000,
+      "rarity": "Common",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "warlords6000",
+      "name": "Warlords Coins",
+      "amount": 6000,
+      "rarity": "Rare",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "warlords15000",
+      "name": "Warlords Coins",
+      "amount": 15000,
+      "rarity": "Epic",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "warlords30000",
+      "name": "Warlords Coins",
+      "amount": 30000,
+      "rarity": "Legendary",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "uhc2500",
+      "name": "UHC Coins",
+      "amount": 2500,
+      "rarity": "Common",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "uhc5000",
+      "name": "UHC Coins",
+      "amount": 5000,
+      "rarity": "Rare",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "uhc12500",
+      "name": "UHC Coins",
+      "amount": 12500,
+      "rarity": "Epic",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "uhc25000",
+      "name": "UHC Coins",
+      "amount": 25000,
+      "rarity": "Legendary",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "bed3000",
+      "name": "Bed Wars Tokens",
+      "amount": 3000,
+      "rarity": "Common",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "bed6000",
+      "name": "Bed Wars Tokens",
+      "amount": 6000,
+      "rarity": "Rare",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "bed10000",
+      "name": "Bed Wars Tokens",
+      "amount": 10000,
+      "rarity": "Epic",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "bed25000",
+      "name": "Bed Wars Tokens",
+      "amount": 25000,
+      "rarity": "Legendary",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "build3000",
+      "name": "Build Battle Tokens",
+      "amount": 3000,
+      "rarity": "Common",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "build6000",
+      "name": "Build Battle Tokens",
+      "amount": 6000,
+      "rarity": "Rare",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "build10000",
+      "name": "Build Battle Tokens",
+      "amount": 10000,
+      "rarity": "Epic",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "build25000",
+      "name": "Build Battle Tokens",
+      "amount": 25000,
+      "rarity": "Legendary",
+      "amountUnconfirmed": true
+    },
+    {
+      "id": "duels3000",
+      "name": "Duels Tokens",
+      "amount": 3000,
+      "rarity": "Common",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "duels6000",
+      "name": "Duels Tokens",
+      "amount": 6000,
+      "rarity": "Rare",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "duels10000",
+      "name": "Duels Tokens",
+      "amount": 10000,
+      "rarity": "Epic",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "duels25000",
+      "name": "Duels Tokens",
+      "amount": 25000,
+      "rarity": "Legendary",
+      "amountUnconfirmed": true
+    },
+    {
+      "id": "murder3000",
+      "name": "Murder Mystery Tokens",
+      "amount": 3000,
+      "rarity": "Common",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "murder6000",
+      "name": "Murder Mystery Tokens",
+      "amount": 6000,
+      "rarity": "Rare",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "murder10000",
+      "name": "Murder Mystery Tokens",
+      "amount": 10000,
+      "rarity": "Epic",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "murder25000",
+      "name": "Murder Mystery Tokens",
+      "amount": 25000,
+      "rarity": "Legendary",
+      "amountUnconfirmed": true
+    },
+    {
+      "id": "swt5000",
+      "name": "SkyWars Tokens",
+      "amount": 5000,
+      "rarity": "Common",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "swt10000",
+      "name": "SkyWars Tokens",
+      "amount": 10000,
+      "rarity": "Rare",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "swt25000",
+      "name": "SkyWars Tokens",
+      "amount": 25000,
+      "rarity": "Epic",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "swt50000",
+      "name": "SkyWars Tokens",
+      "amount": 50000,
+      "rarity": "Legendary",
+      "amountUnconfirmed": true
+    },
+    {
+      "id": "tnt4000",
+      "name": "TNT Games Tokens",
+      "amount": 4000,
+      "rarity": "Common",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "tnt8000",
+      "name": "TNT Games Tokens",
+      "amount": 8000,
+      "rarity": "Rare",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "tnt20000",
+      "name": "TNT Games Tokens",
+      "amount": 20000,
+      "rarity": "Epic",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "tnt40000",
+      "name": "TNT Games Tokens",
+      "amount": 40000,
+      "rarity": "Legendary",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "suitHelmet",
+      "name": "Treasure Hunter Helmet",
+      "amount": null,
+      "rarity": "Legendary",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "suitChestplate",
+      "name": "Treasure Hunter Chestplate",
+      "amount": null,
+      "rarity": "Legendary",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "suitLeggings",
+      "name": "Treasure Hunter Leggings",
+      "amount": null,
+      "rarity": "Legendary",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "suitBoots",
+      "name": "Treasure Hunter Boots",
+      "amount": null,
+      "rarity": "Legendary",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "emote",
+      "name": "Moustache Emote",
+      "amount": null,
+      "rarity": "Legendary",
+      "amountUnconfirmed": false
+    },
+    {
+      "id": "gesture",
+      "name": "Dig for Treasure Gesture",
+      "amount": null,
+      "rarity": "Legendary",
+      "amountUnconfirmed": false
+    }
+  ],
+  "equalityClasses": [
+    [
+      "exp40000",
+      "reward3",
+      "arcade100000",
+      "arcade200000"
+    ],
+    [
+      "exp100000",
+      "souls250",
+      "gesture"
+    ],
+    [
+      "dust30",
+      "duels3000"
+    ],
+    [
+      "reward14",
+      "suitHelmet",
+      "suitChestplate",
+      "suitLeggings",
+      "suitBoots",
+      "emote"
+    ],
+    [
+      "mega30000",
+      "uhc25000"
+    ],
+    [
+      "build25000",
+      "duels25000",
+      "murder25000"
+    ]
+  ],
+  "rules": [
+    {
+      "rule": "skywarsTokensFallback",
+      "description": "User correction: SkyWars Tokens are fallback below non-token rewards; SkyWars Coins stay separate",
+      "tokens": [
+        "swt5000",
+        "swt10000",
+        "swt25000",
+        "swt50000"
+      ]
+    }
+  ],
+  "relations": [
+    {
+      "better": "reward14",
+      "worse": "gesture",
+      "evidence": "Confirmed core order; latest corrections through Q76"
+    },
+    {
+      "better": "gesture",
+      "worse": "arcade200000",
+      "evidence": "Confirmed core order; latest corrections through Q76"
+    },
+    {
+      "better": "arcade200000",
+      "worse": "souls100",
+      "evidence": "Confirmed core order; latest corrections through Q76"
+    },
+    {
+      "better": "souls100",
+      "worse": "exp20000",
+      "evidence": "Confirmed core order; latest corrections through Q76"
+    },
+    {
+      "better": "exp20000",
+      "worse": "swcoin40000",
+      "evidence": "Confirmed core order; latest corrections through Q76"
+    },
+    {
+      "better": "swcoin40000",
+      "worse": "reward1",
+      "evidence": "Confirmed core order; latest corrections through Q76"
+    },
+    {
+      "better": "reward1",
+      "worse": "exp10000",
+      "evidence": "Confirmed core order; latest corrections through Q76"
+    },
+    {
+      "better": "exp100000",
+      "worse": "dust120",
+      "evidence": "Q5"
+    },
+    {
+      "better": "reward1",
+      "worse": "swt25000",
+      "evidence": "Q12"
+    },
+    {
+      "better": "exp10000",
+      "worse": "dust120",
+      "evidence": "Q15 / Q38"
+    },
+    {
+      "better": "exp10000",
+      "worse": "bed25000",
+      "evidence": "Q15 / Q38"
+    },
+    {
+      "better": "exp10000",
+      "worse": "tnt40000",
+      "evidence": "Q15 / Q38"
+    },
+    {
+      "better": "tnt40000",
+      "worse": "build25000",
+      "evidence": "Q7 / Q40"
+    },
+    {
+      "better": "tnt40000",
+      "worse": "murder25000",
+      "evidence": "Q7 / Q40"
+    },
+    {
+      "better": "tnt40000",
+      "worse": "bed3000",
+      "evidence": "Q7 / Q40"
+    },
+    {
+      "better": "tnt40000",
+      "worse": "swt5000",
+      "evidence": "Q7 / Q40"
+    },
+    {
+      "better": "arcade200000",
+      "worse": "swcoin40000",
+      "evidence": "Q22"
+    },
+    {
+      "better": "arcade200000",
+      "worse": "dust120",
+      "evidence": "Q22"
+    },
+    {
+      "better": "bed25000",
+      "worse": "duels25000",
+      "evidence": "Q23 / Q28 / Q81"
+    },
+    {
+      "better": "bed25000",
+      "worse": "murder25000",
+      "evidence": "Q23 / Q28 / Q81"
+    },
+    {
+      "better": "bed25000",
+      "worse": "swt5000",
+      "evidence": "Q23 / Q28 / Q81"
+    },
+    {
+      "better": "bed25000",
+      "worse": "tnt40000",
+      "evidence": "Q23 / Q28 / Q81"
+    },
+    {
+      "better": "bed25000",
+      "worse": "swcoin4000",
+      "evidence": "Q23 / Q28 / Q81"
+    },
+    {
+      "better": "suitHelmet",
+      "worse": "dust120",
+      "evidence": "Q30"
+    },
+    {
+      "better": "suitHelmet",
+      "worse": "bed25000",
+      "evidence": "Q30"
+    },
+    {
+      "better": "classic100",
+      "worse": "paint60000",
+      "evidence": "Q32 / Q39 / Q43"
+    },
+    {
+      "better": "classic100",
+      "worse": "quake30000",
+      "evidence": "Q32 / Q39 / Q43"
+    },
+    {
+      "better": "classic100",
+      "worse": "dust120",
+      "evidence": "Q32 / Q39 / Q43"
+    },
+    {
+      "better": "classic100",
+      "worse": "arcade20000",
+      "evidence": "Q32 / Q39 / Q43"
+    },
+    {
+      "better": "classic100",
+      "worse": "exp10000",
+      "evidence": "Q32 / Q39 / Q43"
+    },
+    {
+      "better": "classic100",
+      "worse": "tnt40000",
+      "evidence": "Q32 / Q39 / Q43"
+    },
+    {
+      "better": "swcoin40000",
+      "worse": "arcade20000",
+      "evidence": "Q29"
+    },
+    {
+      "better": "swcoin40000",
+      "worse": "dust120",
+      "evidence": "Q29"
+    },
+    {
+      "better": "emote",
+      "worse": "gesture",
+      "evidence": "Q47 / Q57 / Q58"
+    },
+    {
+      "better": "emote",
+      "worse": "dust120",
+      "evidence": "Q47 / Q57 / Q58"
+    },
+    {
+      "better": "dust30",
+      "worse": "build3000",
+      "evidence": "Q48"
+    },
+    {
+      "better": "exp20000",
+      "worse": "classic50",
+      "evidence": "Q77 / Q83"
+    },
+    {
+      "better": "exp20000",
+      "worse": "swcoin20000",
+      "evidence": "Q77 / Q83"
+    },
+    {
+      "better": "reward1",
+      "worse": "classic20",
+      "evidence": "Q78 / Q84"
+    },
+    {
+      "better": "reward1",
+      "worse": "arcade40000",
+      "evidence": "Q78 / Q84"
+    },
+    {
+      "better": "souls100",
+      "worse": "arcade40000",
+      "evidence": "Q79"
+    },
+    {
+      "better": "swcoin20000",
+      "worse": "swt25000",
+      "evidence": "Q80"
+    },
+    {
+      "better": "swcoin20000",
+      "worse": "exp10000",
+      "evidence": "Q80"
+    },
+    {
+      "better": "uhc25000",
+      "worse": "paint60000",
+      "evidence": "Q82 / Q86 / Q87"
+    },
+    {
+      "better": "uhc25000",
+      "worse": "warlords30000",
+      "evidence": "Q82 / Q86 / Q87"
+    },
+    {
+      "better": "uhc25000",
+      "worse": "bed25000",
+      "evidence": "Q82 / Q86 / Q87"
+    },
+    {
+      "better": "uhc25000",
+      "worse": "dust120",
+      "evidence": "Q82 / Q86 / Q87"
+    },
+    {
+      "better": "uhc25000",
+      "worse": "smash30000",
+      "evidence": "Q82 / Q86 / Q87"
+    },
+    {
+      "better": "classic50",
+      "worse": "bed25000",
+      "evidence": "Q85"
+    },
+    {
+      "better": "classic50",
+      "worse": "arcade20000",
+      "evidence": "Q85"
+    },
+    {
+      "better": "cvc40000",
+      "worse": "arena40000",
+      "evidence": "Q88"
+    },
+    {
+      "better": "cvc40000",
+      "worse": "tkr30000",
+      "evidence": "Q88"
+    },
+    {
+      "better": "exp20000",
+      "worse": "classic100",
+      "evidence": "Completed quiz Q113: EXP chosen over 100 Classic Tokens"
+    },
+    {
+      "better": "souls100",
+      "worse": "classic100",
+      "evidence": "Completed quiz Q110: Souls chosen over 100 Classic Tokens"
+    },
+    {
+      "better": "classic100",
+      "worse": "reward1",
+      "evidence": "Original Q54: unchanged explicit comparison"
+    },
+    {
+      "better": "swt50000",
+      "worse": "swt25000",
+      "evidence": "Clear-winner quiz Q4: token-only draw; keep observed amount preference"
+    },
+    {
+      "better": "swt50000",
+      "worse": "swt5000",
+      "evidence": "Clear-winner quiz Q4: token-only draw; keep observed amount preference"
+    }
+  ]
+}

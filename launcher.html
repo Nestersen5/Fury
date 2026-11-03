@@ -3549,35 +3549,42 @@
                                     <div class="settings-subgroup-head"><h3>Share Settings</h3></div>
                                     <section class="share-settings-module settings-search-item" aria-labelledby="share-settings-title">
                                         <div class="share-settings-hero">
-                                            <div><span class="eyebrow">Party intelligence</span><h3 id="share-settings-title">Broadcast Scan Results</h3><div class="note">After a scan, send selected threats to party chat. Manual /share remains available.</div></div>
+                                            <div><span class="eyebrow">Party intelligence</span><h3 id="share-settings-title">Broadcast Scan Results</h3><div class="note">Auto-share to party chat.</div></div>
                                             <div class="feature-toggle"><label class="switch"><input id="share-tags-auto" type="checkbox"><span class="switch-track"></span><span class="switch-thumb"></span><span class="switch-label">OFF</span></label></div>
                                         </div>
                                         <div class="share-settings-layout">
                                             <div class="party-chat-preview">
-                                                <div class="party-chat-preview-head"><span>Party chat preview</span><small id="party-preview-visibility">What your party receives</small></div>
+                                                <div class="party-chat-preview-head"><span>Party chat preview</span></div>
                                                 <div class="party-chat-window" id="party-chat-preview-lines"></div>
-                                                <div class="party-chat-caption">Preview updates instantly as formatting options change.</div>
                                             </div>
                                             <div class="share-format-controls">
+                                                <div class="share-option-row fury-share-method-selector">
+                                                    <div><h3 id="share-team-summary-title">Method</h3><span id="share-method-description" hidden>Team summaries apply to BedWars.</span></div>
+                                                    <div class="feature-toggle"><label class="switch"><input id="share-tags-team-summary" type="checkbox" aria-label="Use team summaries" aria-describedby="share-method-description" data-notification-label="Sharing method" data-off-label="Individual players" data-on-label="Team summaries" checked><span class="switch-track"></span><span class="switch-thumb"></span><span class="switch-label">ON</span></label></div>
+                                                </div>
                                                 <div class="share-option-row">
-                                                    <div><h3>Fancy Share Lines</h3><div class="note">Adds stars, compact separators, icons, and clearer threat details.</div></div>
+                                                    <div><h3 id="share-monthly-fkdr-title">Monthly FKDR</h3><div class="note">May slightly delay sharing.</div></div>
+                                                    <div class="feature-toggle"><label class="switch"><input id="share-tags-monthly-fkdr" type="checkbox" aria-labelledby="share-monthly-fkdr-title" data-notification-label="Monthly FKDR" checked><span class="switch-track"></span><span class="switch-thumb"></span><span class="switch-label">OFF</span></label></div>
+                                                </div>
+                                                <div class="share-option-row">
+                                                    <div><h3>Fancy Share Lines</h3><div class="note">Add stars and details.</div></div>
                                                     <div class="feature-toggle"><label class="switch"><input id="share-tags-fancy" type="checkbox"><span class="switch-track"></span><span class="switch-thumb"></span><span class="switch-label">OFF</span></label></div>
                                                 </div>
                                                 <div class="share-option-row">
-                                                    <div><h3>Recolor Own Share Lines</h3><div class="note">Colorizes your local copy by team, stats, and tags. Party members still receive plain text.</div></div>
+                                                    <div><h3>Recolor Own Share Lines</h3></div>
                                                     <div class="feature-toggle"><label class="switch"><input id="share-tags-color-local" type="checkbox"><span class="switch-track"></span><span class="switch-thumb"></span><span class="switch-label">OFF</span></label></div>
                                                 </div>
                                             </div>
                                         </div>
                                         <div class="share-include-panel">
-                                            <div class="share-include-heading"><div><span class="eyebrow">Include</span><h3>Players To Share</h3></div><small>Choose which scan findings belong in party chat</small></div>
+                                            <div class="share-include-heading"><div><h3>Include</h3></div></div>
                                             <div class="share-include-grid">
                                                 <div class="share-include-card"><span class="share-include-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 4h7l9 9-7 7-9-9V4Z"></path><circle cx="8.5" cy="8.5" r="1.25"></circle></svg></span><div><h3>Tagged Players</h3><small>Urchin tags</small></div><div class="feature-toggle"><label class="switch"><input id="share-tags-include-tagged" type="checkbox"><span class="switch-track"></span><span class="switch-thumb"></span><span class="switch-label">OFF</span></label></div></div>
                                                 <div class="share-include-card"><span class="share-include-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3.5 9.5c2.8-2 5.6-2.7 8.5-2.7s5.7.7 8.5 2.7l-1.2 6.1c-2.2 1.6-4.6 2.4-7.3 2.4s-5.1-.8-7.3-2.4L3.5 9.5Z"></path><path d="M7.3 12.1c1.2-.6 2.4-.6 3.5 0-1 1.8-2.6 2-3.5 0Zm5.9 0c1.1-.6 2.3-.6 3.5 0-.9 2-2.5 1.8-3.5 0Z"></path></svg></span><div><h3>Nicked Players</h3><small>Detected nicked accounts</small></div><div class="feature-toggle"><label class="switch"><input id="share-tags-include-nicks" type="checkbox"><span class="switch-track"></span><span class="switch-thumb"></span><span class="switch-label">OFF</span></label></div></div>
                                                 <div class="share-include-card"><span class="share-include-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 19V5M4 19h16"></path><path d="m7 15 3-4 3 2 4-6"></path><path d="m14.5 7 2.5-.2.2 2.5"></path></svg></span><div><h3>Stat Threats</h3><small>Threshold-based risks</small></div><div class="feature-toggle"><label class="switch"><input id="share-tags-include-threats" type="checkbox"><span class="switch-track"></span><span class="switch-thumb"></span><span class="switch-label">OFF</span></label></div></div>
                                             </div>
                                         </div>
-                                        <div class="share-threshold-panel settings-search-item" data-settings-thresholds>
+                                        <div class="share-threshold-panel settings-search-item" data-settings-thresholds data-stat-threat-threshold="share" hidden>
                                             <div class="share-threshold-heading"><div><span class="eyebrow">Classification</span><h3>Threat Thresholds</h3></div><small>Used by scans and Stat Threats sharing</small></div>
                                             <div class="share-threshold-grid">
                                                 <section class="share-threshold-card">
@@ -3670,13 +3677,13 @@
                                                     <div><h4>Define a stat threat</h4><p>A player triggers this rule after reaching either threshold.</p></div>
                                                 </div>
                                                 <div class="auto-dodge-threshold-grid">
-                                                    <label class="auto-dodge-number settings-search-item" for="auto-dodge-min-fkdr">
+                                                    <label class="auto-dodge-number settings-search-item" for="auto-dodge-min-fkdr" data-stat-threat-threshold="dodge" hidden>
                                                         <span>Minimum FKDR</span>
                                                         <small>Final kill/death ratio</small>
                                                         <input id="auto-dodge-min-fkdr" type="number" min="0" step="0.1">
                                                     </label>
-                                                    <div class="auto-dodge-threshold-or" aria-hidden="true">OR</div>
-                                                    <label class="auto-dodge-number settings-search-item" for="auto-dodge-min-stars">
+                                                    <div class="auto-dodge-threshold-or" aria-hidden="true" data-stat-threat-threshold="dodge" hidden>OR</div>
+                                                    <label class="auto-dodge-number settings-search-item" for="auto-dodge-min-stars" data-stat-threat-threshold="dodge" hidden>
                                                         <span>Minimum Stars</span>
                                                         <small>BedWars level</small>
                                                         <input id="auto-dodge-min-stars" type="number" min="0" step="1">
@@ -3805,6 +3812,21 @@
                                     <h2>Overlay &amp; chat</h2>
                                     <div class="note">Overlay controls populate the launcher player board. Chat Stats print player intelligence inside Minecraft chat.</div>
                                 </div>
+                                <section class="fury-settings-panel lobby-spam-settings settings-search-item" aria-labelledby="lobby-spam-title">
+                                    <h3 id="lobby-spam-title">Spam detection</h3>
+                                    <div class="feature-card">
+                                        <div><h3>Detect lobby spam</h3><div class="note">Offer a Mute button for repeated public messages in lobbies. Never active in pregame or matches.</div></div>
+                                        <div class="feature-toggle"><label class="switch"><input id="lobby-spam-enabled" type="checkbox" aria-label="Detect lobby spam"><span class="switch-track"></span><span class="switch-thumb"></span><span class="switch-label">OFF</span></label></div>
+                                    </div>
+                                    <div class="feature-card">
+                                        <div><label for="lobby-spam-sensitivity">Sensitivity</label><div class="note">Low needs more repetition. High catches similar messages sooner.</div></div>
+                                        <select id="lobby-spam-sensitivity" aria-label="Lobby spam sensitivity"><option value="low">Low</option><option value="balanced" selected>Balanced</option><option value="high">High</option></select>
+                                    </div>
+                                    <div class="feature-card">
+                                        <div><h3>Muted players</h3><div class="note">Only their public lobby messages are hidden. Your list clears when you disconnect.</div></div>
+                                        <button id="lobby-spam-manage" type="button" aria-haspopup="dialog" aria-controls="lobby-spam-dialog">Manage muted players</button>
+                                    </div>
+                                </section>
                                 <div class="settings-subgroup overlay-concept-group">
                                     <div class="settings-subgroup-head"><h3>Overlay</h3></div>
                                     <section class="overlay-concept-module settings-search-item" aria-labelledby="overlay-sources-title">
@@ -3867,6 +3889,25 @@
                                                 <article class="bedwars-event-accent-option">
                                                     <div><h4>Scoreboard team colors</h4><p>Show BedWars team names in their in-game team colors.</p></div>
                                                     <div class="feature-toggle"><label class="switch"><input id="bedwars-sidebar-team-colors-enabled" type="checkbox"><span class="switch-track"></span><span class="switch-thumb"></span><span class="switch-label">OFF</span></label></div>
+                                                </article>
+                                                <article class="bedwars-event-accent-option">
+                                                    <div><h4>Custom lobby scoreboard</h4></div>
+                                                    <div class="feature-toggle"><label class="switch"><input id="bedwars-lobby-scoreboard-enabled" type="checkbox" checked><span class="switch-track"></span><span class="switch-thumb"></span><span class="switch-label">ON</span></label></div>
+                                                    <select id="bedwars-lobby-scoreboard-style" aria-label="Lobby scoreboard colors">
+                                                        <option value="grey">Grey labels</option>
+                                                        <option value="classic" selected>Classic</option>
+                                                        <option value="gold">Gold accent</option>
+                                                        <option value="aqua">Aqua accent</option>
+                                                        <option value="labels">Colored labels</option>
+                                                        <option value="category">By category</option>
+                                                    </select>
+                                                    <select id="bedwars-lobby-scoreboard-decimals" aria-label="Lobby scoreboard FKDR decimal digits">
+                                                        <option value="0">0</option>
+                                                        <option value="1">1</option>
+                                                        <option value="2">2</option>
+                                                        <option value="3">3</option>
+                                                        <option value="4" selected>4</option>
+                                                    </select>
                                                 </article>
                                             </div>
                                         </div>
@@ -4600,11 +4641,15 @@
             autoScanOnGameStart: document.getElementById('auto-scan-on-game-start'),
             shareTagsAuto: document.getElementById('share-tags-auto'),
             shareTagsFancy: document.getElementById('share-tags-fancy'),
+            shareTagsTeamSummary: document.getElementById('share-tags-team-summary'),
             shareTagsColorLocal: document.getElementById('share-tags-color-local'),
+            shareTagsMonthlyFkdr: document.getElementById('share-tags-monthly-fkdr'),
             shareTagsIncludeTagged: document.getElementById('share-tags-include-tagged'),
             shareTagsIncludeNicks: document.getElementById('share-tags-include-nicks'),
             shareTagsIncludeThreats: document.getElementById('share-tags-include-threats'),
             quickMathsEnabled: document.getElementById('quick-maths-enabled'),
+            lobbySpamEnabled: document.getElementById('lobby-spam-enabled'),
+            lobbySpamSensitivity: document.getElementById('lobby-spam-sensitivity'),
             autoDodgeEnabled: document.getElementById('auto-dodge-enabled'),
             autoDodgeLeaveMode: document.getElementById('auto-dodge-leave-mode'),
             autoDodgeTaggedPlayers: document.getElementById('auto-dodge-tagged-players'),
@@ -4625,6 +4670,9 @@
             lobbyChatStatsTriggerEnabled: document.getElementById('lobby-chat-stats-trigger-enabled'),
             accentBedwarsEventLabelsEnabled: document.getElementById('accent-bedwars-event-labels-enabled'),
             bedwarsSidebarTeamColorsEnabled: document.getElementById('bedwars-sidebar-team-colors-enabled'),
+            bedwarsLobbyScoreboardEnabled: document.getElementById('bedwars-lobby-scoreboard-enabled'),
+            bedwarsLobbyScoreboardStyle: document.getElementById('bedwars-lobby-scoreboard-style'),
+            bedwarsLobbyScoreboardDecimals: document.getElementById('bedwars-lobby-scoreboard-decimals'),
             pregameChatStatsEnabled: document.getElementById('pregame-chat-stats-enabled'),
             queueTimeEnabled: document.getElementById('queue-time-enabled'),
             queueTimePartyChatEnabled: document.getElementById('queue-time-party-chat-enabled'),
@@ -4688,11 +4736,15 @@
             'autoScanOnGameStart',
             'shareTagsAuto',
             'shareTagsFancy',
+            'shareTagsTeamSummary',
             'shareTagsColorLocal',
+            'shareTagsMonthlyFkdr',
             'shareTagsIncludeTagged',
             'shareTagsIncludeNicks',
             'shareTagsIncludeThreats',
             'quickMathsEnabled',
+            'lobbySpamEnabled',
+            'lobbySpamSensitivity',
             'autoDodgeEnabled',
             'autoDodgeLeaveMode',
             'autoDodgeTaggedPlayers',
@@ -4714,6 +4766,9 @@
             'lobbyChatStatsTriggerEnabled',
             'accentBedwarsEventLabelsEnabled',
             'bedwarsSidebarTeamColorsEnabled',
+            'bedwarsLobbyScoreboardEnabled',
+            'bedwarsLobbyScoreboardStyle',
+            'bedwarsLobbyScoreboardDecimals',
             'pregameChatStatsEnabled',
             'queueTimeEnabled',
             'queueTimePartyChatEnabled',
@@ -5088,11 +5143,24 @@
             finally { drafts.forEach(([el,,value]) => { el.value = value; }); }
         }
 
+        const statThreatThresholdGroups = [
+            [() => ids.autoDodgeStatThreats.checked, [...document.querySelectorAll('[data-stat-threat-threshold="dodge"]')]],
+            [() => ids.scanMode.value === 'threats' || ids.shareTagsIncludeThreats.checked, [...document.querySelectorAll('[data-stat-threat-threshold="share"]')]]
+        ];
+
+        function syncStatThreatThresholds() {
+            statThreatThresholdGroups.forEach(([isEnabled, groups]) => {
+                const hidden = !isEnabled();
+                groups.forEach(group => { group.hidden = hidden; });
+            });
+        }
+
         function syncSwitchLabels() {
             document.querySelectorAll('.switch input').forEach((input) => {
                 const label = input.closest('.switch')?.querySelector('.switch-label');
                 if (label) label.textContent = input.checked ? 'ON' : 'OFF';
             });
+            syncStatThreatThresholds();
         }
 
         const anticheatDetectorGroup = document.getElementById('anticheat-detectors');
@@ -5589,7 +5657,7 @@
             const rankSelect = select.id === 'nickroll-rank';
             const nickrollSelect = rankSelect || select.id === 'nickroll-skinMode';
             const nickrollLabel = rankSelect ? 'Nickname rank' : 'Skin';
-            const searchable = !nickrollSelect && !['tab-stats-preset', 'tab-stats-label-style', 'nametag-tag-display-mode', 'auto-dodge-leave-mode'].includes(select.id);
+            const searchable = !nickrollSelect && !['tab-stats-preset', 'tab-stats-label-style', 'nametag-tag-display-mode', 'auto-dodge-leave-mode', 'bedwars-lobby-scoreboard-style', 'bedwars-lobby-scoreboard-decimals', 'lobby-spam-sensitivity'].includes(select.id);
             const optionMarkup = option => {
                 const label = option?.textContent || 'Choose a stat';
                 if (!rankSelect) return escapeHtml(label);
@@ -5615,6 +5683,8 @@
             trigger.setAttribute('aria-controls', popoverId);
             if (nickrollSelect) trigger.setAttribute('aria-label', nickrollLabel);
             if (select.id === 'auto-dodge-leave-mode') trigger.setAttribute('aria-label', 'Leave timing');
+            if (select.id.startsWith('bedwars-lobby-scoreboard-')) trigger.setAttribute('aria-label', select.getAttribute('aria-label'));
+            if (select.id === 'lobby-spam-sensitivity') trigger.setAttribute('aria-label', select.getAttribute('aria-label'));
             trigger.innerHTML = '<span class="stat-select-value"></span><span class="stat-select-trigger-icon" aria-hidden="true"></span>';
             shell.appendChild(trigger);
 
@@ -5631,6 +5701,7 @@
             if (!searchable) { search.parentElement.hidden = true; list.setAttribute('aria-label', select.id === 'tab-stats-preset' ? 'Preset' : select.id === 'tab-stats-label-style' ? 'Stat labels' : 'Tag display'); }
             if (nickrollSelect) list.setAttribute('aria-label', nickrollLabel);
             if (select.id === 'auto-dodge-leave-mode') list.setAttribute('aria-label', 'Leave timing');
+            if (select.id.startsWith('bedwars-lobby-scoreboard-')) list.setAttribute('aria-label', select.getAttribute('aria-label'));
             const controller = { select, shell, trigger, popover, search, list, empty, open: false, rebuild: null };
 
             controller.rebuild = () => {
@@ -5749,6 +5820,9 @@
 
         NAMETAG_PRIMARY_FALLBACK_PAIRS.flat().forEach(createCustomStatSelect);
         createCustomStatSelect(ids.autoDodgeLeaveMode);
+        createCustomStatSelect(ids.bedwarsLobbyScoreboardStyle);
+        createCustomStatSelect(ids.bedwarsLobbyScoreboardDecimals);
+        createCustomStatSelect(ids.lobbySpamSensitivity);
         document.addEventListener('pointerdown', (event) => {
             if (!openCustomStatSelect) return;
             if (openCustomStatSelect.shell.contains(event.target) || openCustomStatSelect.popover.contains(event.target)) return;
@@ -6242,6 +6316,7 @@
                 button.classList.toggle('active', active);
                 button.setAttribute('aria-checked', String(active));
             });
+            syncStatThreatThresholds();
         }
 
         document.querySelectorAll('[data-scan-mode]').forEach(button => {
@@ -6257,24 +6332,35 @@
             const preview = document.getElementById('party-chat-preview-lines');
             if (!preview) return;
             const fancy = Boolean(ids.shareTagsFancy?.checked);
+            const summary = Boolean(ids.shareTagsTeamSummary?.checked);
             const recolor = Boolean(ids.shareTagsColorLocal?.checked);
+            const individualOptions = document.getElementById('share-individual-options');
+            if (individualOptions) individualOptions.hidden = summary;
+            const monthly = ids.shareTagsMonthlyFkdr?.checked !== false;
             const username = typeof currentMinecraftUsername === 'function' ? currentMinecraftUsername() : 'Player';
             const header = `<span class="party-chat-meta"><span class="party-label">Party</span><span class="party-arrow"> &gt; </span><span class="party-ign">${username}</span><span class="party-colon">: </span></span>`;
-            const lines = fancy
+            const included = new Set();
+            if (ids.shareTagsIncludeTagged?.checked) included.add('tagged');
+            if (ids.shareTagsIncludeNicks?.checked) included.add('nicks');
+            if (ids.shareTagsIncludeThreats?.checked) included.add('threats');
+            const lines = summary
+                ? require('./src/overlay/shareTags').buildTeamSummaryPreviewEntries(8, included, recolor)[0].entries.map(entry => recolor
+                    ? require('./src/launcher/renderer/launcher_denick_format').legacyHtml(require('./features/minecraft_chat').extractFormattedText(entry.component))
+                    : escapeHtml(entry.line))
+                : fancy
                 ? [
-                    `<span class="team-red">[RED]</span> <span class="share-stars">460✫</span> <span>RushGod</span> <span class="share-stat">✓ FKDR 8.42</span> <span class="share-tag">| BLATANT</span>`,
+                    `<span class="team-red">[RED]</span> <span class="share-stars">460✫</span> <span>RushGod</span> <span class="share-stat">✓ FKDR 8.42${monthly ? ' MFKDR 6.31' : ''}</span> <span class="share-tag">| BLATANT</span>`,
                     `<span class="team-blue">[BLUE]</span> <span class="share-stars">231✫</span> <span>HiddenPlayer</span> <span class="share-tag">| NICKED</span>`
                 ]
                 : [
-                    `<span class="team-red">[RED]</span> <span>RushGod: </span><span class="share-stat">FKDR 8.42</span> <span class="share-tag">- BLATANT</span>`,
+                    `<span class="team-red">[RED]</span> <span>RushGod: </span><span class="share-stat">FKDR 8.42${monthly ? ' MFKDR 6.31' : ''}</span> <span class="share-tag">- BLATANT</span>`,
                     `<span class="team-blue">[BLUE]</span> <span>HiddenPlayer: </span><span class="share-tag">NICKED</span>`
                 ];
             preview.innerHTML = lines.map(line => `<div class="party-chat-line">${header}<span class="party-message${recolor ? ' is-recolored' : ''}">${line}</span></div>`).join('');
-            const visibility = document.getElementById('party-preview-visibility');
-            if (visibility) visibility.textContent = recolor ? 'Colored message preview' : 'Hypixel party chat preview';
         }
 
-        [ids.shareTagsFancy, ids.shareTagsColorLocal].filter(Boolean).forEach(control => {
+        [ids.shareTagsFancy, ids.shareTagsTeamSummary, ids.shareTagsColorLocal, ids.shareTagsMonthlyFkdr,
+            ids.shareTagsIncludeTagged, ids.shareTagsIncludeNicks, ids.shareTagsIncludeThreats].filter(Boolean).forEach(control => {
             control.addEventListener('change', renderPartySharePreview);
         });
 
@@ -6398,12 +6484,16 @@
                     autoScanOnGameStart: true,
                     shareTagsAuto: ids.shareTagsAuto.checked,
                     shareTagsFancy: ids.shareTagsFancy.checked,
+                    shareTagsTeamSummary: ids.shareTagsTeamSummary.checked,
                     shareTagsColorLocal: ids.shareTagsColorLocal.checked,
+                    shareTagsMonthlyFkdr: ids.shareTagsMonthlyFkdr.checked,
                     shareTagsGroupByTeam: true,
                     shareTagsIncludeTagged: ids.shareTagsIncludeTagged.checked,
                     shareTagsIncludeNicks: ids.shareTagsIncludeNicks.checked,
                     shareTagsIncludeThreats: ids.shareTagsIncludeThreats.checked,
                     quickMathsEnabled: ids.quickMathsEnabled.checked,
+                    lobbySpamEnabled: ids.lobbySpamEnabled.checked,
+                    lobbySpamSensitivity: ids.lobbySpamSensitivity.value,
                     autoDodgeEnabled: ids.autoDodgeEnabled.checked,
                     autoDodgeLeaveMode: ids.autoDodgeLeaveMode.value,
                     autoDodgeTaggedPlayers: ids.autoDodgeTaggedPlayers.checked,
@@ -6426,6 +6516,9 @@
                     lobbyChatStatsTriggerEnabled: ids.lobbyChatStatsTriggerEnabled.checked,
                     accentBedwarsEventLabelsEnabled: ids.accentBedwarsEventLabelsEnabled.checked,
                     bedwarsSidebarTeamColorsEnabled: ids.bedwarsSidebarTeamColorsEnabled.checked,
+                    bedwarsLobbyScoreboardEnabled: ids.bedwarsLobbyScoreboardEnabled.checked,
+                    bedwarsLobbyScoreboardStyle: ids.bedwarsLobbyScoreboardStyle.value,
+                    bedwarsLobbyScoreboardDecimals: Number(ids.bedwarsLobbyScoreboardDecimals.value),
                     pregameChatStatsEnabled: ids.pregameChatStatsEnabled.checked,
                     queueTimeEnabled: ids.queueTimeEnabled.checked,
                     queueTimePartyChatEnabled: ids.queueTimePartyChatEnabled.checked,
@@ -6558,11 +6651,15 @@
             ids.autoScanOnGameStart,
             ids.shareTagsAuto,
             ids.shareTagsFancy,
+            ids.shareTagsTeamSummary,
             ids.shareTagsColorLocal,
+            ids.shareTagsMonthlyFkdr,
             ids.shareTagsIncludeTagged,
             ids.shareTagsIncludeNicks,
             ids.shareTagsIncludeThreats,
             ids.quickMathsEnabled,
+            ids.lobbySpamEnabled,
+            ids.lobbySpamSensitivity,
             ids.autoDodgeEnabled,
             ids.autoDodgeLeaveMode,
             ids.autoDodgeTaggedPlayers,
@@ -6583,6 +6680,9 @@
             ids.lobbyChatStatsTriggerEnabled,
             ids.accentBedwarsEventLabelsEnabled,
             ids.bedwarsSidebarTeamColorsEnabled,
+            ids.bedwarsLobbyScoreboardEnabled,
+            ids.bedwarsLobbyScoreboardStyle,
+            ids.bedwarsLobbyScoreboardDecimals,
             ids.pregameChatStatsEnabled,
             ids.queueTimeEnabled,
             ids.queueTimePartyChatEnabled,
@@ -7783,13 +7883,18 @@
             ids.autoScanOnGameStart.checked = true;
             ids.shareTagsAuto.checked = featureOn('shareTagsAuto', false);
             ids.shareTagsFancy.checked = featureOn('shareTagsFancy', false);
+            ids.shareTagsTeamSummary.checked = featureOn('shareTagsTeamSummary', true);
             ids.shareTagsColorLocal.checked = featureOn('shareTagsColorLocal', true);
+            ids.shareTagsMonthlyFkdr.checked = featureOn('shareTagsMonthlyFkdr', true);
             ids.shareTagsIncludeTagged.checked = featureOn('shareTagsIncludeTagged', true);
             ids.shareTagsIncludeNicks.checked = featureOn('shareTagsIncludeNicks', true);
             ids.shareTagsIncludeThreats.checked = featureOn('shareTagsIncludeThreats', true);
             renderScanModeButtons();
             renderPartySharePreview();
             ids.quickMathsEnabled.checked = featureOn('quickMathsEnabled', false);
+            ids.lobbySpamEnabled.checked = featureOn('lobbySpamEnabled', false);
+            ids.lobbySpamSensitivity.value = require('./src/chat/lobbySpamSettings').normalizeLobbySpamSettings(features).lobbySpamSensitivity;
+            refreshCustomStatSelect(ids.lobbySpamSensitivity);
             ids.autoDodgeEnabled.checked = featureOn('autoDodgeEnabled', false);
             ids.autoDodgeLeaveMode.value = features.autoDodgeLeaveMode === 'instant' ? 'instant' : 'before_start';
             refreshCustomStatSelect(ids.autoDodgeLeaveMode);
@@ -7817,6 +7922,13 @@
             ids.lobbyChatStatsTriggerEnabled.checked = featureOn('lobbyChatStatsTriggerEnabled', true);
             ids.accentBedwarsEventLabelsEnabled.checked = featureOn('accentBedwarsEventLabelsEnabled', true);
             ids.bedwarsSidebarTeamColorsEnabled.checked = featureOn('bedwarsSidebarTeamColorsEnabled', true);
+            ids.bedwarsLobbyScoreboardEnabled.checked = featureOn('bedwarsLobbyScoreboardEnabled', true);
+            ids.bedwarsLobbyScoreboardStyle.value = [...ids.bedwarsLobbyScoreboardStyle.options].some(option => option.value === features.bedwarsLobbyScoreboardStyle)
+                ? features.bedwarsLobbyScoreboardStyle
+                : 'classic';
+            ids.bedwarsLobbyScoreboardDecimals.value = [...ids.bedwarsLobbyScoreboardDecimals.options].some(option => option.value === String(features.bedwarsLobbyScoreboardDecimals ?? 4))
+                ? String(features.bedwarsLobbyScoreboardDecimals ?? 4)
+                : '4';
             ids.pregameChatStatsEnabled.checked = featureOn('pregameChatStatsEnabled', true);
             ids.queueTimeEnabled.checked = featureOn('queueTimeEnabled', true);
             ids.queueTimePartyChatEnabled.checked = featureOn('queueTimePartyChatEnabled', false);
@@ -10504,7 +10616,9 @@
                     autoScanOnGameStart: true,
                     shareTagsAuto: ids.shareTagsAuto.checked,
                     shareTagsFancy: ids.shareTagsFancy.checked,
+                    shareTagsTeamSummary: ids.shareTagsTeamSummary.checked,
                     shareTagsColorLocal: ids.shareTagsColorLocal.checked,
+                    shareTagsMonthlyFkdr: ids.shareTagsMonthlyFkdr.checked,
                     shareTagsGroupByTeam: true,
                     shareTagsIncludeTagged: ids.shareTagsIncludeTagged.checked,
                     shareTagsIncludeNicks: ids.shareTagsIncludeNicks.checked,
@@ -10532,6 +10646,9 @@
                     lobbyChatStatsTriggerEnabled: ids.lobbyChatStatsTriggerEnabled.checked,
                     accentBedwarsEventLabelsEnabled: ids.accentBedwarsEventLabelsEnabled.checked,
                     bedwarsSidebarTeamColorsEnabled: ids.bedwarsSidebarTeamColorsEnabled.checked,
+                    bedwarsLobbyScoreboardEnabled: ids.bedwarsLobbyScoreboardEnabled.checked,
+                    bedwarsLobbyScoreboardStyle: ids.bedwarsLobbyScoreboardStyle.value,
+                    bedwarsLobbyScoreboardDecimals: Number(ids.bedwarsLobbyScoreboardDecimals.value),
                     pregameChatStatsEnabled: ids.pregameChatStatsEnabled.checked,
                     queueTimeEnabled: ids.queueTimeEnabled.checked,
                     queueTimePartyChatEnabled: ids.queueTimePartyChatEnabled.checked,

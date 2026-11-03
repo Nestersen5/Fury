@@ -26,6 +26,8 @@ const state = {
     apiKillSwitchEnabled: false,
 
     // Feature flags driven by features_config.json.
+    dailyReward: require('../rewards/settings').normalizeSettings(),
+    ...require('../chat/lobbySpamSettings').normalizeLobbySpamSettings(),
     tabStatsEnabled: false,
     autoScanOnGameStart: true,
     autoGamblerEnabled: false,
@@ -93,6 +95,8 @@ const state = {
     // /share: broadcasts tag/nick/threat info from the latest scan to party chat.
     shareTagsAuto: false,
     shareTagsFancy: false, // fancy = star level + icons in broadcast lines
+    shareTagsMonthlyFkdr: true,
+    shareTagsTeamSummary: true,
     shareTagsColorLocal: true, // recolor our own share echoes locally (no doubling)
     shareTagsIncludeTagged: true,
     shareTagsIncludeNicks: true,

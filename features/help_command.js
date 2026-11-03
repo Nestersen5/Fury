@@ -57,6 +57,12 @@ const HELP_SECTIONS = [
                 variations: ['/clip', '/clip <name>']
             },
             {
+                label: '/dailyreward',
+                command: '/dailyreward',
+                description: 'Pick and claim Daily Reward cards in chat after clicking the Delivery Man.',
+                variations: ['/dailyreward open', '/dailyreward status', '/dailyreward on', '/dailyreward off', '/dailyreward others on', '/dailyreward mode manual', '/dailyreward mode auto']
+            },
+            {
                 label: '/reminder',
                 aliases: ['/reminders'],
                 command: '/reminder status',
@@ -133,6 +139,12 @@ const HELP_SECTIONS = [
         title: 'Game & Overlay',
         entries: [
             {
+                label: '/wdr',
+                command: '/wdr ',
+                description: 'Report one player for cheating without opening the confirmation menu.',
+                variations: ['/wdr <player>', '/wdr status', '/wdr cancel']
+            },
+            {
                 label: '/scan',
                 command: '/scan',
                 description: 'Analyze current game players.',
@@ -157,7 +169,11 @@ const HELP_SECTIONS = [
                     '/share nicks',
                     '/share all',
                     '/share auto on',
-                    '/share auto off'
+                    '/share auto off',
+                    '/share monthly on',
+                    '/share monthly off',
+                    '/share summary on',
+                    '/share summary off'
                 ]
             },
             {
@@ -186,6 +202,12 @@ const HELP_SECTIONS = [
                 command: '/nametags ',
                 description: 'Show nick/tag/threat tags above enemy heads (Bedwars).',
                 variations: ['/nametags on', '/nametags style acronyms|full', '/nametags status']
+            },
+            {
+                label: '/lobbyspam',
+                command: '/lobbyspam list',
+                description: 'Temporarily mute public lobby messages from a player until disconnect.',
+                variations: ['/lobbyspam mute <player>', '/lobbyspam unmute <player>', '/lobbyspam list', '/lobbyspam clear']
             },
             {
                 label: '/chatstats /chattrigger',

@@ -142,10 +142,9 @@ function createScanRunner(deps) {
             };
         });
         const sourceOrder = new Map(scanTargets.map((target, index) => [target.name, index]));
-        // Live /share streaming sink (optional). Team membership is known now,
-        // before any lookup — only stats lag — so we can emit each team the
-        // instant its members all resolve (grouped mode) or each player as it
-        // resolves (arrival mode). See createShareTagsBroadcaster.createStream.
+        // Live /share streaming sink (optional). Each resolved row can broadcast
+        // immediately; team callbacks remain compatible and deduplicate rows
+        // already sent. See createShareTagsBroadcaster.createStream.
         const shareStream = context.shareStream || null;
         const teamKeyOf = (name) => {
             if (scanGameMode === 'SKYWARS') return 'SOLO';

@@ -44,10 +44,36 @@ const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
         page=await eventually(async()=>{const p=(await browser.pages()).find(p=>p.url().endsWith('/launcher.html'));assert(p);return p;},'Opening launcher renderer');
         await page.setViewport({width:1440,height:900,deviceScaleFactor:1});
         page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error'&&m.text().includes('[Fury]'))errors.push(m.text());});
+        if(options['--focus']==='lobby-spam') await page.reload({waitUntil:'domcontentloaded'});
         await page.waitForFunction('Boolean(typeof furyDesign !== "undefined" && furyDesign && state?.viewedAccount)');
         assert.strictEqual(await page.evaluate('process.platform'),process.platform);
         assert(await page.evaluate('Boolean(windowsDesign && windowsSettingsDesign && document.querySelector(".fc-module") && document.querySelector(".fury-window-controls"))'));
         assert.deepStrictEqual(await page.evaluate('[...document.querySelectorAll("link[rel=stylesheet]")].filter(link=>!link.sheet).map(link=>link.getAttribute("href"))'),[],'A launcher stylesheet did not load');
+        if(options['--focus']==='lobby-scoreboard'){
+            await require('./verify_lobby_scoreboard_settings')({page,output,profile});
+            assert.deepStrictEqual(errors,[]);
+            return;
+        }
+        if(options['--focus']==='lobby-spam'){
+            await require('./verify_lobby_spam_settings')({page,output,profile});
+            assert.deepStrictEqual(errors,[]);
+            return;
+        }
+        if(options['--focus']==='share-monthly'){
+            await require('./verify_share_monthly_settings')({page,output,profile});
+            assert.deepStrictEqual(errors,[]);
+            return;
+        }
+        if(options['--focus']==='share-summary'){
+            await require('./verify_share_summary_settings')({page,output,profile});
+            assert.deepStrictEqual(errors,[]);
+            return;
+        }
+        if(options['--focus']==='threat-thresholds'){
+            await require('./verify_threat_threshold_settings')({page,output,profile});
+            assert.deepStrictEqual(errors,[]);
+            return;
+        }
         if(options['--focus']==='key-reminder'){
             await require('./verify_launcher_key_reminder')({page,output,profile});
             assert.deepStrictEqual(errors,[]);
@@ -187,10 +213,14 @@ const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
         await page.screenshot({path:path.join(output,'party-split-warnings.png')});
         record('Party split warnings have a saved On/Off control in Automation and remain independent of profiles');
 
-        for(const [id,key] of [['accent-bedwars-event-labels-enabled','accentBedwarsEventLabelsEnabled'],['bedwars-sidebar-team-colors-enabled','bedwarsSidebarTeamColorsEnabled']]){
+        for(const [id,key] of [['accent-bedwars-event-labels-enabled','accentBedwarsEventLabelsEnabled'],['bedwars-sidebar-team-colors-enabled','bedwarsSidebarTeamColorsEnabled'],['bedwars-lobby-scoreboard-enabled','bedwarsLobbyScoreboardEnabled']]){
             const before=await page.evaluate('collectFeatureSettings()');const value=!before.features[key];await change(id,value);await waitSaved(key,value);before.features[key]=value;assert.deepStrictEqual(await page.evaluate('collectFeatureSettings()'),before);
         }
         assert.strictEqual(await page.$$eval('[id^="friend-alias"], .fury-alias-panel', nodes=>nodes.length),0);
+        await change('bedwars-lobby-scoreboard-style','gold');await waitSaved('bedwarsLobbyScoreboardStyle','gold');
+        await page.evaluate('refresh()');assert.strictEqual(await page.evaluate('ids.bedwarsLobbyScoreboardStyle.value'),'gold');
+        assert.ok((await page.$eval('.ia-lobby-board',el=>el.textContent)).includes('BED WARS'));
+        await change('bedwars-lobby-scoreboard-style','grey');await waitSaved('bedwarsLobbyScoreboardStyle','grey');
         await change('auto-dodge-leave-mode','instant');await waitSaved('autoDodgeLeaveMode','instant');
         await page.evaluate('refresh()');assert.strictEqual(await page.evaluate('ids.autoDodgeLeaveMode.value'),'instant');
         await change('auto-dodge-leave-mode','before_start');await waitSaved('autoDodgeLeaveMode','before_start');
@@ -212,6 +242,7 @@ const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
         await page.evaluate("activateSettingsSubpage('gameplay',false)");
         assert.strictEqual(await page.$('.fury-dodge-advanced'),null);
         assert.strictEqual(await page.$('#auto-party-dodge-enabled'),null);
+        await change('auto-dodge-stat-threats',true);await waitSaved('autoDodgeStatThreats',true);
         for (const width of [1440,1100]) {
             await page.setViewport({width,height:900,deviceScaleFactor:1});
             const centers=await page.evaluate(()=>{

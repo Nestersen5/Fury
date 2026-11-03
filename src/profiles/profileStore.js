@@ -39,7 +39,7 @@ const PRESET_SETTING_KEYS = {
         'enderDustReminderEnabled', 'enderDustReminderThreshold',
         'gamblerGeorgeReminderEnabled',
         // Share
-        'shareTagsAuto', 'shareTagsFancy', 'shareTagsColorLocal', 'shareTagsIncludeTagged',
+        'shareTagsAuto', 'shareTagsFancy', 'shareTagsTeamSummary', 'shareTagsColorLocal', 'shareTagsMonthlyFkdr', 'shareTagsIncludeTagged',
         'shareTagsIncludeNicks', 'shareTagsIncludeThreats', 'shareTagsDestination',
         'shareTagsGroupByTeam',
         // Tab stats
@@ -111,6 +111,8 @@ const PROFILE_SETTING_LABELS = {
     nametagTagDisplayMode: 'Name tag tag style',
     autoDodgeEnabled: 'Auto Dodge',
     shareTagsAuto: 'Auto Share',
+    shareTagsMonthlyFkdr: 'Share monthly FKDR',
+    shareTagsTeamSummary: 'Team share summaries',
     autoSkinDenickEnabled: 'Skin denick',
     autoStatsDenickEnabled: 'Stats denick',
     lobbyChatStatsEnabled: 'Lobby chat stats',
