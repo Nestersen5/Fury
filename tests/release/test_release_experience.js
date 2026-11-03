@@ -44,7 +44,7 @@ const { bundled, validateNotes, summarizeNotes } = require('../../src/updates/re
         assert.equal((await current.check()).version, '9.9.8', 'New releases still notify');
         assert.deepEqual((await current.notes()).sections.features, ['Future release feature.']);
         current.dispose();
-        current = service('1.1.2', { version: '1.1.4' }, { read: async () => { throw Error('Offline'); } });
+        current = service('1.1.2', { version: '9.9.7' }, { read: async () => { throw Error('Offline'); } });
         await current.check(); assert.equal((await current.notes()).complete, false); current.dispose();
 
         fs.unlinkSync(statePath);
