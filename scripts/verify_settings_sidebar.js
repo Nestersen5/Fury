@@ -35,18 +35,20 @@ const target = require('./launcher_verification_target').verificationTarget('set
                 await page.waitForFunction('document.documentElement.dataset.sidebar === "collapsed"');
                 const result = await page.evaluate(() => ({
                     saved: localStorage.getItem('fury-sidebar-v1'),
-                    labelsHidden: [...document.querySelectorAll('.fury-nav-label')].every(e => !e.checkVisibility()),
+                    labelsHidden: [...document.querySelectorAll('.nav-tabs .fury-nav-label')].every(e => !e.checkVisibility()),
                     accessible: [...document.querySelectorAll('.nav-tab')].every(e => e.title && e.getAttribute('aria-label')),
                     railWidth: document.querySelector('.app-rail').getBoundingClientRect().width,
-                    categories: document.querySelectorAll('.settings-subnav-button').length
+                    categories: document.querySelectorAll('.ds-settings-items button').length,
+                    settingsVisible: document.querySelector('.ds-settings-nav').checkVisibility(),
+                    labelsFit: [...document.querySelectorAll('.ds-settings-items button')].every(e=>e.textContent.trim()&&e.scrollWidth<=e.clientWidth+1)
                 }));
                 assert.strictEqual(result.saved, preference);
-                assert(result.labelsHidden && result.accessible);
-                assert.strictEqual(result.railWidth, 68);
-                assert.strictEqual(result.categories, 9);
-                await page.locator('[data-settings-subpage-button="sessions"]').click();
+                assert(result.labelsHidden && result.accessible,JSON.stringify(result));
+                assert(result.railWidth>=200&&result.settingsVisible&&result.labelsFit);
+                assert.strictEqual(result.categories, 12);
+                await page.locator('[data-ds-category="sessions"]').click();
                 assert(await page.$eval('[data-settings-subpage="sessions"]', e => e.classList.contains('active')));
-                await page.locator('[data-page-tab="dashboard"]').click();
+                await page.locator('.ds-back').click();
                 assert.strictEqual(await page.evaluate('document.documentElement.dataset.sidebar'), preference);
             }
         }
@@ -57,7 +59,7 @@ const target = require('./launcher_verification_target').verificationTarget('set
         assert.strictEqual(await page.evaluate('document.documentElement.dataset.sidebar'), 'collapsed');
         await page.evaluate("activatePage('dashboard')");
         assert.strictEqual(await page.evaluate('document.documentElement.dataset.sidebar'), 'expanded');
-        console.log('PASS Settings auto-collapse, category navigation, accessible icons, saved preferences and restoration at both viewport sizes');
+        console.log('PASS Dedicated settings navigation, readable categories, accessible icons, saved sidebar preferences and Back restoration at both viewport sizes');
         target.record();
     } finally {
         if (browser) await browser.disconnect();

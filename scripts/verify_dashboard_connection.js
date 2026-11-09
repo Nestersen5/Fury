@@ -19,19 +19,28 @@ const target=require('./launcher_verification_target').verificationTarget('dashb
   const page=await eventually(async()=>{const p=(await browser.pages()).find(p=>p.url().endsWith('/launcher.html'));assert(p);return p;},'Opening launcher');
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.waitForFunction('typeof furyDesign !== "undefined" && furyDesign && state?.viewedAccount');
-  await page.evaluate(()=>{localStorage.setItem('fury-onboarded:'+state.viewedAccount.key,'yes');furyDesign.update(state);});
+  await page.evaluate(async()=>{
+   await refresh();clearTimeout(refreshTimer);localStorage.setItem('fury-onboarded:'+state.viewedAccount.key,'yes');
+   window.dashboardFixture=structuredClone(state);const invoke=ipcRenderer.invoke.bind(ipcRenderer);
+   ipcRenderer.invoke=(channel,...args)=>channel==='state:get'?Promise.resolve(structuredClone(dashboardFixture)):invoke(channel,...args);
+   render(dashboardFixture);
+  });
   const click=s=>page.locator(s).click();
+  const running=value=>page.evaluate(value=>{dashboardFixture.services.proxy.running=value;render(structuredClone(dashboardFixture));},value);
   for(const [width,height] of [[1440,900],[1024,680]]){
    await page.setViewport({width,height});await page.evaluate("activatePage('dashboard')");
    await page.waitForFunction('document.getElementById("join-direct-address").value.length > 0');
-   assert(await page.$eval('.fury-connection-status',e=>e.textContent==='Proxy stopped'));
+   await running(false);
+   assert(await page.$eval('.da-server-strip',e=>e.dataset.proxy==='stopped'));
+   assert(await page.$eval('.da-dashboard-start',e=>e.textContent==='Start proxy'));
+   assert.strictEqual(await page.$eval('[data-copy-route="direct"]',e=>e.checkVisibility()),false);
    assert.strictEqual(await page.$eval('.join-steps',e=>e.checkVisibility()),false);
    assert.strictEqual(await page.$eval('#join-failover-address',e=>e.checkVisibility()),false);
+   await running(true);
+   assert(await page.$eval('.da-dashboard-start',e=>e.textContent==='Stop proxy'));
    await click('[data-copy-route="direct"]');
    assert.strictEqual(await page.evaluate('require("electron").clipboard.readText()'),await page.$eval('#join-direct-address',e=>e.value));
    await page.waitForFunction('document.querySelector("[data-copy-route=direct]").textContent === "Copy address"');
-   await click('.fury-connection-help > summary');assert(await page.$eval('.join-steps',e=>e.checkVisibility()));
-   await page.keyboard.press('Escape');assert.strictEqual(await page.$eval('.fury-connection-help',e=>e.open),false);
    await click('.fury-connection-options > summary');assert(await page.$eval('#join-failover-address',e=>e.checkVisibility()));
    // Native details toggle dispatch is queued after activation. Inspect the
    // fitted disclosure after its handler, including on faster Mac runners.
@@ -41,26 +50,27 @@ const target=require('./launcher_verification_target').verificationTarget('dashb
    },'Fitting the open connection disclosure');
    await page.screenshot({path:path.join(output,`connection-options-${width}.png`)});
    await click('[data-copy-route="failover"]');assert.strictEqual(await page.evaluate('require("electron").clipboard.readText()'),await page.$eval('#join-failover-address',e=>e.value));
-   await click('[data-page="dashboard"] > .page-title h2');assert.strictEqual(await page.$eval('.fury-connection-options',e=>e.open),false);
-   const geometry=await page.evaluate(()=>{const rect=s=>{const r=document.querySelector(s).getBoundingClientRect();return{left:r.left,right:r.right,top:r.top,bottom:r.bottom};};return{strip:rect('.fury-connection-strip'),recent:rect('.fury-recent'),account:rect('.fury-dashboard-right'),overflow:document.querySelector('main').scrollWidth>document.querySelector('main').clientWidth+1};});
-   assert(!geometry.overflow,JSON.stringify(geometry));assert(geometry.strip.bottom<=geometry.recent.top);assert(geometry.recent.right<=geometry.account.left);
+   await page.keyboard.press('Escape');assert.strictEqual(await page.$eval('.fury-connection-options',e=>e.open),false);
+   await click('.fury-connection-options > summary');await click('.da-recent');assert.strictEqual(await page.$eval('.fury-connection-options',e=>e.open),false);
+   const geometry=await page.evaluate(()=>{const rect=s=>{const r=document.querySelector(s).getBoundingClientRect();return{left:r.left,right:r.right,top:r.top,bottom:r.bottom};};return{strip:rect('.da-server-strip'),recent:rect('.da-recent'),reminders:rect('.ds-dashboard-reminders'),overflow:document.querySelector('main').scrollWidth>document.querySelector('main').clientWidth+1};});
+   assert(!geometry.overflow,JSON.stringify(geometry));assert(geometry.strip.bottom<=geometry.recent.top);assert(geometry.recent.bottom<=geometry.reminders.top);
    await page.evaluate(()=>{
     clearTimeout(refreshTimer);
-    furyDesign.update({...state,sessionHistory:{sessions:[{id:'preview',name:'Nestersen',startedAt:1788798600000,lastSeen:1788802980000,endedAt:1788802980000,durationMs:4380000}]}});
+    dashboardFixture.sessionHistory={sessions:[{id:'preview',name:'Nestersen',startedAt:1788798600000,lastSeen:1788802980000,endedAt:1788802980000,durationMs:4380000}]};render(structuredClone(dashboardFixture));
    });
-   assert(await page.$eval('.fury-recent-content',e=>e.textContent.includes('Open session')));
+   assert(await page.$eval('.da-recent-identity button',e=>e.textContent==='Open'));
    assert(await page.$$eval('.fury-recent-content strong',elements=>elements.every(e=>e.scrollWidth<=e.clientWidth+1)));
    await page.screenshot({path:path.join(output,`dashboard-${width}.png`)});
-   await click('.fury-view-sessions');assert(await page.$eval('[data-page="sessions"]',e=>e.classList.contains('active')));
+   await click('.da-recent-identity button');assert(await page.$eval('[data-page="sessions"]',e=>e.classList.contains('active')));
   }
   await page.setViewport({width:1440,height:900});await page.evaluate("activatePage('dashboard')");
   await click('.fury-connection-options > summary');
   await page.setViewport({width:1024,height:680});
   await page.waitForFunction(()=>document.querySelector('.fury-route-menu').getBoundingClientRect().bottom<=innerHeight-12);
   await page.keyboard.press('Escape');assert.strictEqual(await page.$eval('.fury-connection-options',e=>e.open),false);
-  await page.evaluate(()=>{clearTimeout(refreshTimer);furyDesign.update({...state,services:{...state.services,proxy:{...state.services.proxy,running:true}}});});
-  assert.strictEqual(await page.$eval('.fury-connection-status',e=>e.textContent),'Proxy running');
-  assert.deepStrictEqual(errors,[]);console.log('PASS live connection status, direct/backup clipboard copy, help/options disclosure and dismissal, session navigation and dashboard geometry at 1440 and 1024');
+  await running(false);
+  assert.strictEqual(await page.$eval('[data-copy-route="direct"]',e=>e.checkVisibility()),false);
+  assert.deepStrictEqual(errors,[]);console.log('PASS Dashboard stopped/running states, direct/backup clipboard copy, disclosure dismissal, session navigation and geometry at 1440 and 1024');
  target.record();
  }finally{if(browser)await browser.disconnect();await stopChild(child);}
 })().catch(e=>{console.error(e);process.exitCode=1;});
