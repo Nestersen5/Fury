@@ -1,0 +1,135 @@
+'use strict';
+// Called only by the existing isolated Electron/update fixture.
+const assert = require('assert/strict'), fs = require('fs'), path = require('path');
+module.exports = async ({ page, output, profile }) => {
+    const checks = [], views = [];
+    const check = (name, value) => { assert.ok(value, name); checks.push(name); };
+    const click = selector => page.locator(selector).click();
+    const snapshot = async name => { await page.screenshot({ path: path.join(output, name + '.png') }); views.push(name); };
+    const current = async () => page.evaluate(() => ipcRenderer.invoke('updates:notes'));
+    const badge = id => `[data-release-setting="1.1.4:${id}"]`;
+    await page.waitForSelector('.fury-release-highlights');
+    await page.waitForSelector('.ds-main-settings[data-release-unread]');
+    for (const theme of ['graphite', 'midnight', 'forest', 'light', 'obsidian', 'frost']) {
+        await page.evaluate(theme => { NesterTheme.apply(theme, false); NesterTheme.applySidebar('expanded', false); }, theme);
+        for (const [width, height] of [[1440, 900], [1024, 680]]) {
+            await page.setViewport({ width, height });
+            const sizes = await page.$eval('.fury-release-card', card => ({ overflow: card.scrollWidth - card.clientWidth, tiles: card.querySelectorAll('.fury-release-highlight').length, font: getComputedStyle(card.querySelector('p')).fontSize }));
+            check(`${theme} ${width}: dashboard has three readable highlights without overflow`, sizes.overflow <= 1 && sizes.tiles === 3 && parseFloat(sizes.font) >= 15);
+            await snapshot(`discovery-dashboard-${theme}-${width}`);
+        }
+    }
+    await click('.fury-release-card-head .fury-release-link');
+    await page.waitForSelector('.fury-release-dialog[open]');
+    check('Latest installed release is selected', await page.$eval('.fury-release-version[aria-current="true"]', el => el.dataset.version === '1.1.4'));
+    check('Only the opened version loses its unread dot', await page.$eval('.fury-release-version[data-version="1.1.3"]', el => el.hasAttribute('data-release-unread')));
+    for (const theme of ['graphite', 'midnight', 'forest', 'light', 'obsidian', 'frost']) {
+        await page.evaluate(theme => NesterTheme.apply(theme, false), theme);
+        for (const [width, height] of [[1440, 900], [1024, 680]]) {
+            await page.setViewport({ width, height });
+            const bounds = await page.$eval('.fury-release-dialog', el => ({ rect: el.getBoundingClientRect().toJSON(), overflow: el.scrollWidth - el.clientWidth, contentOverflow: el.querySelector('.fury-release-content').scrollWidth - el.querySelector('.fury-release-content').clientWidth, font: getComputedStyle(el.querySelector('li p')).fontSize }));
+            check(`${theme} ${width}: bounded modal, 16px text, no horizontal overflow`, bounds.rect.left >= 0 && bounds.rect.right <= width && bounds.rect.top >= 0 && bounds.rect.bottom <= height && bounds.overflow <= 1 && bounds.contentOverflow <= 1 && bounds.font === '16px');
+            await page.keyboard.press('Tab');
+            check(`${theme} ${width}: native dialog contains focus`, await page.evaluate(() => document.querySelector('.fury-release-dialog').contains(document.activeElement)));
+            await snapshot(`discovery-notes-${theme}-${width}`);
+        }
+    }
+    const newest = await page.$$eval('.fury-release-content li p', els => els.map(el => el.textContent));
+    await click('.fury-release-version[data-version="1.1.3"]');
+    check('Older release has its own notes instead of a merged summary', await page.$eval('.fury-release-content', el => el.textContent.includes('AutoDenick') && !el.textContent.includes('Mute repeated lobby messages')));
+    const version = await page.$eval('.fury-release-version[aria-current="true"]', el => el.dataset.version);
+    check('Version selection is explicit and keyboard reachable', version === '1.1.3');
+    await snapshot('discovery-older-notes');
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() => document.activeElement.matches('.fury-release-reopen'));
+    check('Escape restores the sidebar button', await page.$eval('.fury-release-dialog', el => !el.open));
+    await click('.fury-release-reopen');
+    await page.waitForSelector('.fury-release-dialog[open]');
+    check('Reopening returns to the latest release and preserves read markers', JSON.stringify(await page.$$eval('.fury-release-content li p', els => els.map(el => el.textContent))) === JSON.stringify(newest) && !(await page.$eval('.fury-release-version[data-version="1.1.3"]', el => el.hasAttribute('data-release-unread'))));
+    await page.$eval('.fury-release-content', el => { el.scrollTop = 0; });
+    await click('.fury-release-content .fury-release-link[aria-label^="Open Chat:"]');
+    await page.waitForFunction(() => !document.querySelector('.fury-release-dialog').open && document.documentElement.dataset.workspacePage === 'settings');
+    check('Changelog link opens and focuses the actual setting', await page.evaluate(() => document.activeElement.id === 'lobby-spam-enabled' && !!document.querySelector('.fury-release-target')));
+    await page.waitForSelector(badge('lobby-spam-enabled'));
+    await page.evaluate(() => document.getElementById('lobby-spam-enabled').scrollIntoView({ block: 'center' }));
+    await page.waitForFunction(async () => (await ipcRenderer.invoke('updates:notes')).discovery.seen.includes('1.1.4:lobby-spam-enabled'));
+    check('Visible New tag stays for the entire current visit', !!await page.$(badge('lobby-spam-enabled')));
+    await snapshot('discovery-chat-tag');
+    await page.evaluate(() => { activateSettingsSubpage('scan', false); });
+    await page.waitForSelector(badge('share-tags-team-summary'));
+    await page.evaluate(() => document.getElementById('share-tags-team-summary').closest('.share-option-row').scrollIntoView({ block: 'center' }));
+    await page.waitForFunction(async () => (await ipcRenderer.invoke('updates:notes')).discovery.seen.includes('1.1.4:share-tags-team-summary'));
+    check('Updated label uses the existing Share as control', await page.$eval(badge('share-tags-team-summary'), el => el.textContent === 'Updated'));
+    let data = await current();
+    check('Hidden Monthly FKDR is not consumed by opening Scanning', !data.discovery.seen.includes('1.1.4:share-tags-monthly-fkdr'));
+    check('Scanning dot clears upon visiting even with hidden options left unread', !await page.$('[data-ds-category="scan"][data-release-unread]'));
+    await snapshot('discovery-scan-hidden-tag');
+    await click('.fury-release-reopen');
+    await page.waitForSelector('.fury-release-dialog[open]');
+    await click('.fury-release-content .fury-release-link[aria-label^="Open Scanning: Choose whether individual"]');
+    check('A link to a hidden option focuses Share as without changing the saved mode', await page.evaluate(() => document.activeElement.id === 'share-tags-team-summary' && document.getElementById('share-tags-team-summary').checked));
+    check('The hidden option remains unread after following its link', !(await current()).discovery.seen.includes('1.1.4:share-tags-monthly-fkdr'));
+    await page.evaluate(() => activateSettingsSubpage('overlay', false));
+    await page.waitForFunction(() => !document.querySelector('[data-release-setting="1.1.4:lobby-spam-enabled"]'));
+    check('Seen tag disappears on the next visit', !await page.$(badge('lobby-spam-enabled')));
+    await page.evaluate(() => activateSettingsSubpage('scan', false));
+    await page.waitForFunction(() => !document.querySelector('[data-release-setting="1.1.4:share-tags-team-summary"]'));
+    await click('.ds-method .fury-binary-off');
+    await page.waitForFunction(() => !document.getElementById('share-individual-options').hidden);
+    await page.waitForSelector(badge('share-tags-monthly-fkdr'));
+    await page.evaluate(() => document.getElementById('share-monthly-fkdr-title').scrollIntoView({ block: 'center' }));
+    await page.waitForFunction(async () => (await ipcRenderer.invoke('updates:notes')).discovery.seen.includes('1.1.4:share-tags-monthly-fkdr'));
+    check('Revealing a hidden setting counts as seen without clicking its toggle', !!await page.$(badge('share-tags-monthly-fkdr')));
+    await snapshot('discovery-scan-revealed-tag');
+    await click('.fury-release-reopen');
+    await page.waitForSelector('.fury-release-dialog[open]');
+    await page.evaluate(() => { activateSettingsSubpage('display', false); furyDesign.showIngame('scoreboard'); });
+    await page.waitForSelector(badge('bedwars-lobby-scoreboard-style'));
+    await page.evaluate(() => document.querySelector('[data-release-setting="1.1.4:bedwars-lobby-scoreboard-style"]').scrollIntoView({ block: 'center' }));
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    check('Settings covered by a modal stay unread', !(await current()).discovery.seen.includes('1.1.4:bedwars-lobby-scoreboard-style'));
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(async () => (await ipcRenderer.invoke('updates:notes')).discovery.seen.includes('1.1.4:bedwars-lobby-scoreboard-style'));
+    await snapshot('discovery-scoreboard-tags');
+    await page.evaluate(() => ipcRenderer.invoke('fixture:reject-next-marker'));
+    await page.evaluate(() => activatePage('anticheat'));
+    await page.waitForSelector('[data-release-setting="1.1.2:anticheat-party-broadcast-enabled"]');
+    await page.evaluate(() => document.querySelector('[data-release-setting="1.1.2:anticheat-party-broadcast-enabled"]').scrollIntoView({ block: 'center' }));
+    await page.waitForFunction(() => document.body.textContent.includes('Could not save what you’ve seen'));
+    check('A failed acknowledgement keeps its tag available to retry', !(await current()).discovery.seen.includes('1.1.2:anticheat-party-broadcast-enabled'));
+    await page.evaluate(() => activatePage('dashboard'));
+    await page.waitForFunction(() => !document.querySelector('[data-release-setting="1.1.2:anticheat-party-broadcast-enabled"]'));
+    await page.evaluate(() => activatePage('anticheat'));
+    await page.evaluate(() => document.querySelector('[data-release-setting="1.1.2:anticheat-party-broadcast-enabled"]').scrollIntoView({ block: 'center' }));
+    await page.waitForFunction(async () => (await ipcRenderer.invoke('updates:notes')).discovery.seen.includes('1.1.2:anticheat-party-broadcast-enabled'));
+    check('Revisiting retries a failed marker without changing the setting', !!await page.$('[data-release-setting="1.1.2:anticheat-party-broadcast-enabled"]'));
+    await page.reload();
+    await page.waitForFunction(() => !!furyDesign && !!state?.settings);
+    await page.waitForFunction(async () => !!(await ipcRenderer.invoke('updates:notes')).discovery.seen.includes('1.1.4:share-tags-monthly-fkdr'));
+    await page.evaluate(() => { activatePage('settings'); activateSettingsSubpage('scan', false); });
+    await page.waitForFunction(() => !document.querySelector('[data-release-setting="1.1.4:share-tags-monthly-fkdr"]'));
+    check('Seen markers persist through a full renderer reload', !await page.$(badge('share-tags-team-summary')));
+    check('Card acknowledgement and read-version state persist separately', JSON.parse(fs.readFileSync(path.join(profile, 'launcher_data', 'release-notifications.json'))).readVersions.includes('1.1.3'));
+    await page.evaluate(() => NesterTheme.applySidebar('collapsed', false));
+    await click('.fury-release-reopen');
+    await page.waitForSelector('.fury-release-dialog[open]');
+    check('Collapsed sidebar can reopen the full changelog', !!await page.$('.fury-release-dialog[open]'));
+    await page.keyboard.press('Escape');
+    await click('.fury-release-reopen');
+    await page.waitForSelector('.fury-release-dialog[open]');
+    await page.evaluate(() => {
+        const ipc = require('electron').ipcRenderer, invoke = ipc.invoke.bind(ipc);
+        let release;
+        const gate = new Promise(resolve => { release = resolve; });
+        ipc.once('shutdown:prepare-renderer', () => release());
+        ipc.invoke = (channel, ...args) => {
+            if (channel !== 'updates:seen') return invoke(channel, ...args);
+            window.markerWaitingForShutdown = true; return gate.then(() => invoke(channel, ...args));
+        };
+        document.querySelector('.fury-release-version[data-version="1.1.1"]').click();
+    });
+    await page.waitForFunction(() => window.markerWaitingForShutdown);
+    check('An accepted marker remains queued for the real shutdown drain', !(await current()).readVersions.includes('1.1.1'));
+    fs.writeFileSync(path.join(output, 'discovery-verification.json'), JSON.stringify({ checks, views }, null, 2));
+    console.log(JSON.stringify({ discoveryChecks: checks.length, discoveryViews: views.length }));
+};

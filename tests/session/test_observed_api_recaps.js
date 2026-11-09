@@ -56,7 +56,7 @@ async function scenario({ unavailable = false, partial = false, overlap = false 
         assert.equal(recaps[0].delta.local, true);
         assert.equal(tracker.getSessionDelta().modes[0].games, 1);
         assert.equal(tracker.getSessionDelta().modes[0].losses, 1);
-        if (partial) assert(!('kills' in recaps[0].delta.modes[0]), 'Unobserved coverage stays unknown');
+        if (partial) assert(recaps[0].delta.modes[0].unavailable.includes('kills'), 'Coverage remains internal while counted kills are visible');
         else assert.equal(recaps[0].delta.modes[0].kills, 1);
         assert.equal(record.metadata.map, 'Lighthouse');
         assert.equal(createSessionStore(storeOptions).getLastGame(owner.uuid).localModes[0].games, 1, 'Observed stats persist before verification');
@@ -69,16 +69,18 @@ async function scenario({ unavailable = false, partial = false, overlap = false 
             assert.equal(announcements.length, 2);
             losses += 2; kills += 7;
             await tracker.processPendingVerifications({ force: true });
+            stamp += 30000;
             await tracker.processPendingVerifications({ force: true });
             assert(store.getSessions(owner.uuid)[0].games.every(game => !game.delta), 'Combined API movement is never assigned to either game');
             assert.equal(tracker.getSessionDelta().modes[0].games, 2);
-            assert.equal(tracker.getSessionDelta().modes[0].kills, 2, 'Per-game observations remain separate');
+            assert.equal(tracker.getSessionDelta().modes[0].kills, 7, 'The session uses its complete API window while per-game observations stay separate');
             assert.equal(recaps.length, 2, 'Reconciliation never reprints recaps');
             stamp += 1000;
             const third = await play('three');
             losses++; kills++;
             for (let i = 0; i < 4 && store.getLastGame(owner.uuid).verificationStatus !== 'verified'; i++) {
                 await tracker.processPendingVerifications({ force: true });
+                stamp += 30000;
             }
             assert.equal(store.getLastGame(owner.uuid).id, third.id);
             assert.equal(store.getLastGame(owner.uuid).verificationStatus, 'verified', 'A later isolated game uses the refreshed boundary');
@@ -98,6 +100,9 @@ async function scenario({ unavailable = false, partial = false, overlap = false 
             }
             assert.equal(store.getLastGame(owner.uuid).verificationStatus, 'pending', 'Five-minute stale snapshots do not exhaust verification');
             stamp = ended + 360000; losses++; kills += 2;
+            await tracker.processPendingVerifications({ force: true });
+            assert.equal(store.getLastGame(owner.uuid).verificationStatus, 'pending', 'A new result needs a stable follow-up');
+            stamp += 30000;
             await tracker.processPendingVerifications({ force: true });
             const verified = store.getLastGame(owner.uuid);
             assert.equal(verified.id, record.id);

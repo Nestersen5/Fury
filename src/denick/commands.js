@@ -2,6 +2,7 @@
 
 const { createUsage } = require('../../features/chat_controller');
 const { getBedwarsScanStats } = require('../stats/scanLine');
+const { realAccountUuid } = require('./identity');
 
 // Temporary discovery policy: switch to 'intersection' to restore the prior
 // default. Explicit inspector modes remain available for comparison.
@@ -384,6 +385,7 @@ function createDenickCommands({
         const rejected = [];
         const addCandidate = ({ name, profile, finals, beds }, score) => candidates.push({
             name,
+            ...(realAccountUuid(profile.data.player.uuid) ? { realUuid: realAccountUuid(profile.data.player.uuid) } : {}),
             displayName: profile.data.player.displayname || name,
             finals,
             beds,

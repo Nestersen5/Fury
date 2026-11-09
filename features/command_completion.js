@@ -5,6 +5,8 @@ const { SCAFFOLD_CLIP_SUGGESTIONS } = require('../src/recorder/scaffoldClipLabel
 const { LOBBY_SCOREBOARD_STYLES } = require('../src/scoreboard/lobbyBoard.js');
 const { FURY_HELP_TOPICS } = require('./fury_menu.js');
 const { HELP_CATEGORIES, HELP_SECTIONS, HELP_PAGE_SIZE } = require('./help_command.js');
+const { TEAM_DEFS } = require('../src/net/session/bedwarsTeamEvidence.js');
+const REPORT_TEAMS = TEAM_DEFS.flatMap(team => team.aliases);
 
 const PROXY_COMMANDS = [
     '/quickbuy', '/qb', '/hotbar', '/hb', '/quickbuyandhotbar', '/qbahb',
@@ -280,8 +282,9 @@ function createProxyTabCompleter(options = {}) {
         const toggleCommands = ['autoskin', 'autostats', 'sharenick', 'announcements', 'showreal', 'nametags'];
         const controllerCommands = [...toggleCommands, 'partyannounce'];
         if (args.length === 2) {
-            return completeFromList(['add', 'party', 'test', 'self', 'status', 'info', 'help', ...controllerCommands, ...denickFilterFieldSuggestions()], args[1]);
+            return completeFromList(['add', 'party', 'test', 'self', 'status', 'info', 'help', 'notice', ...controllerCommands, ...denickFilterFieldSuggestions()], args[1]);
         }
+        if (sub === 'notice') return args.length === 3 ? completeFromList(['on', 'off'], args[2] || '') : [];
         if (sub === 'test') {
             if (args.length === 3) return completeFromList(['finals', 'beds', 'messages', 'clear', 'reset'], args[2] || '');
             if (args.length === 5 && ['finals', 'beds'].includes((args[2] || '').toLowerCase())) {
@@ -399,7 +402,7 @@ function createProxyTabCompleter(options = {}) {
 
         if (cmd === '/wdr') {
             if (args.length !== 2) return [];
-            return uniqueTabMatches([...completeFromList(['help', 'status', 'cancel'], args[1] || ''), ...completePlayers(args[1] || '')]);
+            return uniqueTabMatches([...completeFromList(['help', 'status', 'cancel', ...REPORT_TEAMS], args[1] || ''), ...completePlayers(args[1] || '')]);
         }
 
         if (cmd === '/activecosmetics') return args.length === 2 ? completePlayers(args[1] || '') : [];

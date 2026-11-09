@@ -7,6 +7,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { runtimeFiles, verifySources } = require('./verify_packaged_sources');
 const { assertNoBrowserPayload } = require('./verify_no_browser');
+const { applicationRoot, applicationEntries, applicationFileExists } = require('./packaged_application');
 
 function releaseMatrix(version) {
     assert(/^[0-9]+\.[0-9]+\.[0-9]+(?:-[\w.-]+)?(?:\+[\w.-]+)?$/.test(version), 'Invalid release version');
@@ -71,28 +72,20 @@ function verifyApplicationFiles(sourceRoot, appRoot) {
     const source = verifySources(sourceRoot, appRoot);
     const config = JSON.parse(fs.readFileSync(path.join(sourceRoot, 'package.json')));
     const expected = new Set(runtimeFiles(sourceRoot, config));
-    function walk(directory, relative = '') {
-        for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
-            // The builder owns dependency pruning; application allowlists must
-            // not admit private state or stale files beside those dependencies.
-            if (!relative && entry.name === 'node_modules') continue;
-            const file = relative ? `${relative}/${entry.name}` : entry.name;
-            assert(!entry.isSymbolicLink(), `Unexpected application link: ${file}`);
-            if (entry.isDirectory()) walk(path.join(directory, entry.name), file);
-            else assert(expected.has(file), `Unlisted/private application file: ${file}`);
-        }
+    for (const file of applicationEntries(appRoot, { skipDependencies: true })) {
+        // The builder owns dependency pruning, including archive contents.
+        if (!file.startsWith('node_modules/')) assert(expected.has(file), `Unlisted/private application file: ${file}`);
     }
-    walk(appRoot);
     for (const name of ['auth_tokens', 'launcher_data', 'recordings', 'packet_logs', 'backups', 'tmp', '.env', '.env.local',
         'session_data.json', 'features_config.json', 'server_config.json', 'migration-recovery']) {
-        assert(!fs.existsSync(path.join(appRoot, name)), `Private application data bundled: ${name}`);
+        assert(!applicationFileExists(appRoot, name), `Private application data bundled: ${name}`);
     }
     return source;
 }
 
 async function verifyApplication(sourceRoot, application, os, arch) {
     const resources = path.join(application, ...(os === 'mac' ? ['Contents', 'Resources'] : ['resources']));
-    const source = verifyApplicationFiles(sourceRoot, path.join(resources, 'app'));
+    const source = verifyApplicationFiles(sourceRoot, applicationRoot(resources));
     assertNoBrowserPayload(application);
     if (os === 'win') {
         assert.equal(arch, 'x64');

@@ -8,11 +8,15 @@
         const visualStyleRevision = 'fury-gold-options-v2';
         if (localStorage.getItem('fury-visual-style-revision') !== visualStyleRevision) {
             localStorage.setItem('nester-theme-v1', 'graphite');
-            localStorage.setItem('nester-accent-v2', 'sun');
+            if (!localStorage.getItem('nester-accent-v2')) localStorage.setItem('nester-accent-v2', 'custom');
             localStorage.setItem('fury-visual-style-revision', visualStyleRevision);
         }
         document.documentElement.dataset.theme = localStorage.getItem('nester-theme-v1') || 'graphite';
-        document.documentElement.dataset.accent = localStorage.getItem('nester-accent-v2') || 'sun';
+        document.documentElement.dataset.accent = localStorage.getItem('nester-accent-v2') || 'custom';
+        if (document.documentElement.dataset.accent === 'custom') {
+            const savedAccentColor = localStorage.getItem('nester-custom-accent-v2');
+            document.documentElement.style.setProperty('--accent', /^#[0-9a-f]{6}$/i.test(savedAccentColor || '') ? savedAccentColor : '#0022cc');
+        }
         localStorage.removeItem('nester-density-v1');
         document.documentElement.dataset.density = 'comfortable';
         document.documentElement.dataset.motion = localStorage.getItem('nester-motion-v1') || 'reduced';
@@ -2772,6 +2776,7 @@
     <link rel="stylesheet" href="src/launcher/styles/launcher_theme.css">
     <link rel="stylesheet" href="src/launcher/styles/launcher_accessibility.css">
     <link rel="stylesheet" href="src/launcher/styles/launcher_overlay_board.css">
+    <link rel="stylesheet" href="src/launcher/styles/launcher_seasonal.css">
     <script defer src="src/launcher/renderer/launcher_theme.js"></script>
     <style>
     </style>
@@ -3110,7 +3115,7 @@
                             <div class="session-filter-grid">
                                 <label>Account<select id="session-account-filter" aria-label="Filter sessions by Minecraft account"><option value="">All saved accounts</option></select></label>
                                 <label>Mode<select id="session-mode-filter"><option value="">All modes</option><option value="BEDWARS">BedWars</option><option value="SKYWARS">SkyWars</option><option value="DUELS">Duels</option></select></label>
-                                <label>Result<select id="session-result-filter"><option value="">All results</option><option value="win">Wins</option><option value="loss">Losses</option><option value="pending">Pending verification</option><option value="unverified">Unverified</option></select></label>
+                                <label>Result<select id="session-result-filter"><option value="">All results</option><option value="win">Wins</option><option value="loss">Losses</option></select></label>
                                 <label class="session-opponent-filter">Opponent<input id="session-opponent-filter" type="search" placeholder="Search IGN" autocomplete="off"></label>
                             </div>
                             <footer class="session-filter-popover-foot">
@@ -3248,6 +3253,7 @@
                                     </select></label>
                                     <label>Sort<select id="denick-sort">
                                         <option value="recent">Newest first</option>
+                                        <option value="nick">Nickname</option>
                                         <option value="name">Real IGN</option>
                                         <option value="nicks">Most nicks</option>
                                         <option value="events">Most denicks</option>
@@ -3511,12 +3517,25 @@
                                         <div class="appearance-accent-inline">
                                             <div class="appearance-control-heading"><div><span class="eyebrow">Signature color</span><h3>Accent</h3></div><small>Hover, focus, toggles</small></div>
                                             <div class="accent-picker" role="group" aria-label="Accent color presets">
-                                                <button type="button" class="accent-swatch" data-accent-preset="iris" aria-label="Iris accent" aria-pressed="false" style="--swatch:#8b7cff"></button><button type="button" class="accent-swatch" data-accent-preset="cobalt" aria-label="Cobalt accent" aria-pressed="false" style="--swatch:#4385f5"></button><button type="button" class="accent-swatch" data-accent-preset="aqua" aria-label="Aqua accent" aria-pressed="false" style="--swatch:#16b8c8"></button><button type="button" class="accent-swatch" data-accent-preset="mint" aria-label="Mint accent" aria-pressed="false" style="--swatch:#38ba83"></button><button type="button" class="accent-swatch" data-accent-preset="lime" aria-label="Lime accent" aria-pressed="false" style="--swatch:#91bc39"></button><button type="button" class="accent-swatch active" data-accent-preset="sun" aria-label="Sun accent" aria-pressed="true" style="--swatch:#e5b35d"></button><button type="button" class="accent-swatch" data-accent-preset="ember" aria-label="Ember accent" aria-pressed="false" style="--swatch:#e46f45"></button><button type="button" class="accent-swatch" data-accent-preset="rose" aria-label="Rose accent" aria-pressed="false" style="--swatch:#dd5f8d"></button><button type="button" class="accent-swatch" data-accent-preset="violet" aria-label="Violet accent" aria-pressed="false" style="--swatch:#a66bea"></button>
-                                                <label class="accent-custom" title="Custom accent color"><span>Custom</span><input id="settings-accent-custom" type="color" value="#e5b35d" aria-label="Custom accent color"></label>
+                                                <button type="button" class="accent-swatch" data-accent-preset="iris" aria-label="Iris accent" aria-pressed="false" style="--swatch:#8b7cff"></button><button type="button" class="accent-swatch" data-accent-preset="cobalt" aria-label="Cobalt accent" aria-pressed="false" style="--swatch:#4385f5"></button><button type="button" class="accent-swatch" data-accent-preset="aqua" aria-label="Aqua accent" aria-pressed="false" style="--swatch:#16b8c8"></button><button type="button" class="accent-swatch" data-accent-preset="mint" aria-label="Mint accent" aria-pressed="false" style="--swatch:#38ba83"></button><button type="button" class="accent-swatch" data-accent-preset="lime" aria-label="Lime accent" aria-pressed="false" style="--swatch:#91bc39"></button><button type="button" class="accent-swatch" data-accent-preset="sun" aria-label="Sun accent" aria-pressed="false" style="--swatch:#e5b35d"></button><button type="button" class="accent-swatch" data-accent-preset="ember" aria-label="Ember accent" aria-pressed="false" style="--swatch:#e46f45"></button><button type="button" class="accent-swatch" data-accent-preset="rose" aria-label="Rose accent" aria-pressed="false" style="--swatch:#dd5f8d"></button><button type="button" class="accent-swatch" data-accent-preset="violet" aria-label="Violet accent" aria-pressed="false" style="--swatch:#a66bea"></button>
+                                                <label class="accent-custom" title="Custom accent color"><span>Custom</span><input id="settings-accent-custom" type="color" value="#0022cc" aria-label="Custom accent color"></label>
                                             </div>
                                         </div>
                                         </div>
                                         <div class="appearance-motion-card"><div><span class="eyebrow">Motion</span><h3>Animations</h3><small>Smooth page transitions, controls, and notifications.</small></div><div class="feature-toggle"><label class="switch"><input id="settings-animations-enabled" type="checkbox"><span class="switch-track"></span><span class="switch-thumb"></span><span class="switch-label">ON</span></label></div></div>
+                                        <section class="fury-seasonal-panel settings-search-item" id="seasonal-themes" aria-labelledby="seasonal-themes-title">
+                                            <div class="fury-seasonal-heading"><h3 id="seasonal-themes-title">Seasonal themes</h3></div>
+                                            <div class="fury-seasonal-list" role="group" aria-label="Seasonal theme">
+                                                <label class="fury-seasonal-row"><input type="radio" name="fury-seasonal-theme" value="none" checked><span class="fury-seasonal-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="m6 18 12-12"/></svg></span><span class="fury-seasonal-copy"><strong>None</strong><small>No seasonal effects.</small></span><span class="fury-seasonal-selected" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg></span></label>
+                                                <label class="fury-seasonal-row fury-seasonal-winter"><input type="radio" name="fury-seasonal-theme" value="christmas"><img class="fury-seasonal-art" src="assets/launcher-themes/christmas-panorama.png" alt="" loading="lazy" decoding="async"><span class="fury-seasonal-preview-snow" aria-hidden="true"><i style="--x:15%;--y:22%">❄</i><i style="--x:33%;--y:60%">❄</i><i style="--x:53%;--y:18%">❄</i><i style="--x:69%;--y:69%">❄</i><i style="--x:84%;--y:30%">❄</i></span><span class="fury-seasonal-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 2v20M3.3 7l17.4 10M3.3 17 20.7 7M9 4l3 3 3-3M9 20l3-3 3 3M4 10l4-1-1-4M17 19l-1-4 4-1M4 14l4 1-1 4M17 5l-1 4 4 1"/></svg></span><span class="fury-seasonal-copy"><strong>Christmas</strong><small>Soft snow and winter lights.</small></span><span class="fury-seasonal-selected" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg></span></label>
+                                            </div>
+                                            <section class="fury-seasonal-options" id="seasonal-options" hidden aria-label="Christmas effects">
+                                                <div class="fury-seasonal-options-heading"><h4>Christmas effects</h4><button type="button" id="seasonal-preview">Preview theme</button></div>
+                                                <div class="fury-seasonal-effect-list"><label><input id="seasonal-snow" type="checkbox" checked>Falling snow</label><label><input id="seasonal-edges" type="checkbox" checked>Snowy edges</label><label><input id="seasonal-lights" type="checkbox" checked>Christmas lights</label><label><input id="seasonal-trail" type="checkbox" checked>Mouse trail</label></div>
+                                            </section>
+                                            <p class="fury-seasonal-note" id="seasonal-focus-note" hidden>Effects pause while you're in-game or using another app.</p>
+                                            <p class="fury-seasonal-note" id="seasonal-motion-note" hidden>Turn on Animations to see falling snow and mouse trails.</p>
+                                        </section>
                                     </div>
                                 </section>
                             </div>
@@ -4045,8 +4064,8 @@
                                                     </div>
                                                     <div class="nametag-slot-grid">
                                                         <label>Before name<select id="nametag-teammates-prefix"><option value="none">None</option><option value="star">Star</option><option value="fkdr">FKDR</option><option value="kdr">KDR</option><option value="wlr">WLR</option><option value="ws">Winstreak</option><option value="level">Level</option><option value="guild">Guild</option><option value="tag">Tag</option><option value="ping">Avg Ping</option></select></label>
-                                                        <label>After name<select id="nametag-teammates-suffix"><option value="none">None</option><option value="star">Star</option><option value="fkdr">FKDR</option><option value="kdr">KDR</option><option value="wlr">WLR</option><option value="ws">Winstreak</option><option value="level">Level</option><option value="guild">Guild</option><option value="tag">Tag</option><option value="ping">Avg Ping</option></select></label>
                                                         <label class="nametag-fallback-slot">Fallback before<select id="nametag-teammates-prefix-fallback"><option value="none">No fallback</option><option value="star">Star</option><option value="fkdr">FKDR</option><option value="kdr">KDR</option><option value="wlr">WLR</option><option value="ws">Winstreak</option><option value="level">Level</option><option value="guild">Guild</option><option value="tag">Tag</option><option value="ping">Avg Ping</option></select></label>
+                                                        <label>After name<select id="nametag-teammates-suffix"><option value="none">None</option><option value="star">Star</option><option value="fkdr">FKDR</option><option value="kdr">KDR</option><option value="wlr">WLR</option><option value="ws">Winstreak</option><option value="level">Level</option><option value="guild">Guild</option><option value="tag">Tag</option><option value="ping">Avg Ping</option></select></label>
                                                         <label class="nametag-fallback-slot">Fallback after<select id="nametag-teammates-suffix-fallback"><option value="none">No fallback</option><option value="star">Star</option><option value="fkdr">FKDR</option><option value="kdr">KDR</option><option value="wlr">WLR</option><option value="ws">Winstreak</option><option value="level">Level</option><option value="guild">Guild</option><option value="tag">Tag</option><option value="ping">Avg Ping</option></select></label>
                                                     </div>
                                                 </section>
@@ -4058,8 +4077,8 @@
                                                     </div>
                                                     <div class="nametag-slot-grid">
                                                         <label>Before name<select id="nametag-threats-prefix"><option value="none">None</option><option value="star">Star</option><option value="fkdr">FKDR</option><option value="kdr">KDR</option><option value="wlr">WLR</option><option value="ws">Winstreak</option><option value="level">Level</option><option value="guild">Guild</option><option value="tag">Tag</option><option value="ping">Avg Ping</option></select></label>
-                                                        <label>After name<select id="nametag-threats-suffix"><option value="none">None</option><option value="star">Star</option><option value="fkdr">FKDR</option><option value="kdr">KDR</option><option value="wlr">WLR</option><option value="ws">Winstreak</option><option value="level">Level</option><option value="guild">Guild</option><option value="tag">Tag</option><option value="ping">Avg Ping</option></select></label>
                                                         <label class="nametag-fallback-slot">Fallback before<select id="nametag-threats-prefix-fallback"><option value="none">No fallback</option><option value="star">Star</option><option value="fkdr">FKDR</option><option value="kdr">KDR</option><option value="wlr">WLR</option><option value="ws">Winstreak</option><option value="level">Level</option><option value="guild">Guild</option><option value="tag">Tag</option><option value="ping">Avg Ping</option></select></label>
+                                                        <label>After name<select id="nametag-threats-suffix"><option value="none">None</option><option value="star">Star</option><option value="fkdr">FKDR</option><option value="kdr">KDR</option><option value="wlr">WLR</option><option value="ws">Winstreak</option><option value="level">Level</option><option value="guild">Guild</option><option value="tag">Tag</option><option value="ping">Avg Ping</option></select></label>
                                                         <label class="nametag-fallback-slot">Fallback after<select id="nametag-threats-suffix-fallback"><option value="none">No fallback</option><option value="star">Star</option><option value="fkdr">FKDR</option><option value="kdr">KDR</option><option value="wlr">WLR</option><option value="ws">Winstreak</option><option value="level">Level</option><option value="guild">Guild</option><option value="tag">Tag</option><option value="ping">Avg Ping</option></select></label>
                                                     </div>
                                                 </section>
@@ -4071,8 +4090,8 @@
                                                     </div>
                                                     <div class="nametag-slot-grid">
                                                         <label>Before name<select id="nametag-others-prefix"><option value="none">None</option><option value="star">Star</option><option value="fkdr">FKDR</option><option value="kdr">KDR</option><option value="wlr">WLR</option><option value="ws">Winstreak</option><option value="level">Level</option><option value="guild">Guild</option><option value="tag">Tag</option><option value="ping">Avg Ping</option></select></label>
-                                                        <label>After name<select id="nametag-others-suffix"><option value="none">None</option><option value="star">Star</option><option value="fkdr">FKDR</option><option value="kdr">KDR</option><option value="wlr">WLR</option><option value="ws">Winstreak</option><option value="level">Level</option><option value="guild">Guild</option><option value="tag">Tag</option><option value="ping">Avg Ping</option></select></label>
                                                         <label class="nametag-fallback-slot">Fallback before<select id="nametag-others-prefix-fallback"><option value="none">No fallback</option><option value="star">Star</option><option value="fkdr">FKDR</option><option value="kdr">KDR</option><option value="wlr">WLR</option><option value="ws">Winstreak</option><option value="level">Level</option><option value="guild">Guild</option><option value="tag">Tag</option><option value="ping">Avg Ping</option></select></label>
+                                                        <label>After name<select id="nametag-others-suffix"><option value="none">None</option><option value="star">Star</option><option value="fkdr">FKDR</option><option value="kdr">KDR</option><option value="wlr">WLR</option><option value="ws">Winstreak</option><option value="level">Level</option><option value="guild">Guild</option><option value="tag">Tag</option><option value="ping">Avg Ping</option></select></label>
                                                         <label class="nametag-fallback-slot">Fallback after<select id="nametag-others-suffix-fallback"><option value="none">No fallback</option><option value="star">Star</option><option value="fkdr">FKDR</option><option value="kdr">KDR</option><option value="wlr">WLR</option><option value="ws">Winstreak</option><option value="level">Level</option><option value="guild">Guild</option><option value="tag">Tag</option><option value="ping">Avg Ping</option></select></label>
                                                     </div>
                                                 </section>
@@ -4214,6 +4233,7 @@
 
         let windowsSettingsDesign = null;
         let furyDesign = null;
+        let designA = null, releaseUI = null;
         const accountSkinImages = require('./src/launcher/renderer/launcher_account_skin');
         let accountGeneration = 0;
 
@@ -6269,6 +6289,7 @@
                 panel.classList.toggle('active', active);
                 if (active) activePanel = panel;
             });
+            designA?.onSettings(name);
             const previewVisible = syncNametagViewerRenderState();
             if (name === 'display' && previewVisible) renderNametagPreview();
             if (name === 'network' && activePageName() === 'settings' && state?.settings) {
@@ -6338,24 +6359,28 @@
             if (individualOptions) individualOptions.hidden = summary;
             const monthly = ids.shareTagsMonthlyFkdr?.checked !== false;
             const username = typeof currentMinecraftUsername === 'function' ? currentMinecraftUsername() : 'Player';
-            const header = `<span class="party-chat-meta"><span class="party-label">Party</span><span class="party-arrow"> &gt; </span><span class="party-ign">${username}</span><span class="party-colon">: </span></span>`;
+            const header = `<span class="party-chat-meta"><span class="party-label">Party</span><span class="party-arrow"> &gt; </span><span class="party-ign">${escapeHtml(username)}</span><span class="party-colon">: </span></span>`;
             const included = new Set();
             if (ids.shareTagsIncludeTagged?.checked) included.add('tagged');
             if (ids.shareTagsIncludeNicks?.checked) included.add('nicks');
             if (ids.shareTagsIncludeThreats?.checked) included.add('threats');
-            const lines = summary
-                ? require('./src/overlay/shareTags').buildTeamSummaryPreviewEntries(8, included, recolor)[0].entries.map(entry => recolor
-                    ? require('./src/launcher/renderer/launcher_denick_format').legacyHtml(require('./features/minecraft_chat').extractFormattedText(entry.component))
-                    : escapeHtml(entry.line))
-                : fancy
-                ? [
-                    `<span class="team-red">[RED]</span> <span class="share-stars">460✫</span> <span>RushGod</span> <span class="share-stat">✓ FKDR 8.42${monthly ? ' MFKDR 6.31' : ''}</span> <span class="share-tag">| BLATANT</span>`,
-                    `<span class="team-blue">[BLUE]</span> <span class="share-stars">231✫</span> <span>HiddenPlayer</span> <span class="share-tag">| NICKED</span>`
-                ]
+            const { buildTeamSummaryPreviewEntries, formatLine, formatLineComponent } = require('./src/overlay/shareTags');
+            const entries = summary
+                ? buildTeamSummaryPreviewEntries(8, included, recolor)[0].entries
                 : [
-                    `<span class="team-red">[RED]</span> <span>RushGod: </span><span class="share-stat">FKDR 8.42${monthly ? ' MFKDR 6.31' : ''}</span> <span class="share-tag">- BLATANT</span>`,
-                    `<span class="team-blue">[BLUE]</span> <span>HiddenPlayer: </span><span class="share-tag">NICKED</span>`
-                ];
+                    { category: 'tagged', row: { name: 'RushGod', team: 'RED', stars: 460, fkdr: 8.42, uTag: 'Blatant' } },
+                    { category: 'nicks', row: { name: 'HiddenPlayer', team: 'BLUE', isNicked: true } },
+                    { category: 'threats', row: { name: 'HighStats', team: 'GREEN', stars: 620, fkdr: 12.34, isThreat: true, fkdrThreat: true } }
+                ].filter(({ category }) => included.has(category)).map(({ row }) => {
+                    const previewRow = monthly && !row.isNicked ? { ...row, monthlyFkdr: 6.31 } : row;
+                    return {
+                        line: formatLine(previewRow, 'BEDWARS', included, fancy),
+                        component: recolor ? formatLineComponent(previewRow, 'BEDWARS', included, fancy) : null
+                    };
+                });
+            const lines = entries.map(entry => recolor
+                ? require('./src/launcher/renderer/launcher_denick_format').legacyHtml(require('./features/minecraft_chat').extractFormattedText(entry.component))
+                : escapeHtml(entry.line));
             preview.innerHTML = lines.map(line => `<div class="party-chat-line">${header}<span class="party-message${recolor ? ' is-recolored' : ''}">${line}</span></div>`).join('');
         }
 
@@ -6925,7 +6950,7 @@
             const name = escapeHtml(profile.name);
             const panelId = `profile-preview-${encodeURIComponent(profile.name)}`;
             const states = groups.slice(0, 3).map(group => `<div class="fury-profile-feature-row"><span class="fury-feature-mark">${group.icon}</span><span>${escapeHtml(group.label)} <strong class="fury-profile-status ${group.state === 'Off' ? 'is-off' : ['On', 'Threats', 'All players'].includes(group.state) ? 'is-on' : ''}">${escapeHtml(group.state)}</strong></span></div>`).join('');
-            const status = profile.active ? `<span class="profile-badge active">${profile.modified ? 'Current ? Modified' : 'Current'}</span>` : '';
+            const status = profile.active ? `<span class="profile-badge active">${profile.modified ? 'Current &middot; Modified' : 'Current'}</span>` : '';
             const missing = profile.missingSettings?.length ? '<span class="profile-badge missing">Needs update</span>' : '';
             return `<article class="profile-card fury-profile-library-card ${expanded ? 'reviewing' : ''}" data-profile-card="${name}">
                 <button class="fury-profile-expand" data-profile-action="review" data-profile-name="${name}" aria-expanded="${expanded}" aria-controls="${panelId}">
@@ -7043,10 +7068,10 @@
             profileDetailState = profile.name;
             document.getElementById('profile-detail-title').textContent = profile.label.replace(/\s*\(Recommended\)/i, '');
             document.getElementById('profile-detail-content').innerHTML = renderProfileDetailContent(profile);
-            document.getElementById('profile-detail-content').scrollTop = 0;
             document.getElementById('profile-detail-apply').textContent = profile.active && !profile.modified ? 'Profile is active' : `Apply ${profile.label.replace(/\s*\(Recommended\)/i, '')}`;
             modal.classList.remove('hidden');
             if (!modal.open) modal.showModal();
+            document.getElementById('profile-detail-content').scrollTop = 0;
             setTimeout(() => document.querySelector('#profile-detail-modal [data-profile-detail-close]')?.focus(), 0);
         }
 
@@ -8133,7 +8158,6 @@
         function renderNetworkStudio(settings, service = {}) {
             const payload = currentNetworkPayload();
             renderServerPreview(settings.server, payload);
-            furyDesign?.renderNetworkAddresses();
             const running = Boolean(service.running);
             const live = document.getElementById('network-live-status');
             if (live) {
@@ -8405,6 +8429,7 @@
                     return methodOk && matchesDenickTime(player, filters.time) && matchesDenickSearch(player, filters.query);
                 })
                 .sort((a, b) => {
+                    if (filters.sort === 'nick') return String(latestEvent(a)?.nick || a.nicks?.[0] || '').localeCompare(String(latestEvent(b)?.nick || b.nicks?.[0] || ''));
                     if (filters.sort === 'name') return String(a.realIGN || '').localeCompare(String(b.realIGN || ''));
                     if (filters.sort === 'nicks') return (b.nicks?.length || 0) - (a.nicks?.length || 0);
                     if (filters.sort === 'events') return (b.events?.length || 0) - (a.events?.length || 0);
@@ -9151,37 +9176,21 @@
             if (game.mode === 'DUELS') {
                 return `${numberText(stats.kills)} kills · ${numberText(stats.deaths)} deaths`;
             }
-            return 'Stats confirmed after game end';
+            return 'No stats recorded';
         }
 
         function sessionGamePresentation(game = {}) {
             const verification = game.verificationStatus || 'verified';
-            const resultKind = verification === 'pending'
-                ? 'pending'
-                : verification === 'unverified'
-                    ? 'unverified'
-                    : (game.result || 'neutral');
+            const resultKind = game.result || 'neutral';
             const resultLabel = resultKind === 'neutral' ? 'recorded' : resultKind;
-            const statsText = verification === 'pending'
-                ? `Waiting for Hypixel stats · attempt ${numberText(game.verificationAttempts)}`
-                : verification === 'unverified'
-                    ? 'Stats did not update after automatic retries'
-                    : sessionGameStatsText(game);
+            const statsText = sessionGameStatsText(game);
             const modeLabel = game.label || game.mode || 'Saved game';
             const map = game.metadata?.map || '';
             const variant = game.metadata?.variant || '';
             const contextLabel = [map, variant, modeLabel].filter(Boolean).join(' · ');
             const cardTitle = map || (variant ? `${variant} ${modeLabel}` : `${modeLabel} match`);
             const cardKicker = [modeLabel, map ? variant : ''].filter(Boolean).join(' · ');
-            const sourceLabel = verification === 'pending'
-                ? 'Automatic verification in progress'
-                : verification === 'unverified'
-                    ? 'Automatic verification incomplete'
-                    : game.statsSource === 'api'
-                        ? 'API-confirmed totals'
-                        : game.statsSource === 'events'
-                            ? 'Proxy-captured totals'
-                            : 'Match recorded locally';
+            const sourceLabel = game.statsSource === 'api' ? 'Hypixel stats' : 'Local stats';
             return {
                 verification,
                 resultKind,
@@ -9483,12 +9492,11 @@
 
             content.innerHTML = `
                 <div class="session-game-drawer-head">
-                    <div><div class="session-game-overview-badges"><span class="session-result ${escapeHtml(result)}">${escapeHtml(result)}</span><span class="session-quality ${escapeHtml(coverage)}">${escapeHtml(coverage)}</span><span class="eyebrow">${escapeHtml(formatSessionDate(game.at))}</span></div><h2 id="session-game-drawer-title">${escapeHtml(titleBits.join(' / ') || 'Saved game')}</h2><p>${escapeHtml(formatSessionDuration(game.durationMs))} / ${escapeHtml(game.statsSource === 'api' ? 'API-confirmed totals' : 'Proxy-captured totals')}</p></div>
+                    <div><div class="session-game-overview-badges"><span class="session-result ${escapeHtml(result)}">${escapeHtml(result)}</span><span class="eyebrow">${escapeHtml(formatSessionDate(game.at))}</span></div><h2 id="session-game-drawer-title">${escapeHtml(titleBits.join(' / ') || 'Saved game')}</h2><p>${escapeHtml(formatSessionDuration(game.durationMs))}</p></div>
                     <button type="button" class="session-game-drawer-close-icon" data-session-game-close aria-label="Close game overview"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"></path></svg></button>
                 </div>
                 <div class="session-game-drawer-scroll">
                     <section class="session-detail-stat-grid">${statItems.map(([label, value]) => `<span><small>${escapeHtml(label)}</small><strong>${escapeHtml(numberText(value))}</strong></span>`).join('')}</section>
-                    ${sessionReconciliationMarkup(game)}
                     <div class="session-game-overview-columns">
                         <section class="session-detail-section session-game-story"><div class="session-detail-section-head"><div><span class="eyebrow">Automatic capture</span><h3>Game timeline</h3></div><span>${events.length} event${events.length === 1 ? '' : 's'}</span></div><div class="session-event-timeline">${eventRows}</div></section>
                         <div class="session-game-overview-side">
@@ -9676,7 +9684,7 @@
                 ['Finals', metrics.finals || 0],
                 ['FKDR', sessionNumber(metrics.fkdr).toFixed(2)]
             ];
-            target.innerHTML = `<div class="session-live-card"><div class="session-live-title"><span class="session-live-badge">Live</span><strong>${escapeHtml(live.name || 'Current session')}</strong><span>Started ${escapeHtml(formatSessionDate(live.startedAt))}${metrics.pendingGames ? ` · ${metrics.pendingGames} pending` : ''}</span></div>${items.map(([label, value]) => `<div class="session-live-metric"><small>${escapeHtml(label)}</small><strong>${escapeHtml(value)}</strong></div>`).join('')}</div>`;
+            target.innerHTML = `<div class="session-live-card"><div class="session-live-title"><span class="session-live-badge">Live</span><strong>${escapeHtml(live.name || 'Current session')}</strong><span>Started ${escapeHtml(formatSessionDate(live.startedAt))}</span></div>${items.map(([label, value]) => `<div class="session-live-metric"><small>${escapeHtml(label)}</small><strong>${escapeHtml(value)}</strong></div>`).join('')}</div>`;
         }
 
         function updateSessionFilterControl() {
@@ -9944,6 +9952,7 @@
             if (activePage === 'sessions') renderSessionHistory(state.sessionHistory || {});
             renderWhenChanged(`logs:${activeLog}`, state?.services?.[activeLog]?.logs || [], renderLogs);
             furyDesign?.update(state);
+            designA?.update(state);
         }
 
         async function refresh() {
@@ -10023,6 +10032,7 @@
             }
             const activeLabel = nav?.dataset.pageLabel || nav?.textContent?.replace('PRO', '').trim() || 'Dashboard';
             document.title = `Fury - ${activeLabel}`;
+            designA?.onNavigate(page);
             if (page === 'console') renderLogs();
             if (page === 'sessions') renderSessionHistory(state?.sessionHistory || {});
             if (overlayVisibilityChanged || page === 'denicks' || page === 'sessions' || page === 'dashboard' || page === 'reminders') refresh();
@@ -10714,23 +10724,37 @@
             };
         }
 
-        document.getElementById('proxy-start').addEventListener('click', async () => {
+        async function startProxy() {
+            if (document.documentElement.dataset.proxyStarting === 'true' || document.documentElement.dataset.proxyStopping === 'true') return;
+            document.documentElement.dataset.proxyStarting = 'true';
+            designA?.update(state);
             try {
                 await ipcRenderer.invoke('service:start', 'proxy');
                 await refresh();
             } catch (error) {
                 document.getElementById('save-status').textContent = error?.message || 'Could not start proxy';
+            } finally {
+                delete document.documentElement.dataset.proxyStarting;
+                designA?.update(state);
             }
-        });
-        document.getElementById('proxy-stop').addEventListener('click', async () => {
+        }
+        document.getElementById('proxy-start').addEventListener('click', startProxy);
+        async function stopProxy() {
+            if (document.documentElement.dataset.proxyStarting === 'true' || document.documentElement.dataset.proxyStopping === 'true') return;
+            document.documentElement.dataset.proxyStopping = 'true';
+            designA?.update(state);
             try {
                 const result = await ipcRenderer.invoke('service:stop', 'proxy');
                 await refresh();
                 if (!result.clean) document.getElementById('save-status').textContent = 'Proxy shutdown was forced. Check the service log before restarting.';
             } catch (error) {
                 document.getElementById('save-status').textContent = error?.message || 'Could not stop proxy';
+            } finally {
+                delete document.documentElement.dataset.proxyStopping;
+                designA?.update(state);
             }
-        });
+        }
+        document.getElementById('proxy-stop').addEventListener('click', stopProxy);
         async function startMicrosoftLogin(username) {
             furyDesign.showSignIn(username ? {name:username} : null);
         }
@@ -10820,8 +10844,9 @@
                 }
             });
         });
-        document.getElementById('ender-dust-reminder-check')?.addEventListener('click', async (event) => {
-            const button = event.currentTarget;
+        async function checkEnderDust() {
+            const button = document.getElementById('ender-dust-reminder-check');
+            if (button.disabled) return;
             const original = button.textContent;
             const status = document.getElementById('reminder-status-copy');
             button.disabled = true;
@@ -10833,13 +10858,17 @@
                 if (generation !== accountGeneration) return;
                 state = { ...(state || {}), reminders };
                 renderReminderStatus(reminders?.enderDust || null);
+                designA?.update(state);
             } catch (error) {
                 if (status) status.textContent = error?.message || 'Could not check Ender Dust.';
+                document.getElementById('save-status').textContent = error?.message || 'Could not check Ender Dust.';
             } finally {
                 button.disabled = false;
                 button.textContent = original;
+                designA?.update(state);
             }
-        });
+        }
+        document.getElementById('ender-dust-reminder-check')?.addEventListener('click', checkEnderDust);
         [ids.proxyDirectPort, ids.proxyFailoverPort, ids.proxyCustomPort, ids.healthPort, ids.proxyDirectHost, ids.proxyFailoverHost, ids.proxyCustomHost].filter(Boolean).forEach((input) => {
             input.addEventListener('input', () => {
                 const settings = state?.settings;
@@ -11679,11 +11708,11 @@
                 navigate: (category, element) => openGlobalSearchEntry({ page: 'settings', category, element })
             });
         }
+        document.documentElement.classList.add('fury-design-a');
         furyDesign = require('./src/launcher/renderer/launcher_redesign.js').mount({
             document, clipboard, nativeImage, invoke: (channel, ...args) => channel === 'session:action'
                 ? invokeHistoryMutation(channel, ...args) : ipcRenderer.invoke(channel, ...args),
             navigate: activatePage, settingsPage: activateSettingsSubpage, getState: () => state, refresh,
-            validateNetwork: () => scheduleNetworkValidation(0),
             removeAccount: async account => {
                 accountGeneration++;
                 try {
@@ -11708,15 +11737,19 @@
                 catch (error) { accountGeneration++; state = previous; await refresh(); throw error; }
             }
         });
+        designA = require('./src/launcher/renderer/launcher_design_a.js').mount({ document, navigate: activatePage, settingsPage: activateSettingsSubpage, getState: () => state, showIngame: key => furyDesign.showIngame(key), startProxy, stopProxy, checkDust: checkEnderDust, invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args) });
         [ids.tabStatsPreset, ids.tabStatsLabelStyle, ids.nametagTagDisplayMode, document.getElementById('nickroll-rank'), document.getElementById('nickroll-skinMode')].forEach(createCustomStatSelect);
         initializeGlobalSearch();
 
         require('./src/launcher/renderer/launcher_shutdown').installRendererShutdown(ipcRenderer, async () => {
             rendererClosing = true; releaseRenderer();
+            designA?.dispose();
+            window.NesterTheme?.disposeSeasonal();
             // Freeze interaction; do not promote uncommitted/invalid drafts.
             document.body.inert = true;
             flushAccent();
             await furyDesign?.flushNickroll();
+            await releaseUI?.flush();
             if (featureSaveTimer) {
                 clearTimeout(featureSaveTimer); featureSaveTimer = null;
                 saveFeatureControlsNow();
@@ -11730,8 +11763,23 @@
 
         // The shared notification center is loaded by a deferred script.
         window.addEventListener('DOMContentLoaded', () => {
-            require('./src/launcher/renderer/launcher_updates').mount({
+            window.NesterTheme.mountSeasonal(require('./src/launcher/renderer/launcher_seasonal'));
+            releaseUI = require('./src/launcher/renderer/launcher_updates').mount({
                 document, notifications: window.FuryNotifications,
+                navigate: destination => {
+                    if (destination.category === 'nickroll') activatePage('nickroll');
+                    else if (destination.category === 'anticheat') activatePage('anticheat');
+                    else { activatePage('settings'); activateSettingsSubpage(destination.category, false); }
+                    let control = destination.control && document.getElementById(destination.control);
+                    // A changelog link must not change the player's sharing mode.
+                    // Point to its Players/Teams choice when individual options are hidden.
+                    if (control?.closest('#share-individual-options')?.hidden) control = document.getElementById('share-tags-team-summary');
+                    const pane = control?.closest('[data-ingame]');
+                    if (pane) furyDesign.showIngame(pane.dataset.ingame);
+                    control?.closest('details')?.setAttribute('open', '');
+                    return control?.closest('.stat-select-shell')?.querySelector('.stat-select-trigger') || control
+                        || document.querySelector(`[data-ds-category="${destination.category}"]`);
+                },
                 subscribe: listener => {
                     const receive = (event, state) => listener(state);
                     ipcRenderer.on('updates:state-changed', receive);
@@ -11739,6 +11787,7 @@
                 },
                 invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args), isClosing: () => rendererClosing
             });
+            designA.mountRailActions();
         }, { once: true });
 
     </script>

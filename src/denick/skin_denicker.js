@@ -1,3 +1,5 @@
+const { realAccountUuid } = require('./identity');
+
 const nicks = new Set([
     "4c7b0468044bfecacc43d00a3a69335a834b73937688292c20d3988cae58248d",
     "3b60a1f6d562f52aaebbf1434f1de147933a3affe0e764fa49ea057536623cd3",
@@ -231,9 +233,9 @@ const nicks = new Set([
 /**
  * Checks a player's properties for a skin-based real name.
  * @param {Array} properties - The properties array from player_info or GameProfile
- * @returns {string|null} - The real name found, or null
+ * @returns {{realName: string, realUuid: string|null}|null} - The skin owner's identity
  */
-function getRealNameFromSkin(properties) {
+function getIdentityFromSkin(properties) {
     if (!properties || !Array.isArray(properties)) return null;
 
     const texturesProp = properties.find(p => p.name === 'textures');
@@ -261,7 +263,7 @@ function getRealNameFromSkin(properties) {
         // Note: Sometimes this will match the nick if Hypixel updated it, 
         // but often it contains the real name of the account.
         if (skinProfile.profileName) {
-            return skinProfile.profileName;
+            return { realName: skinProfile.profileName, realUuid: realAccountUuid(skinProfile.profileId) };
         }
 
         return null;
@@ -270,4 +272,6 @@ function getRealNameFromSkin(properties) {
     }
 }
 
-module.exports = { getRealNameFromSkin };
+function getRealNameFromSkin(properties) { return getIdentityFromSkin(properties)?.realName || null; }
+
+module.exports = { getRealNameFromSkin, getIdentityFromSkin };

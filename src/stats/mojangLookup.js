@@ -112,9 +112,11 @@ function createMojangLookup({ request, isRetryable, retryAfterMs, now, setTimeou
             launch(0);
         });
     }
-    async function resolve(name, { signal, canRetry }) {
+    async function resolve(name, { signal, canRetry, singleAttempt = false, endpointIndex = 0 }) {
         const failures = [];
         try {
+            // Background migration owns its own spacing and bounded retries.
+            if (singleAttempt) return await read(endpointIndex === 1 ? 1 : 0, name, signal, canRetry, undefined, failures);
             try { return await initial(name, signal, canRetry, failures); }
             catch (error) {
                 if (!isRetryable(error) || signal.aborted || !canRetry()) throw error;

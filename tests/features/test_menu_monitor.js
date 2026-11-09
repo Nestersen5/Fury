@@ -252,6 +252,10 @@ assert.strictEqual(debugState.menuNavStep, 'idle');
 
 // ------------------------------------------------------------- jsonl output
 
+monitor.recordAutomationEvent('unit-owner', { event: 'submit', windowId: 3 });
+monitor.handleCommand(null, ['/menudebug', 'log', 'off']);
+monitor.recordAutomationEvent('unit-owner', { event: 'logging-disabled' });
+monitor.handleCommand(null, ['/menudebug', 'log', 'on']);
 monitor.flush();
 monitor.dispose();
 const logFiles = fs.readdirSync(dir).filter(name => name.endsWith('.jsonl'));
@@ -269,15 +273,59 @@ assert.strictEqual(windowItemsLine.count, 54);
 assert.strictEqual(windowItemsLine.items.length, 2);
 assert.strictEqual(windowItemsLine.items[0].slot, 11);
 assert.deepStrictEqual(windowItemsLine.items[0].lore, ['§7Currently: §aON']);
+const automationLine = lines.find(line => line.p === 'automation');
+assert.strictEqual(automationLine.source, 'unit-owner');
+assert.strictEqual(automationLine.dir, 'local');
+assert.strictEqual(automationLine.t, fakeNow);
+assert.deepStrictEqual(automationLine.event, { event: 'submit', windowId: 3 });
+assert.ok(!lines.some(line => line.p === 'automation' && line.event.event === 'logging-disabled'), 'automation events honor existing logging controls');
 
 // A monitor with no directory logs nothing and still works.
 const quiet = createMenuMonitor({ dir: null, now: () => fakeNow, log: () => {} });
+quiet.recordAutomationEvent('unit-owner', { event: 'submit' });
 quiet.observeServerPacket(
     { windowId: 1, inventoryType: 'minecraft:chest', windowTitle: 'X', slotCount: 9 },
     { name: 'open_window' }
 );
 assert.ok(quiet.getWindow());
 quiet.dispose();
+
+// Hidden report windows use the captured native per-window numbering without
+// changing the default synthetic lane or leaking acknowledgments to the client.
+const nativePackets = [];
+const native = createMenuMonitor({ dir: null, log: () => {},
+    sendUpstream: (name, data) => nativePackets.push({ name, data }) });
+try {
+    native.observeClientPacket({ windowId: 0, slot: 36, mouseButton: 0, action: 32000, mode: 0,
+        item: { blockId: -1 } }, { name: 'window_click' });
+    const openNative = windowId => {
+        native.observeServerPacket({ windowId, inventoryType: 'minecraft:chest', windowTitle: 'Report Cheating/Hacking', slotCount: 27 }, { name: 'open_window' });
+        native.observeServerPacket({ windowId, items: [guiItem('Submit Report', [], { blockId: 159, itemDamage: 13 })] }, { name: 'window_items' });
+    };
+    openNative(101);
+    const firstNative = native.clickSlot({ slot: 0, actionNumbering: 'window' });
+    assert.strictEqual(firstNative.action, 1, 'ignore the client counter from a different window');
+    assert.strictEqual(native.observeServerPacket({ windowId: 101, action: 1, accepted: false }, { name: 'transaction' }), true);
+    assert.deepStrictEqual(nativePackets.at(-1), { name: 'transaction', data: { windowId: 101, action: 1, accepted: true } });
+    assert.strictEqual(native.clickSlot({ slot: 0, actionNumbering: 'window' }).action, 2);
+    openNative(102);
+    assert.strictEqual(native.clickSlot({ slot: 0, actionNumbering: 'window' }).action, 1, 'new windows start their own counter');
+    native.observeClientPacket({ windowId: 102, slot: 0, mouseButton: 0, action: 7, mode: 0,
+        item: { blockId: -1 } }, { name: 'window_click' });
+    assert.strictEqual(native.clickSlot({ slot: 0, actionNumbering: 'window' }).action, 8, 'continue after a real click in this window');
+    assert.strictEqual(native.observeServerPacket({ windowId: 102, action: 7, accepted: true }, { name: 'transaction' }), false);
+    native.observeServerPacket({ windowId: 102 }, { name: 'close_window' });
+    openNative(102);
+    assert.strictEqual(native.clickSlot({ slot: 0, actionNumbering: 'window' }).action, 2, 'skip outstanding action 1 when a server reuses an ID');
+    assert.strictEqual(native.observeServerPacket({ windowId: 102, action: 1, accepted: false }, { name: 'transaction' }), true, 'old acknowledgment keeps its own transaction');
+    assert.strictEqual(native.observeServerPacket({ windowId: 102, action: 2, accepted: false }, { name: 'transaction' }), true);
+    openNative(103);
+    native.observeClientPacket({ windowId: 103, slot: 0, mouseButton: 0, action: 32767, mode: 0,
+        item: { blockId: -1 } }, { name: 'window_click' });
+    assert.strictEqual(native.clickSlot({ slot: 0, actionNumbering: 'window' }).action, -32768, 'wrap as a signed protocol short');
+    assert.strictEqual(native.clickSlot({ slot: 0, actionNumbering: 'window' }).action, -32767);
+    assert.strictEqual(native.clickSlot({ slot: 0 }).action, 1000, 'other automation retains the existing biased/wrapping sequence');
+} finally { native.dispose(); }
 
 fs.rmSync(dir, { recursive: true, force: true });
 console.log('Menu monitor tests passed.');

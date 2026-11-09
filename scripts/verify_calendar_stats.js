@@ -68,7 +68,7 @@ const target=require('./launcher_verification_target').verificationTarget('calen
         await page.evaluate(()=>{window.savedCopy=clipboard.writeImage;clipboard.writeImage=image=>window.calendarCopy=image.getSize();document.querySelector('.fury-period-row[open] .fury-calendar-copy').click();});
         assert((await page.evaluate('calendarCopy')).width>500);await page.evaluate('clipboard.writeImage=savedCopy');
         const exports=path.join(profile,'exports');fs.mkdirSync(exports);const cdp=await page.createCDPSession();await cdp.send('Page.setDownloadBehavior',{behavior:'allow',downloadPath:exports});
-        await page.click('.fury-period-row[open] .fury-gold-outline');await eventually(async()=>assert(fs.readdirSync(exports).some(f=>f.includes('-weekly')&&f.endsWith('.png'))),'Exporting weekly PNG');
+        await page.click('.fury-period-row[open] .fury-calendar-save');await eventually(async()=>assert(fs.readdirSync(exports).some(f=>f.includes('-weekly')&&f.endsWith('.png'))),'Exporting weekly PNG');
         await page.setViewport({width:1024,height:900});await page.screenshot({path:path.join(target.output,'weekly-card-1024.png')});
         assert(await page.$eval('[data-page="sessions"]',e=>e.scrollWidth<=e.clientWidth+1),'Narrow view has no horizontal overflow');
         await page.click('.fury-period-row[open] .fury-contributions');
@@ -92,9 +92,12 @@ const target=require('./launcher_verification_target').verificationTarget('calen
             const cards=require('./src/launcher/renderer/launcher_session_card');const s=structuredClone(state.sessionHistory.sessions[0]);
             s.modes=[{mode:'DUELS',label:'Duels',wins:2,losses:1,games:3,breakdown:{entries:[{id:'a',label:'A',games:1},{id:'b',label:'B',games:1},{id:'c',label:'C',games:1}],total:3,status:'available'}}];
             const {canvas}=await cards.render(s,{avatar:false});const ctx=canvas.getContext('2d');
-            // At a row through the bar interiors, background separates each bar.
-            const y=250;let runs=0,inside=false;for(let x=0;x<canvas.width;x++){const [r,g,b]=ctx.getImageData(x,y,1,1).data;const bar=r===41&&g===44&&b===49;if(bar&&!inside)runs++;inside=bar;}return runs;
-        });assert.equal(gaps,3,'All three bars are separated by background gaps');
+            // On the bar's widest row (above its numbers), background separates each mode's part.
+            const colors=['255,170,0','85,255,255','255,85,255'],{data}=ctx.getImageData(0,0,canvas.width,canvas.height);
+            const at=(x,y)=>{const i=(y*canvas.width+x)*4;return colors.indexOf(`${data[i]},${data[i+1]},${data[i+2]}`);};
+            let best={count:0,y:0};for(let y=0;y<canvas.height;y++){let count=0;for(let x=0;x<canvas.width;x++)if(at(x,y)>=0)count++;if(count>best.count)best={count,y};}
+            const runs=[];let inside=-1;for(let x=0;x<canvas.width;x++){const color=at(x,best.y);if(color>=0&&inside<0)runs.push(color);inside=color;}return runs.join(',');
+        });assert.equal(gaps,'0,1,2','All three bar parts are separated by background gaps');
         await page.evaluate(()=>{state.sessionHistory={sessions:[],calendarSessions:[]};furyDesign.clearAccount();furyDesign.renderSessions(state.sessionHistory,{});});
         assert.equal(await page.$$eval('.fury-period-row',els=>els.length),0,'Account changes clear stale period cards');
         assert.deepEqual(errors,[]);target.record();console.log('PASS calendar tabs, lazy cards, refresh, filters, contributions, PNG/copy export, responsive layout, monthly activity, account clearing and shared chart gaps.');

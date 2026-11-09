@@ -26,6 +26,8 @@ function sameTeam(a, b) {
 function titleResult(events) {
     const victory = events.some(event => event.type === 'victory');
     const defeat = events.some(event => event.type === 'defeat' && event.cause !== 'game_over');
+    const draw = events.some(event => event.type === 'draw');
+    if (draw) return victory || defeat ? null : 'draw';
     if (victory && defeat) return null;
     if (victory) return 'win';
     if (defeat || events.some(event => event.type === 'defeat')) return 'loss';
@@ -55,7 +57,7 @@ function inferGameResult({ mode = null, events = [], ownTeam = null, roster = []
 
 // The API delta is authoritative; watched evidence only fills its gaps.
 function resolveGameResult(apiResult, context = {}) {
-    if (apiResult === 'win' || apiResult === 'loss') return { result: apiResult, source: 'api' };
+    if (['win','loss','draw'].includes(apiResult)) return { result: apiResult, source: 'api' };
     if (['win', 'loss'].includes(context.manualResult)) return { result: context.manualResult, source: 'manual' };
     if (context.resultSource === 'manual' && ['win', 'loss'].includes(context.result)) {
         return { result: context.result, source: 'manual' };

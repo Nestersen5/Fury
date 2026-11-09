@@ -2,6 +2,7 @@
 
 const { BoundedTtlMap } = require('../util/bounded_ttl_map.js');
 const { InFlightDeduper } = require('../util/in_flight_deduper.js');
+const { realAccountUuid } = require('./identity');
 
 const VALID_NAME = /^[A-Za-z0-9_]{3,16}$/;
 const VALID_UUID = /^[0-9a-f]{32}$/i;
@@ -63,10 +64,11 @@ function createRealSkinTextureResolver({
         return entry.properties ? entry.properties.map(property => ({ ...property })) : null;
     }
 
-    async function resolve(realName) {
+    async function resolve(realName, realUuid) {
         const name = String(realName || '').trim();
         if (!VALID_NAME.test(name)) return null;
-        const key = name.toLowerCase();
+        const accountUuid = realAccountUuid(realUuid);
+        const key = accountUuid || name.toLowerCase();
         const cached = cachedValue(key);
         if (cached !== undefined) return cached;
 
@@ -75,11 +77,11 @@ function createRealSkinTextureResolver({
             if (afterWait !== undefined) return afterWait;
 
             try {
-                const profileResponse = await httpClient.get(
+                const profileResponse = accountUuid ? null : await httpClient.get(
                     `https://api.mojang.com/users/profiles/minecraft/${encodeURIComponent(name)}`,
                     { timeout: timeoutMs }
                 );
-                const uuid = String(profileResponse?.data?.id || '').replace(/-/g, '');
+                const uuid = accountUuid || String(profileResponse?.data?.id || '').replace(/-/g, '');
                 if (!VALID_UUID.test(uuid)) throw new Error('Mojang returned an invalid profile UUID');
 
                 const sessionResponse = await httpClient.get(

@@ -339,11 +339,12 @@ function createScanRunner(deps) {
                         stars,
                         starThreat: stars >= state.threatConfig.minStars,
                         fkdr,
+                        fkdrThreat: fkdr >= state.threatConfig.minFkdr,
                         wlr,
                         ws,
                         sortValue: fkdr
                     };
-                    isThreat = lookupFailed || fkdr >= state.threatConfig.minFkdr || tagThreat || nickedThreat || stars >= state.threatConfig.minStars;
+                    isThreat = lookupFailed || stats.fkdrThreat || tagThreat || nickedThreat || stats.starThreat;
                 }
 
                 const shouldInclude = state.scanMode === 'all' || (state.scanMode === 'threats' && isThreat);

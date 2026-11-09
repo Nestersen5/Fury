@@ -100,7 +100,7 @@ debug.observeChat('Rival was too shy to meet Tester.');
 assert(messages.some(message => message.includes('Kills +1 (1) (incomplete)')),
     'midgame observations remain visible without claiming complete coverage');
 debug.end({ at: stamp + 45000, serverId: 'mini5', confirmed: true });
-assert(messages.some(message => message.includes('Kills ? (seen 1)')));
+assert(messages.some(message => message.includes('Kills 1')));
 
 apiAvailable = true;
 stamp += 10000;

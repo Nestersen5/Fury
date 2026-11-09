@@ -266,7 +266,8 @@ function createMenuMonitor({
         slots: new Map(),
         rawSlots: new Map(),
         openedAt: 0,
-        nextAction: 0
+        nextAction: 0,
+        nextWindowAction: 0
     };
 
     const stats = { s2c: new Map(), c2s: new Map(), suppressedCloses: 0, syntheticClicks: 0 };
@@ -363,7 +364,8 @@ function createMenuMonitor({
             slots: new Map(),
             rawSlots: new Map(),
             openedAt: now(),
-            nextAction: 0
+            nextAction: 0,
+            nextWindowAction: 0
         };
         return window;
     }
@@ -517,6 +519,7 @@ function createMenuMonitor({
         if (meta.name === 'window_click') {
             if (Number.isFinite(data.action)) lastClientAction = Math.max(lastClientAction, data.action);
             const target = windowById(data.windowId);
+            if (target && Number.isFinite(data.action)) target.nextWindowAction = data.action;
             const item = describeItem(data.item, itemNameLookup);
             const tracked = target ? target.slots.get(data.slot) : null;
             const click = describeClick(data.mode, data.mouseButton, data.slot);
@@ -573,7 +576,17 @@ function createMenuMonitor({
 
     // ------------------------------------------------------------- clicking
 
-    function nextActionNumber(target) {
+    function nextActionNumber(target, actionNumbering) {
+        if (actionNumbering === 'window') {
+            // A hidden report has no real-client clicks to avoid. Match the
+            // captured native first click (1), then use a per-window signed
+            // short sequence. Still skip outstanding actions if an ID is reused.
+            let action = target.nextWindowAction || 0;
+            do { action = action === 32767 ? -32768 : action + 1; }
+            while (pendingActions.has(`${target.windowId}:${action}`));
+            target.nextWindowAction = action;
+            return action;
+        }
         syntheticActionCounter += 1;
         // Stay clear of the client's own counter for this window: vanilla
         // increments per click, so we bias well above whatever it has used.
@@ -598,7 +611,7 @@ function createMenuMonitor({
         return { blockId: described.id, itemCount: described.count, itemDamage: described.damage };
     }
 
-    function clickSlot({ slot, mode = 0, button = 0, source = 'manual' }) {
+    function clickSlot({ slot, mode = 0, button = 0, source = 'manual', actionNumbering = 'synthetic' }) {
         const target = currentWindow();
         if (!Number.isFinite(slot)) return { ok: false, error: 'Slot must be a number.' };
         if (slot !== -999 && (slot < 0 || (target.slotCount && slot >= target.slotCount + 36))) {
@@ -608,7 +621,7 @@ function createMenuMonitor({
         // The server compares the item we claim is in the slot against its own
         // copy, so echo back exactly what the last window_items/set_slot said.
         const item = tracked ? rebuildSlotItem(target, slot) : EMPTY_ITEM;
-        const action = nextActionNumber(target);
+        const action = nextActionNumber(target, actionNumbering);
         const at = now();
         pendingActions.set(`${target.windowId}:${action}`, { at, slot, synthetic: true, source });
         stats.syntheticClicks += 1;
@@ -968,6 +981,9 @@ function createMenuMonitor({
         isEnabled: () => enabled,
         setEnabled: (value) => { enabled = Boolean(value); },
         setHold: (value) => { holdOpen = Boolean(value); },
+        // Menu owners can add compact context to the same buffered JSONL
+        // stream without creating another file writer or logging raw packets.
+        recordAutomationEvent: (source, event) => record({ t: now(), dir: 'local', p: 'automation', source, event }),
         flush: flushLog
     };
 }

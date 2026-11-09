@@ -2,8 +2,11 @@
     const STORAGE_KEY = 'nester-theme-v1';
     const ACCENT_STORAGE_KEY = 'nester-accent-v2';
     const CUSTOM_ACCENT_STORAGE_KEY = 'nester-custom-accent-v2';
+    const DEFAULT_ACCENT = 'custom';
+    const DEFAULT_CUSTOM_ACCENT = '#0022cc';
     const MOTION_STORAGE_KEY = 'nester-motion-v1';
     const SIDEBAR_STORAGE_KEY = 'fury-sidebar-v1';
+    let seasonalAppearance = null;
     const THEMES = new Set(['graphite', 'midnight', 'forest', 'light', 'obsidian', 'frost']);
     const ACCENTS = {
         iris: '#8b7cff',
@@ -44,6 +47,7 @@
             button.classList.toggle('active', active);
             button.setAttribute('aria-checked', active ? 'true' : 'false');
         });
+        window.dispatchEvent(new Event('fury:theme-change'));
         return selected;
     }
 
@@ -51,10 +55,10 @@
         const requested = String(accent || '').toLowerCase();
         const selected = requested === 'custom' || Object.prototype.hasOwnProperty.call(ACCENTS, requested)
             ? requested
-            : 'sun';
+            : DEFAULT_ACCENT;
         const customColor = isHexColor(customValue)
             ? customValue
-            : (isHexColor(localStorage.getItem(CUSTOM_ACCENT_STORAGE_KEY)) ? localStorage.getItem(CUSTOM_ACCENT_STORAGE_KEY) : '#e5b35d');
+            : (isHexColor(localStorage.getItem(CUSTOM_ACCENT_STORAGE_KEY)) ? localStorage.getItem(CUSTOM_ACCENT_STORAGE_KEY) : DEFAULT_CUSTOM_ACCENT);
 
         document.documentElement.dataset.accent = selected;
         if (selected === 'custom') {
@@ -101,6 +105,7 @@
             const label = input.closest('.switch')?.querySelector('.switch-label');
             if (label) label.textContent = input.checked ? 'ON' : 'OFF';
         }
+        window.dispatchEvent(new Event('fury:motion-change'));
         return selected;
     }
 
@@ -129,6 +134,7 @@
             const label = button.dataset.pageLabel || button.title || 'Open page';
             button.setAttribute('aria-label', `Open ${label}`);
         });
+        window.dispatchEvent(new Event('fury:sidebar-change'));
         return selected;
     }
 
@@ -424,7 +430,7 @@
 
     function initialize() {
         applyTheme(localStorage.getItem(STORAGE_KEY) || document.documentElement.dataset.theme || 'graphite', false);
-        applyAccent(localStorage.getItem(ACCENT_STORAGE_KEY) || document.documentElement.dataset.accent || 'sun', false);
+        applyAccent(localStorage.getItem(ACCENT_STORAGE_KEY) || document.documentElement.dataset.accent || DEFAULT_ACCENT, false);
         document.documentElement.dataset.density = 'comfortable';
         applySidebar(localStorage.getItem(SIDEBAR_STORAGE_KEY) || document.documentElement.dataset.sidebar || 'expanded', false);
         const storedMotion = localStorage.getItem(MOTION_STORAGE_KEY);
@@ -519,7 +525,9 @@
         apply: applyTheme,
         applyAccent,
         applyMotion,
-        applySidebar
+        applySidebar,
+        mountSeasonal: module => { if (!seasonalAppearance) seasonalAppearance = module.mount({document, notify:showSavedStatus}); },
+        disposeSeasonal: () => seasonalAppearance?.dispose()
     };
     window.FuryNotifications = {
         show: showNotification,

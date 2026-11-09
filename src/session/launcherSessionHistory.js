@@ -17,6 +17,7 @@ const { modeBreakdown } = require('./modeBreakdown');
 const { submodeStats } = require('./submodeStats');
 const localTracking = require('./localTracking');
 const { deriveRatios } = require('./localStats');
+const { gameApiStats, gameModes, countsForGame } = require('./observedStats');
 
 const { MODE_DEFINITIONS } = require('./modeDefinitions');
 
@@ -99,21 +100,24 @@ function compactGameFrom(record, { gameCache = null, ...options } = {}) {
 function compactGame(record = {}, { encounterLookup = null, ownName = null } = {}) {
     if (record.verificationStatus === 'local') return {
         id: String(record.id || ''), at: number(record.at), mode: record.mode,
-        durationMs: number(record.durationMs), result: ['win','loss'].includes(record.result)?record.result:null, stats: record.localModes?.[0] || null,
+        durationMs: number(record.durationMs), result: ['win','loss','draw'].includes(record.result)?record.result:null, stats: record.localModes?.[0] || null,
         statsSource: 'local', verificationStatus: 'local', events: [],
         coverage: { status: record.localModes?.[0]?.unavailable?.length?'partial':'local' }, metadata:record.metadata||null, opponents: [], teammates: [], roster: []
     };
     const mode = String(record.mode || '').toUpperCase();
     const definition = MODE_DEFINITIONS.find(item => item.mode === mode);
+    const tracked = record.localModes?.length || record.observation;
+    const api = tracked ? gameApiStats(record) : record.delta?.stats?.[definition?.key];
     const apiStats = definition
-        ? compactModeStats(definition, record.delta?.stats?.[definition.key] || {})
+        ? compactModeStats(definition, api || {})
         : null;
+    const localStats = !apiStats && tracked ? gameModes(record)?.find(entry => entry.mode === mode) : null;
     const events = dedupeGameEvents(record.events || []);
     return withGameEventNormalizationCache(events, () => {
         const ownTeam = record.metadata?.team || null;
         const derived = eventTotals(events, { ownName, ownTeam });
         const hasDerivedMovement = Object.values(derived).some(value => number(value) > 0);
-        const stats = apiStats || record.localModes?.[0] || (definition && hasDerivedMovement ? {
+        let stats = apiStats || localStats || (definition && hasDerivedMovement ? {
             mode: definition.mode,
             label: definition.label,
             ...derived,
@@ -126,6 +130,12 @@ function compactGame(record = {}, { encounterLookup = null, ownName = null } = {
                 bblr: derived.beds / Math.max(1, derived.bedsLost)
             } : {})
         } : null);
+        if (stats && tracked) {
+            const counted = countsForGame(record);
+            if (counted) stats = deriveRatios({ ...stats, ...Object.fromEntries(localTracking.FIELDS
+                .filter(field => counted[field].available || counted[field].observed || counted[field].value > 0)
+                .map(field => [field,counted[field].value])) });
+        }
         const opponents = Array.isArray(record.opponents)
             ? record.opponents.slice(0, 32).map(value => String(value)).filter(Boolean)
             : [];
@@ -148,7 +158,7 @@ function compactGame(record = {}, { encounterLookup = null, ownName = null } = {
             mode: definition?.mode || (mode || null),
             label: definition?.label || (mode ? mode.toLowerCase() : 'Unknown mode'),
             durationMs: Math.max(0, number(record.durationMs)),
-            result: (['win', 'loss'].includes(String(record.result || '').toLowerCase())
+            result: (['win', 'loss', 'draw'].includes(String(record.result || '').toLowerCase())
                 ? String(record.result).toLowerCase()
                 : null),
             opponents,
@@ -158,7 +168,7 @@ function compactGame(record = {}, { encounterLookup = null, ownName = null } = {
                 ? opponents.map((name) => ({ name, encounter: encounterLookup(name) || null }))
                 : opponents.map(name => ({ name, encounter: null })),
             stats,
-            statsSource: apiStats ? 'api' : record.localModes?.length ? 'local' : (stats ? 'events' : 'none'),
+            statsSource: apiStats ? 'api' : localStats ? 'local' : (stats ? 'events' : 'none'),
             metadata: record.metadata && typeof record.metadata === 'object' ? {
                 serverId: record.metadata.serverId || null,
                 map: record.metadata.map || null,
@@ -191,7 +201,9 @@ function sessionMetrics(modes = [], games = [], durationMs = 0) {
         });
         return out;
     }, { wins: 0, losses: 0, kills: 0, deaths: 0, finals: 0, finalDeaths: 0, beds: 0, bedsLost: 0 });
-    totals.games = games.length;
+    // Match details are bounded independently of the session's full totals.
+    totals.games = modes.length ? modes.reduce((sum, mode) => sum + Math.max(
+        number(mode.games), number(mode.wins) + number(mode.losses)), 0) : games.length;
     totals.verifiedGames = games.filter(game => game.verificationStatus === 'verified').length;
     totals.pendingGames = games.filter(game => game.verificationStatus === 'pending').length;
     totals.unverifiedGames = games.filter(game => game.verificationStatus === 'unverified').length;
@@ -251,7 +263,7 @@ function withSessionClock(compact, now) {
 
 function summarize(sessions) {
     const total = sessions.reduce((total, session) => {
-        total.games += session.trackingSource==='local' ? number(session.metrics.games) : session.games.length;
+        total.games += number(session.metrics.games);
         total.pendingGames += number(session.metrics.pendingGames);
         total.unverifiedGames += number(session.metrics.unverifiedGames);
         session.modes.forEach(mode => {

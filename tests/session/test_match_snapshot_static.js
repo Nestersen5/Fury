@@ -44,7 +44,7 @@ expect(
 
 // A finished game's id must not survive into the next one.
 expect(
-    /gameActive = true;[\s\S]*?presentAtGameStart = true;[\s\S]*?activeMatchServerId = pregameLobbyIdForScoreboard\(getCurrentScoreboardText\(\)\) \|\| null;/,
+    /gameActive = true;[\s\S]*?presentAtGameStart = resumedSessionGame \? false : true;[\s\S]*?activeMatchServerId = pregameLobbyIdForScoreboard\(getCurrentScoreboardText\(\)\) \|\| null;/,
     'Starting a game should re-stamp the server id rather than inherit the previous one.'
 );
 expect(
@@ -84,7 +84,7 @@ expect(
     'The new lobby must replace the old lobby state before its parsed map is stored.'
 );
 expect(
-    /function activateGame\(mode,[\s\S]*?const pregameMap = mode === 'BEDWARS' && bedwarsPregameActive[\s\S]*?leaveBedwarsPregame\([\s\S]*?startSessionGameEventCapture\(mode, \{ map: pregameMap \}\);/,
+    /function activateGame\(mode,[\s\S]*?const pregameMap = mode === 'BEDWARS' && bedwarsPregameActive[\s\S]*?leaveBedwarsPregame\([\s\S]*?startSessionGameEventCapture\(mode, \{\s*map: pregameMap,/,
     'Game activation must capture the pregame map before clearing lobby state and hand it to session tracking.'
 );
 expect(

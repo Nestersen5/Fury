@@ -14,6 +14,8 @@
 // What lives here are the storage and the read/write helpers that don't
 // need to touch anything outside the four maps.
 
+const { realAccountUuid } = require('../../denick/identity');
+
 function createDenickTracker(deps) {
     const {
         isValidPlayerName,
@@ -38,7 +40,7 @@ function createDenickTracker(deps) {
     const mappingVersion = name => `${mappingEpoch}:${mappingVersions.get(nickKey(name)) || 0}`;
     const canAutoDenick = (name, version = mappingVersion(name)) => !removedMappings.has(nickKey(name)) && version === mappingVersion(name);
 
-    function applySavedMappingChange(name, next) {
+    function applySavedMappingChange(name, next, { suppressAuto = true } = {}) {
         const key = nickKey(name);
         mappingVersions.set(key, (mappingVersions.get(key) || 0) + 1);
         const attempt = autoSkinDenickAttempts.get(key);
@@ -50,8 +52,8 @@ function createDenickTracker(deps) {
         announcedDenicks.delete(key);
         if (next?.realName) {
             removedMappings.delete(key);
-            rememberKnownDenickInSession(name, next.realName, next.source);
-        } else removedMappings.add(key);
+            rememberKnownDenickInSession(name, next.realName, next.source, next.realUuid);
+        } else if (suppressAuto) removedMappings.add(key);
     }
     function clearSavedMappingChanges() {
         mappingEpoch++;
@@ -77,7 +79,7 @@ function createDenickTracker(deps) {
         if (key) announcedDenicks.add(key);
     }
 
-    function rememberKnownDenickInSession(name, realName, source = 'history') {
+    function rememberKnownDenickInSession(name, realName, source = 'history', realUuid = null) {
         if (!isValidPlayerName(name) || !isValidPlayerName(realName) || nickKey(name) === nickKey(realName)) return false;
 
         const key = nickKey(name);
@@ -86,6 +88,8 @@ function createDenickTracker(deps) {
             ...existing,
             nick: name,
             realName,
+            realUuid: realAccountUuid(realUuid)
+                || (existing.realName && nickKey(existing.realName) === nickKey(realName) ? existing.realUuid || null : null),
             source,
             fromHistory: source === 'history',
             fromManual: source === 'manual',
@@ -100,7 +104,7 @@ function createDenickTracker(deps) {
         if (!known?.realName || !isValidPlayerName(known.realName)) return false;
 
         const denickSource = known.source || source;
-        if (!rememberKnownDenickInSession(name, known.realName, denickSource)) return false;
+        if (!rememberKnownDenickInSession(name, known.realName, denickSource, known.realUuid)) return false;
         afterApplyKnownDenick(name, known.realName, denickSource, options);
         if (getDenickChatAnnouncementsEnabled() && options.announce !== false && !shouldSuppressDenickAnnouncement(name) && !hasAnnouncedDenick(name)) {
             const label = denickSource === 'manual' ? 'manual' : 'history';

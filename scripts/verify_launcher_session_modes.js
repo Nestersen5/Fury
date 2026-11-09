@@ -38,7 +38,7 @@ module.exports=async({page,output})=>{
     await page.click('[data-submode="eight_two"]');
     await page.waitForFunction('document.querySelector(".fury-card-image canvas")?.getAttribute("aria-label").includes("Wins: 4")');
     assert(await page.$eval('.fury-card-image canvas',e=>e.getAttribute('aria-label').includes('BedWars - Doubles')));
-    await page.evaluate(()=>{window.originalModeWrite=clipboard.writeImage;clipboard.writeImage=image=>{window.modeCopiedPng=image.toPNG().toString('base64');};[...document.querySelectorAll('.fury-card-toolbar button')].find(b=>b.textContent==='Copy image').click();clipboard.writeImage=window.originalModeWrite;});
+    await page.evaluate(()=>{window.originalModeWrite=clipboard.writeImage;clipboard.writeImage=image=>{window.modeCopiedPng=image.toPNG().toString('base64');};document.querySelector('.fury-session-row[open] .fury-card-copy').click();clipboard.writeImage=window.originalModeWrite;});
     assert(await page.evaluate(()=>window.modeCopiedPng===require('electron').nativeImage.createFromDataURL(document.querySelector('.fury-card-image canvas').toDataURL()).toPNG().toString('base64')));
     await page.focus('[data-submode="eight_two"]');await page.keyboard.press('Home');
     await page.waitForFunction('document.querySelector(".fury-card-image canvas")?.getAttribute("aria-label").includes("Wins: 7")');
@@ -83,7 +83,8 @@ module.exports=async({page,output})=>{
     assert(await page.$eval('.fury-card-image canvas',e=>e.getAttribute('aria-label').includes('Variant 0 1v1: 1')),'chart retains other played modes');
     const manyCard=await page.$eval('.fury-card-image canvas',e=>({png:e.toDataURL(),text:e.getAttribute('aria-label'),height:e.height}));
     for(let i=0;i<31;i++)assert(manyCard.text.includes(`Variant ${i} 1v1: 1`),'every played mode must be in the exported chart');
-    assert(manyCard.height>1200,'chart must grow to fit multiple rows');
+    // Small modes share one part of the bar, so many modes no longer stretch the card.
+    assert(manyCard.height<=1200,'many modes keep the card a normal size');
     require('fs').writeFileSync(path.join(output,'session-duels-31-card.png'),Buffer.from(manyCard.png.split(',')[1],'base64'));
     await (await page.$('.fury-session-row')).screenshot({path:path.join(output,'session-duels-31-modes.png')});
     await page.evaluate(()=>{

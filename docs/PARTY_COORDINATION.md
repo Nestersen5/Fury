@@ -96,6 +96,15 @@ feature to work outside local verification.
 
 ## Deployment
 
+The nickname-sharing update was deployed on 2026-11-07 as Worker version
+`d240951d-649c-4dbc-b871-c6d27540427a` at 100% on the existing production route.
+The previous version was `8def3cc1-3100-49f7-bcb3-db3a3f6945b4`; the Durable
+Object namespace and v1 migration are unchanged. Fury 1.1.4 already includes the
+compatible client code, so this service activation needs no new desktop build.
+The nine party test suites and public health/WebSocket smoke passed. Real
+two-player Hypixel verification remains outstanding. See
+`output/party-service-deploy/DEPLOYMENT-RESULT.json` for deployment evidence.
+
 Requires a Cloudflare account with Workers, SQLite Durable Objects, and permission
 to attach a Worker route to the existing `furyproxy.online` zone. The deployment
 uses no new secrets or account IDs in checked-in files and does not modify the

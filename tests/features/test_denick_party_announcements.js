@@ -23,9 +23,16 @@ assert(start >= 0 && end > start, 'production announcement functions must be pre
 const tagStart = source.indexOf('function getInteractiveTags(');
 const tagEnd = source.indexOf('// renderSkyWarsDashboard lives', tagStart);
 assert(tagStart >= 0 && tagEnd > tagStart);
+const rosterStart = source.indexOf('        function seedGameRoster()');
+const rosterEnd = source.indexOf('        function markPlayerLeftTab(', rosterStart);
+assert(rosterStart >= 0 && rosterEnd > rosterStart);
+const pregameStart = source.indexOf('        async function resolveKnownPregameDenickForDodge(');
+const pregameEnd = source.indexOf('        const lookupPregameIdentity =', pregameStart);
+assert(pregameStart >= 0 && pregameEnd > pregameStart);
 
 function harness({ broadcast = true, local = true, mode = 'BEDWARS', lookup } = {}) {
     const commands = [], messages = [], rawMessages = [], dashboards = [], cosmetics = [];
+    const identities = new Map(), lookups = [];
     const announced = new Set();
     const partyTracker = createPartyTracker({
         stripFormatting: value => value,
@@ -37,6 +44,9 @@ function harness({ broadcast = true, local = true, mode = 'BEDWARS', lookup } = 
     partyTracker.handleChatLine('Friend joined the party.');
     const context = {
         partyTracker, denickPartyAnnounceEnabled: broadcast,
+        partyDenickAnnouncements: new Set(),
+        gameSessionId: 1, bedwarsPregameSessionId: 1,
+        nickKey: name => String(name).toLowerCase(),
         denickChatAnnouncementsEnabled: local, currentGamemode: mode,
         client: {}, BEDWARS_MODE_DEFS: [{}],
         shouldSuppressDenickAnnouncement: () => false,
@@ -46,18 +56,28 @@ function harness({ broadcast = true, local = true, mode = 'BEDWARS', lookup } = 
         getBedwarsScanStats, formatDenickAnnouncement, formatAutoDenickMatch,
         hasTag, formatTagDescriptor, MAX_PC_LENGTH,
         buildOverlayTags, buildOverlayTagComponents, isUrchinRequestFailed, shortUrchinStatusLabel, urchinStatusMessage,
-        getPlayerData: lookup || (async () => ({ data: { player: {} }, fromCache: false })),
+        getAutoDenickResult: nick => identities.get(nick.toLowerCase()) || null,
+        findKnownDenickByNick: () => null,
+        markNickedPlayer: () => {},
+        getPlayerData: (name, options) => {
+            lookups.push({ name, options });
+            return lookup ? lookup(name, options) : Promise.resolve({ data: { player: {} }, fromCache: false });
+        },
         rememberPlayerActiveCosmetics: name => cosmetics.push(name),
         renderBedwarsStats: () => dashboards.push('BEDWARS'),
         renderSkyWarsDashboard: () => dashboards.push('SKYWARS'),
         numberOr: (value, fallback) => Number(value) || fallback,
         ratioValue: (a, b) => (Number(a) || 0) / (Number(b) || 1),
-        sendHypixelCommand: (command, options) => commands.push({ command, options })
+        sendHypixelCommand: (command, options) => {
+            commands.push({ command, options });
+            return Promise.resolve({ sent: true });
+        }
     };
     vm.createContext(context);
     vm.runInContext(source.slice(tagStart, tagEnd), context);
     vm.runInContext(source.slice(start, end), context);
-    return { context, partyTracker, commands, messages, rawMessages, dashboards, cosmetics, announced };
+    vm.runInContext(source.slice(pregameStart, pregameEnd), context);
+    return { context, partyTracker, commands, messages, rawMessages, dashboards, cosmetics, announced, identities, lookups };
 }
 
 async function run() {
@@ -162,7 +182,7 @@ async function run() {
         await enemy.context.announceSuccessfulDenick('HiddenNick', { realName: 'Enemy', source: method });
         assert.strictEqual(enemy.commands.length, 1, `${method}: non-party matches still broadcast`);
         assert(enemy.commands[0].command.startsWith('/pc [Denick] Enemy is nicked as HiddenNick | '));
-        assert.strictEqual(enemy.commands[0].options.dedupeKey, 'denick-party:HiddenNick:Enemy');
+        assert.strictEqual(enemy.commands[0].options.dedupeKey, 'denick-party:HiddenNick:Enemy:1:1');
         await enemy.context.announceSuccessfulDenick('HiddenNick', { realName: 'Enemy', source: method });
         assert.strictEqual(enemy.commands.length, 1, 'duplicate results must not broadcast again');
     }
@@ -202,10 +222,204 @@ async function run() {
     assert.strictEqual(quiet.dashboards.length, 0);
     assert.strictEqual(quiet.commands.length, 1, 'party broadcast remains independent of local notices');
 
+    const statsProfile = { data: { player, urchin: parseUrchinBatchTags([{ type: 'Closet', reason: 'scaffold' }]) } };
+    const statsCommand = '/pc [Denick] Enemy is nicked as OtherNick | 44★ FKDR 2.18 WLR 0.41 WS 3 | Closet Cheater (Scaffold)';
+    const loaded = harness({ lookup: async () => { throw Error('Must reuse the pregame profile'); } });
+    const knownIdentity = { realName: 'Enemy', realUuid: 'a'.repeat(32) };
+    loaded.identities.set('othernick', knownIdentity);
+    const pregameProfile = { ...statsProfile, pregameRealName: 'Enemy', pregameKnownDenick: knownIdentity };
+    const loadedDodge = await loaded.context.resolveKnownPregameDenickForDodge('OtherNick', pregameProfile);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.strictEqual(loadedDodge.dodgeProfile, pregameProfile, 'Dodge retains the resolved pregame profile');
+    assert.strictEqual(loaded.commands[0].command, statsCommand, 'saved denicks share the fresh stats and tag format');
+    assert.strictEqual(loaded.lookups.length, 0, 'loaded pregame stats do not trigger another lookup');
+
+    const detected = harness({ lookup: async () => statsProfile });
+    detected.identities.set('othernick', knownIdentity);
+    const detectedDodge = await detected.context.resolveKnownPregameDenickForDodge('OtherNick', { data: { isNicked: true } });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.strictEqual(detected.lookups.length, 1, 'newly recognized pregame identities share the Dodge lookup with the party message');
+    assert.strictEqual(detected.commands[0].command, statsCommand);
+    assert.strictEqual(detectedDodge.dodgeProfile.data.player, player);
+
+    const pregameFailure = harness({ lookup: async () => { throw Error('Pregame fixture failure'); } });
+    pregameFailure.identities.set('othernick', knownIdentity);
+    await assert.rejects(pregameFailure.context.resolveKnownPregameDenickForDodge('OtherNick', { data: { isNicked: true } }), /Pregame fixture failure/);
+    await new Promise(resolve => setImmediate(resolve));
+    assert.strictEqual(pregameFailure.commands[0].command, '/pc [Denick] Enemy is nicked as OtherNick');
+    assert.strictEqual(pregameFailure.lookups.length, 1, 'failed Dodge lookups retain their error behavior and are not repeated for broadcasting');
+
+    let finishPregame;
+    const stalePregame = harness({ lookup: () => new Promise(resolve => { finishPregame = resolve; }) });
+    stalePregame.identities.set('othernick', knownIdentity);
+    const pendingPregame = stalePregame.context.resolveKnownPregameDenickForDodge('OtherNick', { data: { isNicked: true } });
+    stalePregame.context.partyDenickAnnouncements = new Set();
+    finishPregame(statsProfile);
+    await pendingPregame;
+    assert.strictEqual(stalePregame.commands.length, 0, 'Dodge lookups cannot announce an opponent from a previous game');
+
+    const uncached = harness({ lookup: async () => statsProfile });
+    uncached.identities.set('othernick', { realName: 'Enemy', realUuid: 'a'.repeat(32) });
+    await uncached.context.announceKnownPregameDenickToParty('OtherNick', 'Enemy');
+    assert.strictEqual(uncached.commands[0].command, statsCommand);
+    assert.strictEqual(uncached.lookups.length, 1);
+    assert.strictEqual(uncached.lookups[0].name, 'Enemy');
+    assert.strictEqual(uncached.lookups[0].options.realUuid, 'a'.repeat(32), 'saved profiles use the verified account UUID');
+    assert.strictEqual(uncached.lookups[0].options.preferCache, true);
+
+    for (const lookup of [
+        async () => ({ error: true }),
+        async () => { throw Error('Offline fixture'); },
+        async () => null,
+        async () => ({ data: { player, lookupFailed: true } }),
+        async () => ({ data: { player, isNicked: true } })
+    ]) {
+        const h = harness({ lookup });
+        await h.context.announceKnownPregameDenickToParty('OtherNick', 'Enemy');
+        assert.strictEqual(h.commands[0].command, '/pc [Denick] Enemy is nicked as OtherNick', 'failed saved stats keep the name-only fallback without fake zeroes');
+        assert.strictEqual(h.lookups.length, 1);
+    }
+    const failedLoaded = harness();
+    await failedLoaded.context.announceKnownPregameDenickToParty('OtherNick', 'Enemy', { profile: undefined });
+    assert.strictEqual(failedLoaded.commands[0].command, '/pc [Denick] Enemy is nicked as OtherNick');
+    assert.strictEqual(failedLoaded.lookups.length, 0, 'an already failed pregame lookup is not repeated');
+
+    let finishSaved;
+    const concurrent = harness({ lookup: () => new Promise(resolve => { finishSaved = resolve; }) });
+    const savedPending = concurrent.context.announceKnownPregameDenickToParty('OtherNick', 'Enemy');
+    await concurrent.context.announceKnownPregameDenickToParty('OTHERNICK', 'enemy');
+    concurrent.context.announceDenickToParty('OtherNick', 'Enemy', statsProfile.data);
+    assert.strictEqual(concurrent.lookups.length, 1, 'roster repeats share one pending saved lookup');
+    assert.strictEqual(concurrent.commands.length, 0, 'fresh results cannot race a reserved saved announcement');
+    finishSaved(statsProfile);
+    await savedPending;
+    assert.strictEqual(concurrent.commands.length, 1);
+    assert.strictEqual(concurrent.commands[0].command, statsCommand);
+
+    for (const invalidate of [
+        h => { h.context.denickPartyAnnounceEnabled = false; },
+        h => { h.partyTracker.handleChatLine('You left the party.'); },
+        h => { h.partyTracker.handleChatLine('Enemy joined the party.'); },
+        h => { h.context.shouldSuppressDenickAnnouncement = () => true; },
+        h => { h.context.currentGamemode = 'SKYWARS'; },
+        h => { h.context.partyDenickAnnouncements = new Set(); },
+        h => { h.identities.delete('othernick'); },
+        h => { h.identities.set('othernick', { realName: 'AnotherPlayer', realUuid: 'b'.repeat(32) }); }
+    ]) {
+        let finish;
+        const h = harness({ lookup: () => new Promise(resolve => { finish = resolve; }) });
+        h.identities.set('othernick', { realName: 'Enemy', realUuid: 'a'.repeat(32) });
+        const pending = h.context.announceKnownPregameDenickToParty('OtherNick', 'Enemy');
+        invalidate(h);
+        finish(statsProfile);
+        await pending;
+        assert.strictEqual(h.commands.length, 0, 'saved lookups recheck game, settings, privacy and mapping ownership');
+    }
+
+    const renamed = harness({ lookup: async () => ({ data: { player: { ...player, displayname: 'NewEnemy' } } }) });
+    renamed.identities.set('othernick', { realName: 'Enemy', realUuid: 'a'.repeat(32) });
+    await renamed.context.announceKnownPregameDenickToParty('OtherNick', 'Enemy');
+    assert(renamed.commands[0].command.startsWith('/pc [Denick] NewEnemy is nicked as OtherNick | 44★'));
+    await renamed.context.announceKnownPregameDenickToParty('OtherNick', 'NewEnemy');
+    assert.strictEqual(renamed.lookups.length, 1, 'name refreshes preserve the announcement reservation');
+    renamed.partyTracker.handleChatLine('NewEnemy joined the party.');
+    assert(!renamed.commands[0].options.shouldSend(), 'queued sends protect the refreshed real name');
+
+    const renamedFriend = harness({ lookup: async () => ({ data: { player: { ...player, displayname: 'Friend' } } }) });
+    await renamedFriend.context.announceKnownPregameDenickToParty('OtherNick', 'FormerName');
+    assert.strictEqual(renamedFriend.commands.length, 0, 'a name refresh cannot reveal a party member');
+
     const saved = harness();
-    saved.context.announceKnownPregameDenickToParty('HiddenNick', 'FRIEND');
-    saved.context.announceKnownPregameDenickToParty('OtherNick', 'Enemy');
+    await saved.context.announceKnownPregameDenickToParty('HiddenNick', 'FRIEND');
+    await saved.context.announceKnownPregameDenickToParty('OtherNick', 'Enemy');
     assert.strictEqual(saved.commands.length, 1, 'saved denicks retain the same party protection');
+    await saved.context.announceKnownPregameDenickToParty('OTHERNICK', 'enemy');
+    assert.strictEqual(saved.commands.length, 1, 'saved identities broadcast once per game, ignoring case');
+    await saved.context.announceSuccessfulDenick('OtherNick', { realName: 'Enemy', source: 'skin' });
+    assert.strictEqual(saved.commands.length, 1, 'fresh and saved announcements share party deduplication');
+
+    const fresh = harness();
+    await fresh.context.announceSuccessfulDenick('OtherNick', { realName: 'Enemy', source: 'stats' });
+    await fresh.context.announceKnownPregameDenickToParty('OtherNick', 'Enemy');
+    assert.strictEqual(fresh.commands.length, 1, 'a fresh result is not repeated by roster refreshes');
+
+    for (const options of [{ broadcast: false }, { mode: 'SKYWARS' }]) {
+        const h = harness(options);
+        await h.context.announceKnownPregameDenickToParty('OtherNick', 'Enemy');
+        assert.strictEqual(h.commands.length, 0, 'saved broadcasts preserve the option and mode gates');
+        assert.strictEqual(h.lookups.length, 0, 'ineligible saved broadcasts do not fetch profiles');
+    }
+    const teammate = harness();
+    teammate.context.shouldSuppressDenickAnnouncement = () => true;
+    await teammate.context.announceKnownPregameDenickToParty('OtherNick', 'Enemy');
+    assert.strictEqual(teammate.commands.length, 0, 'saved teammates and self stay private');
+    assert.strictEqual(teammate.lookups.length, 0, 'teammates do not need a broadcast lookup');
+
+    for (const invalidate of [
+        h => { h.context.denickPartyAnnounceEnabled = false; },
+        h => { h.partyTracker.handleChatLine('You left the party.'); },
+        h => { h.partyTracker.handleChatLine('Enemy joined the party.'); },
+        h => { h.context.shouldSuppressDenickAnnouncement = () => true; },
+        h => { h.context.currentGamemode = 'SKYWARS'; },
+        h => { h.context.partyDenickAnnouncements = new Set(); }
+    ]) {
+        const h = harness();
+        await h.context.announceKnownPregameDenickToParty('OtherNick', 'Enemy');
+        assert(h.commands[0].options.shouldSend(), 'eligible queued announcement may send');
+        invalidate(h);
+        assert(!h.commands[0].options.shouldSend(), 'queued announcements recheck settings, party, team and game ownership');
+    }
+
+    const nextGame = harness({ local: false });
+    await nextGame.context.announceKnownPregameDenickToParty('OtherNick', 'Enemy');
+    nextGame.context.partyDenickAnnouncements = new Set();
+    nextGame.context.gameSessionId++;
+    await nextGame.context.announceKnownPregameDenickToParty('OtherNick', 'Enemy');
+    assert.strictEqual(nextGame.commands.length, 2, 'the same saved opponent can be announced in the next game');
+    assert.notStrictEqual(nextGame.commands[0].options.dedupeKey, nextGame.commands[1].options.dedupeKey,
+        'the command queue must not suppress an opponent in a new game within five seconds');
+    assert.strictEqual(nextGame.messages.length, 0, 'party broadcasts do not depend on local notices');
+
+    const cancelled = harness();
+    const sendCommand = cancelled.context.sendHypixelCommand;
+    cancelled.context.sendHypixelCommand = async () => ({ sent: false, reason: 'cancelled' });
+    await cancelled.context.announceKnownPregameDenickToParty('OtherNick', 'Enemy');
+    cancelled.context.sendHypixelCommand = sendCommand;
+    await cancelled.context.announceKnownPregameDenickToParty('OtherNick', 'Enemy');
+    assert.strictEqual(cancelled.commands.length, 1, 'a cancelled send does not permanently silence the saved identity');
+
+    const rejected = harness();
+    const originalSend = rejected.context.sendHypixelCommand;
+    rejected.context.sendHypixelCommand = async () => { throw Error('Queue stopped'); };
+    await rejected.context.announceKnownPregameDenickToParty('OtherNick', 'Enemy');
+    rejected.context.sendHypixelCommand = originalSend;
+    await rejected.context.announceKnownPregameDenickToParty('OtherNick', 'Enemy');
+    assert.strictEqual(rejected.commands.length, 1, 'queue failures release the reservation without unhandled rejections');
+
+    for (const [known, expected] of [
+        [{ realName: 'Enemy', source: 'history', at: 200 }, 1],
+        [{ realName: 'Enemy', source: 'manual', at: 200 }, 1],
+        [{ realName: 'Enemy', source: 'skin', at: 99 }, 1],
+        [{ realName: 'Enemy', source: 'skin', at: 200 }, 0],
+        [{ realName: 'Enemy', source: 'stats', at: 200 }, 0]
+    ]) {
+        const h = harness();
+        Object.assign(h.context, {
+            Date: { now: () => 200 }, gameStartTime: 100, gameActive: true,
+            gameRoster: new Set(), lobbyPlayers: new Map([['OtherNick', {
+                inTab: true, team: 'BLUE', teamAssignedAt: 200, lastSeen: 200
+            }]]),
+            isDenickAliasDuplicate: () => false, isValidPlayerName: () => true,
+            hasCurrentBedwarsTeam: () => true, clientBedwarsTeamName: () => 'RED',
+            getAutoDenickResult: () => known, findKnownDenickByNick: () => null,
+            rememberCurrentGamePlayerName: () => {}, rememberCurrentGameTeam: () => {},
+            scheduleBedwarsClientTeamSync: () => {}, scheduleCurrentMatchSnapshot: () => {}
+        });
+        vm.runInContext(source.slice(rosterStart, rosterEnd), h.context);
+        h.context.seedGameRoster();
+        await new Promise(resolve => setImmediate(resolve));
+        assert.strictEqual(h.commands.length, expected, 'roster shares saved identities while leaving new matches to their stats announcement');
+    }
 
     const unavailable = harness({ lookup: async () => ({ error: true }) });
     await unavailable.context.announceSuccessfulDenick('HiddenNick', {

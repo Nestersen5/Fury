@@ -32,18 +32,18 @@ for(const field of ['games','wins','finals','finalDeaths','kills','deaths','beds
 assert.equal(mode.winRate,100);assert.equal(mode.losses,0);assert.equal(game.endedAt,3000);
 assert.deepEqual(mode.breakdown.entries,[{id:'eight_two',label:'Doubles',games:1,unknown:false}]);
 assert.equal(mode.submodes[0].finalDeaths,1);
-observeResult(game,'DEFEAT!');assert(!('wlr'in localModes({current:game})[0]),'Conflicting results invalidate the ratio');
+observeResult(game,'DEFEAT!');assert(localModes({current:game})[0].unavailable.includes('wins'),'Conflicting results retain internal coverage flags');
 const loss=createGame(start);observe(loss,'TEAM ELIMINATED > Aqua Team has been eliminated!',{at:4000});
 assert.equal(loss.result,'loss');assert.equal(localModes({current:loss})[0].localStreak,0);
 let streak;for(const [banner,expected]of [['VICTORY!',1],['VICTORY!',2],['DEFEAT!',0],['VICTORY!',1],['GAME OVER!',0],['VICTORY!',1]]){
     const g=createGame(start);observeResult(g,banner);streak=nextStreak(streak,g);assert.equal(streak.available?streak.value:undefined,expected);
 }
 const skyOver=createGame({...start,mode:'SKYWARS'});observeResult(skyOver,'GAME OVER!');assert.equal(skyOver.result,null,'GAME OVER! outside BedWars stays unknown');
-const unknown=createGame({...start,observedFromStart:false});observeResult(unknown,'VICTORY!');assert(!('games'in localModes({current:unknown})[0]));
-const nick=createGame({...start,identityKnown:false});observeResult(nick,'VICTORY!');assert.equal(localModes({current:nick})[0].wins,1);assert(!('kdr'in localModes({current:nick})[0]));
+const unknown=createGame({...start,observedFromStart:false});observeResult(unknown,'VICTORY!');assert.equal(localModes({current:unknown})[0].games,1);
+const nick=createGame({...start,identityKnown:false});observeResult(nick,'VICTORY!');assert.equal(localModes({current:nick})[0].wins,1);assert(localModes({current:nick})[0].unavailable.includes('kills'));
 const legacy=localModes(normalizeLocal({totals:{BEDWARS:{finals:{value:3,available:true},beds:{value:1,available:true},bedsLost:{value:0,available:true}}}}))[0];
 assert.equal(legacy.finals,3);for(const key of ['games','wins','losses','kills','deaths','finalDeaths','fkdr','kdr','wlr'])assert(!(key in legacy),key+' must remain unknown in old saves');
-const odd=createGame(start);observe(odd,'Rival was mysteriously vaporized.');assert(!('kdr'in localModes({current:odd})[0]));
+const odd=createGame(start);observe(odd,'Rival was mysteriously vaporized.');assert(localModes({current:odd})[0].unavailable.includes('kills'));
 const gotKill=createGame(start);observe(gotKill,'Rival got killed by Tester.');
 assert.equal(gotKill.counts.kills.value,1,'a real got-killed message still counts');
 const unknownMode=createGame({...start,variant:null});observeResult(unknownMode,'VICTORY!');assert.equal(localModes({current:unknownMode})[0].breakdown.status,'partial');

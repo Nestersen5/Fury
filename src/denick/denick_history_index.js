@@ -18,14 +18,18 @@ function preferred(a, b) {
 
 function createDenickHistoryIndex(players = []) {
     const byNick = new Map(), candidates = new Map(), keysByReal = new Map();
-    function updatePlayer(player) {
-        const realKey = nickKey(player?.realIGN);
+    function updatePlayer(player, previousKey) {
+        const realKey = player?.realUuid || nickKey(player?.realIGN);
         if (!realKey) return;
-        const affected = new Set(keysByReal.get(realKey) || []);
-        for (const key of affected) candidates.get(key)?.delete(realKey);
+        const affected = new Set([...(keysByReal.get(previousKey) || []), ...(keysByReal.get(realKey) || [])]);
+        for (const key of affected) {
+            candidates.get(key)?.delete(realKey);
+            if (previousKey) candidates.get(key)?.delete(previousKey);
+        }
+        if (previousKey) keysByReal.delete(previousKey);
         const names = new Map(), events = new Map(), manual = new Map();
-        for (const nick of player.nicks || []) if (nickKey(nick)) names.set(nickKey(nick), nick);
-        for (const event of player.events || []) {
+        for (const nick of player.identityState === 'missing' ? [] : player.nicks || []) if (nickKey(nick)) names.set(nickKey(nick), nick);
+        for (const event of player.identityState === 'missing' ? [] : player.events || []) {
             const key = nickKey(event?.nick);
             if (!key) continue;
             names.set(key, event.nick);
@@ -42,7 +46,9 @@ function createDenickHistoryIndex(players = []) {
             const entry = {
                 realKey, manual: method === 'manual',
                 at: manual.has(key) ? manual.get(key) : eventTimestamp(event || { at: player.lastSeen }),
-                known: { nick, realName: player.realIGN, source: method === 'manual' ? 'manual' : 'history', method }
+                known: { nick, realName: player.realIGN, source: method === 'manual' ? 'manual' : 'history', method,
+                    ...(player.realUuid ? { realUuid: player.realUuid } : {}),
+                    ...(player.identityState ? { identityState: player.identityState } : {}) }
             };
             if (!candidates.has(key)) candidates.set(key, new Map());
             candidates.get(key).set(realKey, entry);

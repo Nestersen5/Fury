@@ -346,7 +346,11 @@ function formatTagDescriptor(row = {}) {
     return labels;
 }
 
-// Compact threat lines include stars when stars contributed to the threat.
+function isStarsOnlyThreat(row, gameMode = 'BEDWARS') {
+    return gameMode === 'BEDWARS' && row.starThreat === true && row.fkdrThreat !== true;
+}
+
+// Threat lines show the triggering stat, with FKDR taking priority over stars.
 // fancy=true: star level + checkmark + pipe separators, launcher-selectable.
 function formatLine(row, gameMode, includeSet, fancy = false) {
     const teamLabel = gameMode === 'SKYWARS' ? 'SOLO' : normalizeTeamLabel(row.team);
@@ -366,11 +370,13 @@ function formatLine(row, gameMode, includeSet, fancy = false) {
             ? `[${teamLabel}] ${playerIdentity({ ...row, name: displayName }, gameMode)} | ${statTextWithMonthly(row, gameMode, true)} | ${formatTagDescriptor(row)}`
             : `[${teamLabel}] ${displayName}: ${statTextWithMonthly(row, gameMode)} - ${formatTagDescriptor(row)}`;
     } else if (kind === 'threats') {
-        const includePrestige = gameMode !== 'BEDWARS' || row.starThreat === true;
+        const starsOnly = isStarsOnlyThreat(row, gameMode);
+        const includePrestige = gameMode !== 'BEDWARS' || starsOnly;
         const prestige = gameMode === 'BEDWARS' && includePrestige ? prestigeText(row, gameMode) : '';
+        const stats = starsOnly ? '' : statTextWithMonthly(row, gameMode, fancy);
         line = fancy
-            ? `[${teamLabel}] ${playerIdentity({ ...row, name: displayName }, gameMode, includePrestige)} | ${statTextWithMonthly(row, gameMode, true)}`
-            : `[${teamLabel}] ${prestige ? `${prestige} ` : ''}${displayName}: ${statTextWithMonthly(row, gameMode)}`;
+            ? `[${teamLabel}] ${playerIdentity({ ...row, name: displayName }, gameMode, includePrestige)}${stats ? ` | ${stats}` : ''}`
+            : `[${teamLabel}] ${prestige ? `${prestige} ` : ''}${displayName}${stats ? `: ${stats}` : ''}`;
     } else {
         line = `[${teamLabel}] ${displayName}`;
     }
@@ -546,15 +552,16 @@ function formatLineComponent(row, gameMode, includeSet, fancy = false) {
             extra.push(seg(': ', 'gray'), ...statSegments(row, gameMode, fancy), seg(' - ', 'dark_gray'), ...tagDescriptorSegments(row));
         }
     } else if (kind === 'threats') {
-        const includePrestige = gameMode !== 'BEDWARS' || row.starThreat === true;
+        const starsOnly = isStarsOnlyThreat(row, gameMode);
+        const includePrestige = gameMode !== 'BEDWARS' || starsOnly;
         if (fancy) {
             extra.push(...identitySegments(row, displayName, gameMode, nameColor, includePrestige));
-            extra.push(seg(' | ', 'dark_gray'), ...statSegments(row, gameMode, fancy));
+            if (!starsOnly) extra.push(seg(' | ', 'dark_gray'), ...statSegments(row, gameMode, fancy));
         } else {
             const prestige = gameMode === 'BEDWARS' && includePrestige ? prestigeText(row, gameMode) : '';
             if (prestige) extra.push(seg(`${prestige} `, 'gold'));
             extra.push(...nameSegments(displayName, row, nameColor));
-            extra.push(seg(': ', 'gray'), ...statSegments(row, gameMode, fancy));
+            if (!starsOnly) extra.push(seg(': ', 'gray'), ...statSegments(row, gameMode, fancy));
         }
     } else {
         extra.push(...nameSegments(displayName, row, nameColor));
@@ -642,12 +649,12 @@ const PREVIEW_ROWS = [
     {
         note: 'Stat threat (stars only)',
         gameMode: 'BEDWARS',
-        row: { name: 'StarGrinder', team: 'BLUE', isThreat: true, starThreat: true, stars: 1200, fkdr: 1.2 }
+        row: { name: 'StarGrinder', team: 'BLUE', isThreat: true, starThreat: true, fkdrThreat: false, stars: 1200, fkdr: 1.2 }
     },
     {
         note: 'Stat threat (stars and FKDR)',
         gameMode: 'BEDWARS',
-        row: { name: 'StarSweat', team: 'GREEN', isThreat: true, starThreat: true, stars: 1500, fkdr: 6.7 }
+        row: { name: 'StarSweat', team: 'GREEN', isThreat: true, starThreat: true, fkdrThreat: true, stars: 1500, fkdr: 6.7 }
     },
     {
         note: 'SkyWars stat threat (KDR)',
@@ -675,7 +682,7 @@ function teamSummaryCategory(row, includeSet) {
         || /\bcheater\b/i.test(tagLabels(row)[0]))) return 'cheaters';
     if (includeSet.has('nicks') && row.isNicked) return 'nicks';
     if (tagged) return ({ caution: 'caution', legit_sniper: 'legitSnipers', sniper: 'snipers', blacklisted: 'blacklisted' })[category] || 'tagged';
-    if (includeSet.has('threats') && row.isThreat) return 'fkdrs';
+    if (includeSet.has('threats') && row.isThreat) return 'threatStats';
     return '';
 }
 
@@ -695,9 +702,15 @@ function buildTeamSummaryEntries(rows, includeSet = new Set(SHARE_CATEGORIES), c
             entries.push({ line, component: { text: line, color: 'white' } });
             continue;
         }
-        if (!teams.has(team)) teams.set(team, { cheaters: 0, nicks: 0, caution: 0, legitSnipers: 0, snipers: 0, blacklisted: 0, tagged: 0, fkdrs: [], cheats: new Set() });
+        if (!teams.has(team)) teams.set(team, { cheaters: 0, nicks: 0, caution: 0, legitSnipers: 0, snipers: 0, blacklisted: 0, tagged: 0, threatStats: [], cheats: new Set() });
         const counts = teams.get(team);
-        if (category === 'fkdrs') counts.fkdrs.push(row.fkdr);
+        if (category === 'threatStats') {
+            const starsOnly = isStarsOnlyThreat(row);
+            const value = starsOnly ? row.stars : row.fkdr;
+            counts.threatStats.push(value !== null && value !== undefined && Number.isFinite(Number(value))
+                ? `${numberText(value, 0)} ${starsOnly ? 'stars' : 'FKDR'}`
+                : `${starsOnly ? 'Stars' : 'FKDR'} unavailable`);
+        }
         else counts[category]++;
         if (category === 'cheaters') detectedCheats(row).forEach(cheat => counts.cheats.add(cheat));
     }
@@ -709,9 +722,7 @@ function buildTeamSummaryEntries(rows, includeSet = new Set(SHARE_CATEGORIES), c
             ['snipers', 'sniper', 'snipers'], ['blacklisted', 'blacklisted', 'blacklisted'], ['tagged', 'tagged', 'tagged']]) {
             if (counts[key]) parts.push(`${counts[key]} ${counts[key] === 1 ? single : plural}`);
         }
-        parts.push(...counts.fkdrs.map(fkdr => fkdr !== null && fkdr !== undefined && Number.isFinite(Number(fkdr))
-            ? `${numberText(fkdr, 0)} FKDR`
-            : 'FKDR unavailable'));
+        parts.push(...counts.threatStats);
         const cheats = [...counts.cheats];
         let omitted = 0;
         const buildEntry = () => {
@@ -924,7 +935,8 @@ function createShareTagsBroadcaster(deps) {
         }
     }
 
-    async function enrichMonthlyFkdr(row, gameMode) {
+    async function enrichMonthlyFkdr(row, gameMode, includeSet) {
+        if (rowKind(row, includeSet) === 'threats' && isStarsOnlyThreat(row, gameMode)) return row;
         if (state.shareTagsMonthlyFkdr === false) return row?.monthlyFkdr === undefined ? row : { ...row, monthlyFkdr: undefined };
         const realName = denickedRealName(row);
         if (gameMode !== 'BEDWARS' || !row || (row.isNicked && !realName) || Number.isFinite(Number(row.monthlyFkdr))) return row;
@@ -947,7 +959,7 @@ function createShareTagsBroadcaster(deps) {
         const fancy = Boolean(state.shareTagsFancy);
         const colorLocal = Boolean(state.shareTagsColorLocal);
         const denickEnriched = await Promise.all(rows.map(row => enrichDenickedRow(row, gameMode)));
-        const enriched = await Promise.all(denickEnriched.map(row => enrichMonthlyFkdr(row, gameMode)));
+        const enriched = await Promise.all(denickEnriched.map(row => enrichMonthlyFkdr(row, gameMode, includeSet)));
         return enriched.map(row => {
             const line = formatLine(row, gameMode, includeSet, fancy);
             let component = null;
@@ -976,7 +988,7 @@ function createShareTagsBroadcaster(deps) {
 
     async function buildItem(row, gameMode, includeSet, fancy, colorLocal) {
         const denickEnriched = await enrichDenickedRow(row, gameMode);
-        const enriched = await enrichMonthlyFkdr(denickEnriched, gameMode);
+        const enriched = await enrichMonthlyFkdr(denickEnriched, gameMode, includeSet);
         const line = formatLine(enriched, gameMode, includeSet, fancy);
         let component = null;
         if (colorLocal) {

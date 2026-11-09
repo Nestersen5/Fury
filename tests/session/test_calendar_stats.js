@@ -28,8 +28,8 @@ assert.equal(build([crossing],'weekly')[0].calendar.chart.entries.find(e=>e.id==
 // Old cross-midnight summaries without game detail cannot be assigned to days.
 const old={...crossing,games:[]};const partial=build([old]);assert(partial.every(p=>p.calendar.partial));assert(partial.every(p=>!('wins'in p.modes[0])));
 assert.equal(build([old],'weekly')[0].modes[0].wins,2,'Whole-week summary is still usable');
-// A later verified session must not restore a field missing from another session.
-const mixed=build([old,a]);assert(!('wins'in mixed.find(p=>p.calendar.start==='2026-09-14').modes[0]));
+// Keep known daily counts without guessing the cross-midnight residual.
+const mixed=build([old,a]);assert.equal(mixed.find(p=>p.calendar.start==='2026-09-14').modes[0].wins,2);
 const incomplete={...crossing,games:[g1]};assert(build([incomplete]).every(p=>!('wins'in p.modes[0])));
 const duplicate={...crossing,games:[g1,g1,g2]};assert.equal(build([duplicate])[1].modes[0].wins,1);
 const delayed={...crossing,games:[{...g2,stats:summary,from:crossing.startedAt}]};assert(build([delayed]).every(p=>!('wins'in p.modes[0])),'A multi-match API delta across midnight is not assigned to its latest match');

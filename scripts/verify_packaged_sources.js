@@ -9,6 +9,7 @@ const crypto = require('crypto');
 const minimatchModule = require('minimatch');
 const match = minimatchModule.minimatch || minimatchModule;
 const { packagePaths } = require('./smoke_packaged_app');
+const { readApplicationFile, applicationFileExists } = require('./packaged_application');
 
 function runtimeFiles(root, config) {
     const patterns = config.build.files;
@@ -38,19 +39,19 @@ function runtimeFiles(root, config) {
 
 function verifySources(root, appRoot) {
     const config = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
-    const packaged = JSON.parse(fs.readFileSync(path.join(appRoot, 'package.json'), 'utf8'));
+    const packaged = JSON.parse(readApplicationFile(appRoot, 'package.json').toString('utf8'));
     for (const key of ['name', 'version', 'main', 'dependencies']) {
         assert.deepStrictEqual(packaged[key], config[key], `Packaged ${key} differs from the current source`);
     }
     const files = {};
     for (const file of runtimeFiles(root, config).filter(file => file !== 'package.json')) {
         const source = fs.readFileSync(path.join(root, file));
-        const bundled = fs.readFileSync(path.join(appRoot, file));
+        const bundled = readApplicationFile(appRoot, file);
         assert(source.equals(bundled), `Packaged runtime file differs from current source: ${file}`);
         files[file] = crypto.createHash('sha256').update(source).digest('hex');
     }
     for (const retired of ['fury_hud.js', 'fury_hud.html', 'fury_hud.css', 'fury_hud_preload.js', 'fury-hud-demo']) {
-        assert(!fs.existsSync(path.join(appRoot, retired)), `Retired desktop HUD was bundled: ${retired}`);
+        assert(!applicationFileExists(appRoot, retired), `Retired desktop HUD was bundled: ${retired}`);
     }
     return { version: config.version, runtimeFileCount: Object.keys(files).length,
         sourceSha256: crypto.createHash('sha256').update(JSON.stringify(files)).digest('hex'), files };

@@ -3,7 +3,8 @@
 // Denick history store extracted from proxy.js. Owns the on-disk denicked.json
 // file: publication-aware cached reads and coalesced, acknowledged off-thread
 // writes. The history is a list of
-// real-IGN-keyed players, each with the nicks they've used, the detection
+// UUID-backed players (legacy rows retain their IGN until migration), with
+// the nicks they've used, the detection
 // methods, and a capped event log.
 //
 // The factory takes the file path and writer as DI so tests can supply
@@ -13,6 +14,7 @@
 
 const { JsonFileCache } = require('../storage/json_file_cache.js');
 const { createDenickHistoryIndex } = require('./denick_history_index.js');
+const { realAccountUuid, isAccountName } = require('./identity');
 
 function denickEventTimestamp(event = {}) {
     const parsed = Date.parse(event.at || '');
@@ -52,7 +54,8 @@ function normalizeDenickHistory(raw) {
     rows.forEach(item => {
         const realIGN = item.realIGN || item.realName;
         if (!realIGN) return;
-        const key = String(realIGN).toLowerCase();
+        const realUuid = realAccountUuid(item.realUuid);
+        const key = realUuid || String(realIGN).toLowerCase();
         const current = byRealName.get(key) || {
             realIGN,
             nicks: [],
@@ -62,6 +65,14 @@ function normalizeDenickHistory(raw) {
             events: [],
             manualNicks: Object.create(null)
         };
+        if (realUuid) {
+            current.realUuid = realUuid;
+            current.identityState = 'verified';
+            current.realIGN = realIGN;
+        } else if (item.identityState) {
+            current.identityState = item.identityState === 'missing' ? 'missing' : 'pending';
+        }
+        if (Number.isFinite(item.identityRetryAt)) current.identityRetryAt = item.identityRetryAt;
 
         for (const [nick, at] of Object.entries(item.manualNicks || {})) {
             const key = String(nick).trim().toLowerCase();
@@ -114,14 +125,17 @@ function normalizeDenickHistory(raw) {
     return Array.from(byRealName.values());
 }
 
-function createDenickHistory({ historyFile, writeJsonOffThread, saveDelayMs = 75, onError = () => {} }) {
+function createDenickHistory({ historyFile, writeJsonOffThread, saveDelayMs = 75, requireVerifiedIdentity = false,
+    getVerifiedAccountUuid = () => null, onError = () => {} }) {
     if (!historyFile) throw new Error('createDenickHistory: historyFile is required');
     if (typeof writeJsonOffThread !== 'function') throw new Error('createDenickHistory: writeJsonOffThread is required');
     let dirty = false, inFlight = null, saveTimer = null;
     const listeners = new Set();
+    const identityVersions = new WeakMap();
     const makeStore = players => ({
         players,
         byReal: new Map(players.map(player => [String(player.realIGN).toLowerCase(), player])),
+        byUuid: new Map(players.filter(player => player.realUuid).map(player => [player.realUuid, player])),
         ...createDenickHistoryIndex(players)
     });
     const denickHistoryFileCache = new JsonFileCache(historyFile, {
@@ -137,7 +151,12 @@ function createDenickHistory({ historyFile, writeJsonOffThread, saveDelayMs = 75
         const key = String(nick || '').trim().toLowerCase();
         if (!key) return null;
         const known = loadDenickHistoryStore().byNick.get(key);
-        return known ? { ...known, nick, at: Date.now() } : null;
+        if (!known || known.identityState === 'missing' || (requireVerifiedIdentity && !known.realUuid)) return null;
+        return { ...known, realIGN: known.realName, nick, at: Date.now() };
+    }
+    function findPendingDenickByNick(nick) {
+        const known = loadDenickHistoryStore().byNick.get(String(nick || '').trim().toLowerCase());
+        return known && !known.realUuid && known.identityState !== 'missing' ? known : null;
     }
     function scheduleSave() {
         if (saveTimer || inFlight) return;
@@ -151,7 +170,8 @@ function createDenickHistory({ historyFile, writeJsonOffThread, saveDelayMs = 75
         dirty = true;
         denickHistoryFileCache.set(store);
         scheduleSave();
-        const next = store.byNick.get(String(nick).toLowerCase()) || null;
+        const candidate = store.byNick.get(String(nick).toLowerCase());
+        const next = candidate?.identityState === 'missing' ? null : candidate || null;
         // Automatic sightings of an unchanged identity don't repaint live views.
         if (reason !== 'automatic' || previous?.realName !== next?.realName || previous?.source !== next?.source) {
             for (const listener of listeners) {
@@ -176,12 +196,25 @@ function createDenickHistory({ historyFile, writeJsonOffThread, saveDelayMs = 75
             gameMode: entry.gameMode || null, account: entry.account || null
         };
         const realKey = record.realIGN.toLowerCase();
-        let player = store.byReal.get(realKey);
+        const uuid = realAccountUuid(entry.realUuid) || realAccountUuid(getVerifiedAccountUuid(record.realIGN));
+        const byName = store.byReal.get(realKey);
+        let player = (uuid && store.byUuid.get(uuid)) || (byName && (!uuid || !byName.realUuid || byName.realUuid === uuid) ? byName : null);
         if (!player) {
             player = { realIGN: record.realIGN, nicks: [], methods: [], firstSeen: now, lastSeen: now, events: [], manualNicks: Object.create(null) };
             store.byReal.set(realKey, player);
             store.players.push(player);
         }
+        if (uuid && player.realUuid === uuid && player.realIGN !== record.realIGN) {
+            updateIdentity(player, { realUuid: uuid, realIGN: record.realIGN });
+        }
+        const previousKey = player.realUuid || String(player.realIGN).toLowerCase();
+        if (uuid) {
+            player.realUuid = uuid;
+            player.identityState = 'verified';
+            store.byUuid.set(uuid, player);
+        } else if (!player.realUuid) player.identityState = 'pending';
+        delete player.identityRetryAt;
+        identityVersions.set(player, (identityVersions.get(player) || 0) + 1);
         player.lastSeen = now;
         if (!player.nicks.some(nick => String(nick).toLowerCase() === key)) player.nicks.push(record.nick);
         if (!player.methods.includes(record.method)) player.methods.push(record.method);
@@ -192,7 +225,7 @@ function createDenickHistory({ historyFile, writeJsonOffThread, saveDelayMs = 75
         }
         player.events.push(record);
         finalizeDenickPlayerEvents(player);
-        store.updatePlayer(player);
+        store.updatePlayer(player, previousKey);
         changed(store, record.nick, previous, record.method === 'manual' ? 'manual' : 'automatic');
         return { ok: true, nick: record.nick, realIGN: player.realIGN };
     }
@@ -200,16 +233,22 @@ function createDenickHistory({ historyFile, writeJsonOffThread, saveDelayMs = 75
         const realKey = String(realRaw || '').trim().toLowerCase();
         const nickKey = String(nickRaw || '').trim().toLowerCase();
         if (!realKey || !nickKey) return { removed: false, reason: 'invalid' };
-        const store = loadDenickHistoryStore(), player = store.byReal.get(realKey);
+        const store = loadDenickHistoryStore();
+        const named = store.byReal.get(realKey);
+        const player = named?.nicks.some(nick => String(nick).toLowerCase() === nickKey) ? named
+            : store.players.find(player => String(player.realIGN).toLowerCase() === realKey
+                && player.nicks.some(nick => String(nick).toLowerCase() === nickKey));
         if (!player || !player.nicks.some(nick => String(nick).toLowerCase() === nickKey)) return { removed: false, reason: 'not_found' };
         if (denickHistoryFileCache.failedStamp) throw new Error('Saved nick history could not be read.');
         const previous = store.byNick.get(nickKey);
+        identityVersions.set(player, (identityVersions.get(player) || 0) + 1);
         player.nicks = player.nicks.filter(nick => String(nick).toLowerCase() !== nickKey);
         player.events = player.events.filter(event => String(event.nick).toLowerCase() !== nickKey);
         if (player.manualNicks) delete player.manualNicks[nickKey];
         if (!player.nicks.length) {
             store.players.splice(store.players.indexOf(player), 1);
-            store.byReal.delete(realKey);
+            if (store.byReal.get(realKey) === player) store.byReal.delete(realKey);
+            if (player.realUuid) store.byUuid.delete(player.realUuid);
         } else {
             player.methods = [...new Set(player.events.map(event => event.method || 'unknown'))];
             finalizeDenickPlayerEvents(player);
@@ -217,6 +256,77 @@ function createDenickHistory({ historyFile, writeJsonOffThread, saveDelayMs = 75
         store.updatePlayer(player);
         changed(store, nickRaw, previous, 'remove');
         return { removed: true, removedPlayer: !player.nicks.length, realIGN: player.realIGN, nick: nickRaw, remainingNicks: player.nicks.length };
+    }
+
+    function identityVersion(player) { return identityVersions.get(player) || 0; }
+    function updateIdentity(player, patch, version = identityVersion(player)) {
+        const store = loadDenickHistoryStore();
+        if (denickHistoryFileCache.failedStamp || !store.players.includes(player) || identityVersion(player) !== version) return false;
+        let previousKey = player.realUuid || String(player.realIGN).toLowerCase();
+        const uuid = realAccountUuid(patch.realUuid);
+        if (uuid && player.realUuid && player.realUuid !== uuid) return false;
+        const other = uuid && store.byUuid.get(uuid);
+        const before = new Map([...player.nicks, ...(other?.nicks || [])].map(nick => [nick, store.byNick.get(String(nick).toLowerCase())]));
+        if (other && other !== player) {
+            // Two legacy name rows can resolve to the same account. Merge their
+            // evidence without losing explicit corrections or duplicating it.
+            store.updatePlayer({ ...player, nicks: [], events: [], manualNicks: {} }, previousKey);
+            store.players.splice(store.players.indexOf(player), 1);
+            const oldKey = String(player.realIGN).toLowerCase();
+            if (store.byReal.get(oldKey) === player) store.byReal.delete(oldKey);
+            const keys = new Set(other.nicks.map(nick => String(nick).toLowerCase()));
+            for (const nick of player.nicks) if (!keys.has(String(nick).toLowerCase())) {
+                other.nicks.push(nick); keys.add(String(nick).toLowerCase());
+            }
+            other.methods = [...new Set([...other.methods, ...player.methods])];
+            other.events.push(...player.events);
+            other.manualNicks ||= Object.create(null);
+            for (const [nick, at] of Object.entries(player.manualNicks || {})) {
+                if (!other.manualNicks[nick] || String(at) > String(other.manualNicks[nick])) other.manualNicks[nick] = at;
+            }
+            finalizeDenickPlayerEvents(other);
+            identityVersions.set(player, version + 1);
+            player = other;
+            version = identityVersion(player);
+            previousKey = player.realUuid;
+            patch = { ...patch, realIGN: player.realIGN };
+        }
+        if (uuid) {
+            // A verified UUID never changes because a name acquired a new owner.
+            player.realUuid = uuid;
+            player.identityState = 'verified';
+            store.byUuid.set(uuid, player);
+        }
+        if (isAccountName(patch.realIGN) && patch.realIGN !== player.realIGN) {
+            const oldKey = String(player.realIGN).toLowerCase();
+            if (store.byReal.get(oldKey) === player) store.byReal.delete(oldKey);
+            player.realIGN = patch.realIGN;
+            for (const event of player.events) event.realIGN = player.realIGN;
+            store.byReal.set(String(player.realIGN).toLowerCase(), player);
+        }
+        if (!player.realUuid && patch.identityState) player.identityState = patch.identityState;
+        if (Number.isFinite(patch.identityRetryAt)) player.identityRetryAt = patch.identityRetryAt;
+        else if (uuid) delete player.identityRetryAt;
+        identityVersions.set(player, version + 1);
+        store.updatePlayer(player, previousKey);
+        if (patch.identityRetryAt !== undefined && !uuid && patch.identityState !== 'missing') {
+            dirty = true;
+            denickHistoryFileCache.set(store);
+            scheduleSave();
+        } else {
+            for (const nick of player.nicks) changed(store, nick, before.get(nick), 'identity');
+        }
+        return true;
+    }
+    function observeAccountProfile(uuid, profile) {
+        uuid = realAccountUuid(uuid);
+        if (!uuid || realAccountUuid(profile?.uuid) !== uuid || !isAccountName(profile?.displayname)) return;
+        const store = loadDenickHistoryStore();
+        const named = store.byReal.get(String(profile.displayname).toLowerCase());
+        const player = store.byUuid.get(uuid) || (named && !named.realUuid && named.identityState !== 'missing' ? named : null);
+        if (player && (!player.realUuid || player.realIGN !== profile.displayname)) {
+            updateIdentity(player, { realUuid: uuid, realIGN: profile.displayname });
+        }
     }
     function persist() {
         if (inFlight) return inFlight;
@@ -254,7 +364,8 @@ function createDenickHistory({ historyFile, writeJsonOffThread, saveDelayMs = 75
         }
     }
     function subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); }
-    return { loadDenickHistoryStore, findKnownDenickByNick, appendDenickHistory, removeDenickMapping, denickHistoryFileCache, flush, subscribe };
+    return { loadDenickHistoryStore, findKnownDenickByNick, appendDenickHistory, removeDenickMapping, denickHistoryFileCache,
+        findPendingDenickByNick, identityVersion, updateIdentity, observeAccountProfile, flush, subscribe };
 }
 
 module.exports = { createDenickHistory, denickEventTimestamp, dedupeDenickEventsByNick, finalizeDenickPlayerEvents, normalizeDenickHistory };

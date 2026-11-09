@@ -53,4 +53,14 @@ function submodeStats(mode, stats = {}) {
     return [];
 }
 
-module.exports = {submodeStats};
+// Only stat counters needed for later mode-level corrections, excluding kits,
+// streaks and cosmetics. Keep the same prefix ownership as submodeStats.
+function submodeCounterKeys(mode, stats = {}) {
+    if (mode === 'BEDWARS') return Object.keys(stats).filter(key => /^.{1,80}_(?:wins|losses|kills|deaths|final_kills|final_deaths|beds_broken|beds_lost|games_played)_bedwars$/.test(key));
+    if (mode === 'SKYWARS') return Object.keys(stats).filter(key => /^(?:wins|losses|kills|deaths|assists|games)_(?:solo_normal|team_normal|solo_insane|team_insane|mini|mega|mega_doubles|lab|tourney)$/.test(key));
+    if (mode === 'DUELS') return duelsPrefixes(stats).filter(id => id.length <= 80)
+        .flatMap(id => ['wins','losses','kills','deaths','assists','rounds_played'].map(field => `${id}_${field}`)).filter(key => Object.hasOwn(stats,key));
+    return [];
+}
+
+module.exports = {submodeStats,submodeCounterKeys};

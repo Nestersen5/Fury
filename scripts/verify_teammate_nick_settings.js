@@ -14,7 +14,7 @@ module.exports = async function ({ page, output, profile }) {
     const shareId = '#share-own-nickname-enabled';
     assert.strictEqual(await page.$eval(shareId, el => el.checked), false);
     for (const enabled of [true, false]) {
-        await page.locator(`label:has(${shareId}) [data-checked="${enabled}"]`).click();
+        await page.locator(shareId).click();
         await page.waitForFunction('!featureSaveTimer && !featureSaveInFlight');
         assert.strictEqual(JSON.parse(fs.readFileSync(path.join(profile, 'features_config.json'))).shareOwnNicknameEnabled, enabled);
     }

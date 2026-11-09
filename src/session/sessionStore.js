@@ -15,11 +15,32 @@
 // many sessions accumulate.
 
 const { JsonFileCache } = require('../storage/json_file_cache.js');
-const { diffSessionSnapshots } = require('./sessionSnapshot.js');
+const { diffSessionSnapshots, snapshotRegressed, gamePresent, SNAPSHOT_GAMES } = require('./sessionSnapshot.js');
 const { hasCardStatMovement, pruneEmptyModeStats } = require('./cardStatsPolicy');
 const { dedupeGameEvents, MAX_GAME_EVENTS } = require('./gameEvents.js');
 const { RESULT_SOURCES } = require('./gameResult.js');
-const { observedSessionDelta, archiveObservedGames } = require('./observedStats');
+const { observedSessionDelta, archiveObservedGames, reconciliationBaseline } = require('./observedStats');
+const { normalizeLocal, localModes, FIELDS, addVariant, settleGame } = require('./localStats');
+const observation = raw => raw ? normalizeLocal({ current: raw }).current : null;
+function normalizeLiveGame(raw) {
+    const observed = observation(raw?.observed);
+    return observed ? { mode: observed.mode, sessionKey: observed.key, startedAt: observed.startedAt,
+        observed, baseSnapshot: raw.baseSnapshot || null, recordId: raw.recordId || null } : null;
+}
+function normalizeApiTotals(raw = {}) {
+    const values = source => Object.fromEntries([...FIELDS,'assists','experience'].filter(field => Number.isFinite(source?.[field]))
+        .map(field => [field, Math.max(0, source[field])]));
+    return Object.fromEntries(['BEDWARS','SKYWARS','DUELS'].filter(mode => raw?.[mode]).map(mode => [mode, {
+        throughSequence: Math.max(0, Number(raw[mode].throughSequence) || 0),
+        values: values(raw[mode].values),
+        afterArchive: values(raw[mode].afterArchive),
+        candidate: raw[mode].candidate?.snapshot ? { at: Math.max(0,Number(raw[mode].candidate.at)||0),
+            snapshot: reconciliationBaseline(raw[mode].candidate.snapshot) } : null,
+        settled: raw[mode].settled === true,
+        variants: Object.fromEntries(Object.entries(raw[mode].variants || {}).filter(([id]) => /^[a-z0-9_]{1,80}$/.test(id)).slice(0,128)
+            .map(([id, entry]) => [id, { values: values(entry?.values), afterArchive: values(entry?.afterArchive) }]))
+    }]));
+}
 
 const STORE_VERSION = 4;
 // Ended sessions collapse to a small summary (snapshots dropped), so keeping
@@ -35,6 +56,7 @@ function normalizeGameRecord(raw = {}) {
         : 'verified';
     return {
         id: typeof raw.id === 'string' && raw.id ? raw.id : (at ? `g${at.toString(36)}` : null),
+        sequence: Math.max(0, Number(raw.sequence) || 0),
         at,
         mode: typeof raw.mode === 'string' ? raw.mode : null,
         durationMs: Math.max(0, Number(raw.durationMs) || 0),
@@ -68,11 +90,16 @@ function normalizeGameRecord(raw = {}) {
         delta: raw.delta && typeof raw.delta === 'object' ? raw.delta : null,
         verificationStatus: status,
         localModes: Array.isArray(raw.localModes) ? raw.localModes : null,
+        observation: observation(raw.observation),
         verificationAttempts: Math.max(0, Number(raw.verificationAttempts) || 0),
+        verificationSettled: raw.verificationSettled === true || (raw.verificationSettled !== false && status === 'verified'),
+        verificationCandidate: raw.verificationCandidate?.snapshot ? { at: Math.max(0,Number(raw.verificationCandidate.at)||0),
+            snapshot: reconciliationBaseline(raw.verificationCandidate.snapshot) } : null,
+        verificationRecoveryUntil: Math.max(0,Number(raw.verificationRecoveryUntil)||0),
         nextVerificationAt: Math.max(0, Number(raw.nextVerificationAt) || 0),
         lastVerificationAt: Math.max(0, Number(raw.lastVerificationAt) || 0),
-        verificationBaseline: status === 'pending' && raw.verificationBaseline && typeof raw.verificationBaseline === 'object'
-            ? raw.verificationBaseline
+        verificationBaseline: (status === 'pending' || raw.verificationSettled === false) && raw.verificationBaseline && typeof raw.verificationBaseline === 'object'
+            ? reconciliationBaseline(raw.verificationBaseline)
             : null
     };
 }
@@ -116,7 +143,7 @@ function recoverSessionSummary(session, summary = session?.summary || null) {
 function sessionHasCardStats(session, summary = summarizeSession(session)) {
     if (session?.trackingSource === 'local') {
         const { localModes, FIELDS } = require('./localTracking');
-        return localModes(session.localTracking).some(mode => FIELDS.some(field => Number.isFinite(mode[field]) && mode[field] > 0));
+        return sessionDeltaFor(session).modes.some(mode => FIELDS.some(field => Number.isFinite(mode[field]) && mode[field] > 0));
     }
     if (['Bedwars', 'SkyWars', 'Duels'].some(key => hasCardStatMovement(key, summary?.stats?.[key]))) return true;
     const observed = summary?.local ? summary : observedSessionDelta(session, summary);
@@ -165,6 +192,7 @@ function sessionHasPositiveStatGain(session, summary = session?.summary || null)
 // Pending games stay temporarily so their API retries can still recover a
 // result or stat delta after the session itself has ended.
 function shouldDiscardCompletedSession(session, summary = session?.summary || null) {
+    if (!session.endedAt && session.liveGame) return false;
     if (session?.trackingSource === 'local') {
         if (sessionHasCardStats(session, summary)) return false;
         if (sessionHasOnlyZeroStats(session, summary)) return true;
@@ -183,12 +211,12 @@ function shouldDiscardCompletedSession(session, summary = session?.summary || nu
 // does not have to care which it is looking at.
 function sessionDeltaFor(session) {
     if (!session) return null;
-    if (session.trackingSource === 'local') return {
+    if (session.trackingSource === 'local') return observedSessionDelta(session, {
         local: true, modes: require('./localTracking').localModes(session.localTracking),
         from: session.startedAt, to: session.endedAt || session.lastSeen,
         spanMs: Math.max(0, (session.endedAt || session.lastSeen) - session.startedAt),
         stats: {}, achievements: {}, root: { delta: { stats: {}, achievements: {} } }
-    };
+    });
     if (session.summary) {
         const summary = recoverSessionSummary(session);
         const stats = summary.stats || {};
@@ -220,11 +248,19 @@ function normalizeSession(raw = {}, maxGames = DEFAULT_MAX_GAMES_PER_SESSION) {
         endedAt: Number(raw.endedAt) || 0,
         trackingSource: raw.trackingSource === 'local' ? 'local' : 'api',
         localTracking: raw.trackingSource === 'local' || raw.localTracking ? require('./localTracking').normalizeLocal(raw.localTracking) : null,
+        liveGame: normalizeLiveGame(raw.liveGame),
+        gameSequence: (Array.isArray(raw.games) ? raw.games : []).reduce((last, game, index) => Math.max(last, Number(game.sequence) || index + 1), Number(raw.gameSequence) || 0),
+        apiTotals: normalizeApiTotals(raw.apiTotals),
+        apiBoundaries: Object.fromEntries(['BEDWARS','SKYWARS','DUELS'].filter(mode=>raw.apiBoundaries?.[mode])
+            .map(mode=>[mode,reconciliationBaseline(raw.apiBoundaries[mode])])),
+        apiBaselines: Object.fromEntries(['BEDWARS','SKYWARS','DUELS'].filter(mode=>raw.apiBaselines?.[mode])
+            .map(mode=>[mode,reconciliationBaseline(raw.apiBaselines[mode])])),
+        reconciliationBaseline: raw.reconciliationBaseline || null,
         baseline: raw.baseline && typeof raw.baseline === 'object' ? raw.baseline : null,
         latest: raw.latest && typeof raw.latest === 'object' ? raw.latest : null,
         summary: raw.summary && typeof raw.summary === 'object' ? raw.summary : null,
         games: (Array.isArray(raw.games) ? raw.games : [])
-            .map(normalizeGameRecord)
+            .map((game, index) => normalizeGameRecord({ ...game, sequence: game.sequence || index + 1 }))
             .filter(game => game.at > 0)
             .slice(-maxGames)
     };
@@ -455,6 +491,12 @@ function createSessionStore({
             baseline: snapshot || null,
             latest: snapshot || null,
             summary: null,
+            liveGame: null,
+            gameSequence: 0,
+            apiTotals: {},
+            apiBoundaries: {},
+            apiBaselines: {},
+            reconciliationBaseline: reconciliationBaseline(snapshot),
             games: []
         };
         store.sessions.push(session);
@@ -473,6 +515,19 @@ function createSessionStore({
         return session;
     }
 
+    // The account-owned row exists before its first network response. Attach
+    // that response without resetting games or observations saved meanwhile.
+    function initializeBaseline(sessionId, snapshot) {
+        const data = load(), session = data.sessions.find(item => item.id === sessionId);
+        if (!session || session.endedAt || snapshot?.uuid !== session.uuid
+            || SNAPSHOT_GAMES.some(game => gamePresent(session.baseline,game))) return null;
+        session.baseline = snapshot;
+        session.latest = snapshot;
+        session.reconciliationBaseline = reconciliationBaseline(snapshot);
+        session.lastSeen = Math.max(session.lastSeen, Number(snapshot.at) || now());
+        commit(data); return session;
+    }
+
     function updateLocalTracking(sessionId, tracking, at = now()) {
         const store = load(), session = store.sessions.find(item => item.id === sessionId);
         if (!session || session.endedAt || session.trackingSource !== 'local') return null;
@@ -482,15 +537,72 @@ function createSessionStore({
         return session;
     }
 
+    function updateLiveGame(sessionId, game) {
+        const data = load(), session = data.sessions.find(item => item.id === sessionId);
+        if (!session || session.endedAt) return null;
+        session.liveGame = normalizeLiveGame(game);
+        session.lastSeen = Math.max(session.lastSeen, now());
+        commit(data); return session;
+    }
+
+    function updateApiTotals(sessionId, totals) {
+        const data = load(), session = data.sessions.find(item => item.id === sessionId);
+        if (!session) return null;
+        session.apiTotals = normalizeApiTotals({ ...session.apiTotals, ...totals });
+        commit(data); return session;
+    }
+
+    function updateApiBoundary(sessionId, mode, snapshot) {
+        const data = load(), session = data.sessions.find(item=>item.id===sessionId);
+        if (!session || !['BEDWARS','SKYWARS','DUELS'].includes(mode) || snapshot?.uuid!==session.uuid) return null;
+        session.apiBoundaries ||= {};
+        session.apiBoundaries[mode] = reconciliationBaseline(snapshot);
+        const key={BEDWARS:'Bedwars',SKYWARS:'SkyWars',DUELS:'Duels'}[mode];
+        if (!gamePresent(session.reconciliationBaseline||session.baseline,key) && gamePresent(snapshot,key)) {
+            session.apiBaselines ||= {};
+            session.apiBaselines[mode] ||= reconciliationBaseline(snapshot);
+        }
+        commit(data); return session;
+    }
+
+    function updateGameObservation(sessionId, gameId, observed, events = []) {
+        const session = findSession(sessionId), previous = session?.games.find(game => game.id === gameId);
+        if (!previous) return null;
+        const game = observation(observed);
+        const one = { totals: { [game.mode]: game.counts }, variants: {} }; addVariant(one, game);
+        const modes = localModes(one);
+        if (session.trackingSource === 'local') {
+            const local = normalizeLocal(session.localTracking), before = previous.localModes?.find(mode => mode.mode === game.mode);
+            const targets = [local.totals[game.mode], local.variants[game.mode]?.[game.variant.id]?.counts].filter(Boolean);
+            for (const target of targets) for (const field of FIELDS) {
+                target[field].value = Math.max(0, target[field].value + game.counts[field].value - (Number(before?.[field]) || 0));
+                target[field].observed ||= game.counts[field].observed;
+                target[field].available &&= game.counts[field].available;
+            }
+            // A tail can arrive just after a session closes; preserve its totals
+            // through the same persisted local aggregate rather than reopening it.
+            session.localTracking = local;
+        }
+        return updateGame(sessionId, gameId, { observation: game, localModes: modes,
+            events: events.length ? [...previous.events, ...events] : previous.events });
+    }
+
     // Re-baseline in place: used when a snapshot regresses (account switch,
     // stale baseline). Keeps the session row but restarts its arithmetic.
     function rebaseline(sessionId, snapshot) {
         const store = load();
         const session = store.sessions.find(item => item.id === sessionId);
         if (!session) return null;
+        const observed = session.localTracking || session.liveGame || session.games.some(game => game.localModes?.length || game.observation);
+        // A stale/partial response is not permission to erase accepted history.
+        // The connected-account fence remains owned by the tracker.
+        if (observed && snapshotRegressed(session.baseline, snapshot)) return session;
         session.baseline = snapshot || null;
         session.latest = snapshot || null;
-        const observed = session.localTracking || session.games.some(game => game.localModes?.length);
+        session.apiTotals = {};
+        session.apiBoundaries = {};
+        session.apiBaselines = {};
+        session.reconciliationBaseline = null;
         if (!observed) {
             session.startedAt = Number(snapshot?.at) || now();
             session.games = [];
@@ -505,7 +617,8 @@ function createSessionStore({
         const session = store.sessions.find(item => item.id === sessionId);
         if (!session) return null;
         const at = Number(record?.at) || now();
-        const game = normalizeGameRecord({ ...record, id: record?.id || nextGameId(at), at });
+        const game = normalizeGameRecord({ ...record, id: record?.id || nextGameId(at), at, sequence: (session.gameSequence || 0) + 1 });
+        session.gameSequence = game.sequence;
         session.games.push(game);
         if (session.games.length > maxGamesPerSession) archiveObservedGames(session, session.games.slice(0, -maxGamesPerSession));
         session.games = session.games.slice(-maxGamesPerSession);
@@ -530,14 +643,34 @@ function createSessionStore({
         return updated;
     }
 
-    function getPendingGames() {
+    function getPendingGames({ includeRecovery = false } = {}) {
         const pending = [];
         load().sessions.forEach((session) => {
             session.games.forEach((game) => {
-                if (game.verificationStatus === 'pending') pending.push({ session, game });
+                if (game.verificationStatus === 'pending' || (includeRecovery && game.verificationSettled===false
+                    && game.verificationBaseline && game.verificationRecoveryUntil>now())) pending.push({ session, game });
             });
         });
         return pending.sort((a, b) => a.game.nextVerificationAt - b.game.nextVerificationAt || a.game.at - b.game.at);
+    }
+
+    function settleLiveGame(session) {
+        const live = session.liveGame;
+        if (!live?.observed) return;
+        const game = observation(live.observed);
+        game.leftAt ||= session.lastSeen;
+        game.endedAt ||= game.leftAt;
+        settleGame(game);
+        game.unresolved = []; game.recent = [];
+        const one = { totals: { [game.mode]: game.counts }, variants: {} }; addVariant(one, game);
+        const previous = session.games.find(record => record.id === live.recordId);
+        session.liveGame = null;
+        const patch = { mode: game.mode, at: game.endedAt, durationMs: Math.max(0, game.endedAt - game.startedAt),
+            result: game.result, metadata: { ...previous?.metadata, variant: game.variant.unknown ? null : game.variant.label,
+                observedFromStart: game.observedFromStart, disconnected: true },
+            observation: game, localModes: localModes(one), verificationStatus: previous?.verificationStatus || 'unverified' };
+        if (previous) updateGame(session.id, previous.id, patch);
+        else appendGame(session.id, patch);
     }
 
     // Close a session and collapse its snapshots to the computed delta. This
@@ -547,6 +680,7 @@ function createSessionStore({
         const store = load();
         const session = store.sessions.find(item => item.id === sessionId);
         if (!session) return null;
+        settleLiveGame(session);
         const summary = summarizeSession(session);
         if (shouldDiscardCompletedSession(session, summary)) {
             store.sessions = store.sessions.filter(item => item.id !== sessionId);
@@ -555,6 +689,7 @@ function createSessionStore({
         }
         session.summary = summary;
         session.endedAt = Number(endedAt) || now();
+        session.liveGame = null;
         session.baseline = null;
         session.latest = null;
         commit(store);
@@ -574,6 +709,7 @@ function createSessionStore({
         const stamp = now();
         const discarded = new Set();
         stale.forEach((session) => {
+            settleLiveGame(session);
             const summary = summarizeSession(session);
             if (shouldDiscardCompletedSession(session, summary)) {
                 discarded.add(session.id);
@@ -605,6 +741,7 @@ function createSessionStore({
         if (!expired.length) return 0;
         const discarded = new Set();
         expired.forEach((session) => {
+            settleLiveGame(session);
             const summary = summarizeSession(session);
             if (shouldDiscardCompletedSession(session, summary)) {
                 discarded.add(session.id);
@@ -684,7 +821,13 @@ function createSessionStore({
         findResumableSession,
         startSession,
         updateLatest,
+        initializeBaseline,
         updateLocalTracking,
+        updateLiveGame,
+        updateGameObservation,
+        updateApiTotals,
+        updateApiBoundary,
+        settleLiveGame: sessionId => { const session = findSession(sessionId); if (session) settleLiveGame(session); },
         rebaseline,
         appendGame,
         updateGame,

@@ -43,22 +43,56 @@ module.exports=async({page,output})=>{
                 results.push({name:name+'-chart-off'+(local?'-local':''),width:hidden.width,height:hidden.height,text:hidden.canvas.getAttribute('aria-label'),png:hidden.canvas.toDataURL(),chartOff:true,shownWidth:shown.width,shownHeight:shown.height});
             }
         }
+        // Longer scope labels and shorter mode values must not resize the
+        // canvas or move its headline/table columns when switching tabs.
+        const comparison=compactModeStats(MODE_DEFINITIONS[0],{
+            wins_bedwars:11,games_played_bedwars:11,final_kills_bedwars:28,final_deaths_bedwars:1,
+            kills_bedwars:25,deaths_bedwars:36,beds_broken_bedwars:9,beds_lost_bedwars:2,Experience:178,
+            four_four_games_played_bedwars:9,four_four_wins_bedwars:9,four_four_final_kills_bedwars:22,
+            four_four_final_deaths_bedwars:1,four_four_kills_bedwars:18,four_four_deaths_bedwars:27,
+            four_four_beds_broken_bedwars:7,four_four_beds_lost_bedwars:2
+        });
+        const traces=new WeakMap(),proto=CanvasRenderingContext2D.prototype;
+        const originals={roundRect:proto.roundRect,fillRect:proto.fillRect,drawImage:proto.drawImage};
+        for(const method of Object.keys(originals))proto[method]=function(...args){
+            if(!traces.has(this.canvas))traces.set(this.canvas,{roundRect:[],fillRect:[],drawImage:[]});
+            traces.get(this.canvas)[method].push(args.slice(method==='drawImage'?5:0));
+            return originals[method].apply(this,args);
+        };
+        try{
+            for(const avatar of [false,true])for(const chartOff of [false,true])for(const calendar of [false,true])for(const submode of ['overall','four_four']){
+                const session={...base,modes:[comparison],...(calendar?{calendar:{kind:'daily',label:'September 10, 2026',sessionIds:['fixture'],activeDays:1,timeZone:'UTC'}}:{})};
+                const fields=chartOff?[...require('./src/session/settings').SESSION_TRACKED_FIELDS.BEDWARS.filter(key=>key!=='gamesByMode'),'hideGamesByMode']:undefined;
+                const card=await renderer.render(session,{submode,avatar,fields,skinAccount:null});
+                const trace=traces.get(card.canvas),hero=trace.roundRect.find(rect=>rect[3]===116);
+                const scales=[...new Set(trace.drawImage.filter(([,y,,h])=>y>=hero[1]&&y<hero[1]+hero[3]&&h>16).map(([,y,,h])=>`${y}:${h}`))];
+                results.push({name:`stable-${avatar}-${chartOff}-${calendar}-${submode}`,width:card.width,height:card.height,
+                    text:card.canvas.getAttribute('aria-label'),png:card.canvas.toDataURL(),stable:true,
+                    geometry:{boxes:trace.roundRect,rules:trace.fillRect,scales}});
+            }
+        }finally{Object.assign(proto,originals);}
         return results;
     });
     for(const label of ['Wins: 7','Losses: 3','Final deaths: 3','WLR:','FKDR:','KDR:','BBLR:','Local streak: 3','Games: 10','70.0%','Doubles: 10'])assert(result.find(c=>c.name==='observed-local').text.includes(label),label);
-    assert(result.find(c=>c.name==='stars-0.4').text.includes('0.40/1 \u272b'));
-    assert(result.find(c=>c.name==='stars-1.5').text.includes('1.50/2 \u272b'));
-    assert(result.find(c=>c.name==='stars-2').text.includes('2.00/2 \u272b'));
-    assert(result.find(c=>c.name==='stars-0').text.includes('0.00/0 \u272b'));
-    assert(result.find(c=>c.name==='stars-2.35').text.includes('2.35/3 \u272b'));
+    // Stars are a headline gain; the card no longer draws a progress bar.
+    for(const gain of ['0','0.4','1.5','2','2.35'])assert(result.find(c=>c.name==='stars-'+gain).text.includes(`Stars gained: +${Number(gain).toFixed(2)}`),'stars-'+gain);
     assert(result.every(c=>!c.text.includes('Progress to star')));
-    for(const card of result){if(card.chartOff){assert(!card.text.includes('Games by mode'));assert(card.width<card.shownWidth||card.height<card.shownHeight);}else assert(card.text.includes('Games by mode')||card.text.includes('Mode breakdown unavailable'));fs.writeFileSync(path.join(output,`new-card-${card.name}.png`),Buffer.from(card.png.split(',')[1],'base64'));}
+    for(const card of result){if(card.stable)continue;if(card.chartOff){assert(!card.text.includes('Games by mode'));assert(card.width<card.shownWidth||card.height<card.shownHeight);}else assert(card.text.includes('Games by mode')||card.name==='unavailable');assert(!/at least|uncertain|incomplete coverage|Mode breakdown unavailable/i.test(card.text));fs.writeFileSync(path.join(output,`new-card-${card.name}.png`),Buffer.from(card.png.split(',')[1],'base64'));}
+    for(const card of result.filter(c=>c.stable&&c.name.endsWith('-overall'))){
+        const selected=result.find(c=>c.name===card.name.replace(/overall$/,'four_four'));
+        assert.deepStrictEqual([selected.width,selected.height,selected.geometry],[card.width,card.height,card.geometry],card.name);
+        assert(card.text.includes('Wins: 11')&&selected.text.includes('Wins: 9'),'Mode selection must retain the distinct stats');
+        assert(selected.text.includes('Full session stars:')||selected.text.includes('Full period stars:'),'Keep the full-session star scope clear');
+        assert(!selected.text.includes('Unknown: 0'));
+        for(const item of [card,selected])fs.writeFileSync(path.join(output,`${item.name}.png`),Buffer.from(item.png.split(',')[1],'base64'));
+    }
     assert(result.find(c=>c.name==='bedwars').text.includes('Threes: 40 (100.0%)'));
     assert(result.find(c=>c.name==='skywars').text.includes('Insane Solo: 9 (75.0%)'));
-    assert(result.find(c=>c.name==='bedwars').text.includes('Solos: 0 (0.0%)'));
+    assert(!result.find(c=>c.name==='bedwars').text.includes('Solos: 0'),'Unplayed BedWars modes stay off the bar');
     assert(!result.find(c=>c.name==='skywars').text.includes('Mini SkyWars: 0 (0.0%)'),'SkyWars hides unplayed mode columns');
     assert(!result.find(c=>c.name==='duels').text.includes('0 (0.0%)'));
-    assert(result.find(c=>c.name==='partial').text.includes('Unavailable: 3 (60.0%)'));
-    assert(result.find(c=>c.name==='modes-17').height>result.find(c=>c.name==='modes-10').height);
-    assert(result.find(c=>c.name==='modes-31').height>result.find(c=>c.name==='modes-17').height);
+    assert(result.find(c=>c.name==='partial').text.includes('Unknown: 3 (60.0%)'));
+    // Small modes share one part of the bar, but the image description keeps every mode.
+    assert(result.find(c=>c.name==='modes-31').text.includes('Bow Spleef 1v1 Variant 29: 2'));
+    assert(result.find(c=>c.name==='modes-31').height>=result.find(c=>c.name==='modes-5').height);
 };

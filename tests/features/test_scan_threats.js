@@ -7,6 +7,7 @@
 const assert = require('assert');
 const { isLikelyBot } = require('../../src/denick/botNames.js');
 const { createScanRunner } = require('../../src/overlay/scan.js');
+const { formatLine, buildTeamSummaryEntries } = require('../../src/overlay/shareTags.js');
 const { getFkdrColor, getKdrColor, getWlrColor, getWsColor } = require('../../src/stats/colors.js');
 const { formatBedwarsPrestige, formatSkyWarsLevel, getSkyWarsLevelValue } = require('../../src/stats/format.js');
 
@@ -134,15 +135,25 @@ async function runScan({ profiles, detectedNicks = [], scanMode = 'threats', sca
 }
 
 (async () => {
-    for (const [stars, fkdr, expected] of [[499, 7, false], [500, 1, true], [1200, 7, true]]) {
+    for (const [stars, fkdr, starThreat, fkdrThreat] of [[499, 5, false, true], [500, 1, true, false], [1200, 7, true, true], [499, 4.99, false, false]]) {
         const profile = quietProfile(fkdr);
         profile.data.player.achievements.bedwars_level = stars;
         let snapshot;
-        await runScan({ profiles: { samplename: profile, quietguy: quietProfile(1) },
+        await runScan({ scanMode: 'all', profiles: { samplename: profile, quietguy: quietProfile(1) },
             onResults: result => { snapshot = result; } });
         const row = snapshot.results.find(row => row.name === 'samplename');
-        assert(row?.isThreat, 'Stars-only, FKDR-only, and combined threats retain classification');
-        assert.strictEqual(row.starThreat, expected, 'Share receives the exact star-threshold reason, including equality');
+        assert.strictEqual(Boolean(row?.isThreat), starThreat || fkdrThreat, 'Stat thresholds retain OR classification');
+        assert.strictEqual(row.starThreat, starThreat, 'Share receives the exact star-threshold reason, including equality');
+        assert.strictEqual(row.fkdrThreat, fkdrThreat, 'Share receives the exact FKDR-threshold reason, including equality');
+        if (row.isThreat) {
+            const shareLine = formatLine(row, 'BEDWARS', new Set(['threats']));
+            assert.strictEqual(shareLine, fkdrThreat
+                ? `[GREEN] samplename: FKDR: ${fkdr.toFixed(2)}`
+                : `[GREEN] [${stars}✫] samplename`, 'Individual Share uses the real scan reasons');
+            assert.strictEqual(buildTeamSummaryEntries([row])[0].line, fkdrThreat
+                ? `Green team has ${Math.round(fkdr)} FKDR`
+                : `Green team has ${stars} stars`, 'Team Share uses the same real scan reasons');
+        }
     }
     for (const gameMode of ['BEDWARS', 'SKYWARS']) {
         const retired = quietProfile(1);

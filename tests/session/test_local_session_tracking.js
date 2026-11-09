@@ -24,15 +24,17 @@ for (let repeat = 0; repeat < 2; repeat++) {
 }
 assert.equal(localModes({current:game})[0].finals,2);assert.equal(localModes({current:game})[0].beds,1);assert.equal(localModes({current:game})[0].bedsLost,1);
 observe(game, 'Other vanished mysteriously. FINAL KILL!');
-assert(!('finals' in localModes({ current: game })[0]), 'Unknown final format removes the total instead of reporting a partial number');
+assert.equal(localModes({ current: game })[0].finals, 2, 'Unknown final format keeps observed finals visible');
+assert(localModes({ current: game })[0].unavailable.includes('finals'));
 assert.strictEqual(localModes({ current: game })[0].beds, 1);
 observe(game, 'BED DESTRUCTION > Red Bed disappeared mysteriously!');
-assert(!cardStats(localModes({current:game})[0]).some(x=>['finals','beds','bedsLost','fkdr','bblr'].includes(x.key)));
-assert.strictEqual(cardStats(localModes({current:createGame({...start,observedFromStart:false})})[0]).length,0);
-for(const patch of [{standardBedwars:false},{mode:'DUELS'}])assert(!('finals'in localModes({current:createGame({...start,...patch})})[0]));
+assert(cardStats(localModes({current:game})[0]).some(x=>x.key==='finals'));
+assert(cardStats(localModes({current:createGame({...start,observedFromStart:false})})[0]).length>0);
+assert(localModes({current:createGame({...start,standardBedwars:false})})[0].unavailable.includes('finals'));
+assert(!('finals'in localModes({current:createGame({...start,mode:'DUELS'})})[0]));
 const automaticBeds = createGame(start);
 observe(automaticBeds, 'All beds have been destroyed!');
-assert(!('bblr'in localModes({current:automaticBeds})[0]));assert.equal(localModes({current:automaticBeds})[0].finals,0);
+assert(localModes({current:automaticBeds})[0].unavailable.includes('bedsLost'));assert.equal(localModes({current:automaticBeds})[0].finals,0);
 // Nicked play counts under the live nick; an unplaced nick stays unknown.
 const nicked = createGame({ ...start, ownNames: ['Tester', 'NickName'] });
 observe(nicked, 'Rival was killed by NickName. FINAL KILL!', { ownNames: ['NickName'] });
@@ -45,7 +47,7 @@ observe(lateNick, 'Rival was killed by LateNick. FINAL KILL!', { ownNames: ['Lat
 assert.equal(localModes({current:lateNick})[0].finals, 1, 'A nick placed mid-game joins the own names');
 const unplaced = createGame({ ...start, identityKnown: false });
 observe(unplaced, 'Rival was killed by NickName. FINAL KILL!', { identityKnown: false });
-assert(!('finals' in localModes({ current: unplaced })[0]) && !('kills' in localModes({ current: unplaced })[0]));
+assert(localModes({ current: unplaced })[0].unavailable.includes('finals') && localModes({ current: unplaced })[0].unavailable.includes('kills'));
 assert.deepStrictEqual(require('../../src/session/localStats').normalizeLocal({ current: { ...start, mode: 'BEDWARS', ownName: 'Tester' } }).current.ownNames, ['tester'], 'Older saves keep their single own name');
 
 (async () => {
@@ -122,18 +124,19 @@ assert.deepStrictEqual(require('../../src/session/localStats').normalizeLocal({ 
     const interrupted = store.getHistory()[0];
     assert(interrupted.session.localTracking.current.leftAt > 0, 'Disconnecting mid-BedWars pauses the game for a rejoin');
     assert.strictEqual(interrupted.delta.modes[0].finals, 1, 'Counters seen before leaving are kept');
-    assert(!('wins' in interrupted.delta.modes[0]) && !('finalDeaths' in interrupted.delta.modes[0]), 'A paused game claims no result or bed outcome');
+    assert(interrupted.delta.modes[0].unavailable.includes('wins') && interrupted.delta.modes[0].unavailable.includes('finalDeaths'), 'A paused game retains internal coverage flags');
     assert.strictEqual(calls, 0);
 
     apiAvailable = true; tracker = createSessionTracker({ ...options, store });
     stamp += 100; await tracker.onGameStart(start);
-    const apiId = tracker.getActiveSessionId(); assert.notStrictEqual(apiId, interrupted.session.id);
+    const apiId = tracker.getActiveSessionId(); assert.strictEqual(apiId, interrupted.session.id, 'API changes after reconnect preserve the same session');
     stamp += 60000; await tracker.onGameEnd({ ...start, durationMs: 60000 });
-    assert.strictEqual(tracker.getSessionDelta().stats.Bedwars.final_kills_bedwars, 1, 'Returning API data must not turn lifetime counters into local gains');
+    assert.strictEqual(tracker.getSessionDelta().modes[0].finals, 1, 'Returning API data must not turn lifetime counters into local gains');
     apiAvailable = false; tracker.refreshSettings();
     tracker.observeLocalChat('Rival was killed by Tester. FINAL KILL!', start);
-    assert.notStrictEqual(tracker.getActiveSessionId(), apiId);
-    assert.strictEqual(cardStats(tracker.getSessionDelta().modes[0]).length, 0, 'Switching mid-game cannot claim full coverage');
+    assert.strictEqual(tracker.getActiveSessionId(), apiId);
+    assert(tracker.getSessionDelta().modes[0].unavailable.includes('finals'), 'Switching mid-game retains internal coverage flags');
+    assert.equal(tracker.getSessionDelta().modes[0].finals, 2, 'Observed finals from both games remain visible');
     const countAtDisable = calls; await tracker.refresh({ force: true });
     assert.strictEqual(calls, countAtDisable);
     tracker.detach();
@@ -144,7 +147,7 @@ assert.deepStrictEqual(require('../../src/session/localStats').normalizeLocal({ 
     await tracker.ensureSession(); await tracker.finish(); stamp += 100;
     await tracker.onGameStart({ ...start, sessionKey: 'nick-change' });
     tracker.observeLocalChat('Ordinary server notice', { ...start, identityKnown: false });
-    assert(!('finals'in tracker.getSessionDelta().modes[0]));assert.equal(tracker.getSessionDelta().modes[0].bedsLost,0);
+    assert(tracker.getSessionDelta().modes[0].unavailable.includes('finals'));assert.equal(tracker.getSessionDelta().modes[0].bedsLost,0);
     stamp += 60000; tracker.observeLocalResult('VICTORY!');
     await tracker.onGameEnd({ ...start, durationMs: 60000 });
     const idleSession = tracker.getActiveSession();
@@ -212,7 +215,7 @@ assert.deepStrictEqual(require('../../src/session/localStats').normalizeLocal({ 
     stamp += 60000; await tracker.onGameEnd({ ...start, durationMs: 60000 });
     assert(!tracker.getActiveSession().localTracking.current, 'Leaving without a bed ends the game');
     assert.strictEqual(lastGame().localModes[0].finalDeaths, 1, 'and is a final death');
-    assert(!('wins' in lastGame().localModes[0]), 'Teammates may still win, so the result stays unknown');
+    assert(lastGame().localModes[0].unavailable.includes('wins'), 'Teammates may still win, so the result stays unknown internally');
 
     stamp += 100; await tracker.onGameStart({ ...start, sessionKey: 'abandoned' });
     say('Rival was killed by Tester. FINAL KILL!', 'Tester');
@@ -220,7 +223,7 @@ assert.deepStrictEqual(require('../../src/session/localStats').normalizeLocal({ 
     stamp += 100; await tracker.onGameStart({ ...start, sessionKey: 'next' });
     const abandoned = lastGame().localModes[0];
     assert.strictEqual(abandoned.finals, 1, 'A game never rejoined keeps what was seen');
-    assert(!('finalDeaths' in abandoned) && !('bedsLost' in abandoned) && !('games' in abandoned), 'but not what could happen after leaving');
+    assert(['finalDeaths','bedsLost','games'].every(field=>abandoned.unavailable.includes(field)), 'Coverage records what could happen after leaving');
 
     say('Rival was killed by Tester. FINAL KILL!', 'Tester');
     stamp += 60000; await tracker.onGameEnd({ ...start, durationMs: 60000 });

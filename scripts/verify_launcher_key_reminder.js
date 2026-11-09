@@ -82,10 +82,13 @@ module.exports = async function verify({ page, output, profile }) {
     assert.strictEqual(await page.evaluate('state.settings.keyMeta.hypixelSavedAt'), saved);
 
     async function ageKey(hours) {
+        const savedAt = Date.now() - hours * HOUR;
         const raw = fs.readFileSync(keyFile, 'utf8').replace(/^Hypixel API key saved at:.*$/m,
-            `Hypixel API key saved at: ${Date.now() - hours * HOUR}`);
+            `Hypixel API key saved at: ${savedAt}`);
         fs.writeFileSync(keyFile, raw);
+        await page.waitForFunction('!refreshInFlight');
         await page.evaluate('refresh()');
+        await page.waitForFunction(savedAt => state.settings.keyMeta.hypixelSavedAt === savedAt, {}, savedAt);
     }
     await ageKey(45.5);
     assert((await readText('#hypixel-key-reminder-status')).includes('within 3 hours'));

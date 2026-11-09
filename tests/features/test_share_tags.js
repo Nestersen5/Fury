@@ -287,21 +287,26 @@ assert.strictEqual(
     '[RED] QuasiDig2073 ✔ | FKDR 2.30'
 );
 
-// Stars appear in threat messages only when the scan's star threshold matched.
-for (const fkdr of [1.2, 6.7]) {
+// Share only the triggering stat, preferring FKDR when both thresholds match.
+for (const [fkdrThreat, starThreat] of [[true, false], [false, true], [true, true]]) {
     for (const fancy of [false, true]) {
-        const row = { name: 'StarThreat', team: 'RED', stars: 1200, fkdr, isThreat: true, starThreat: true };
+        const row = { name: 'StarThreat', team: 'RED', stars: 1200, fkdr: 6.7,
+            monthlyFkdr: 4.2, isThreat: true, fkdrThreat, starThreat };
         const include = new Set(['threats']);
         const line = formatLine(row, 'BEDWARS', include, fancy);
-        assert(line.startsWith('[RED] [1200✫] StarThreat'), 'Stars-only and stars-plus-FKDR threats include the fancy star badge');
+        const expected = fkdrThreat
+            ? fancy ? '[RED] StarThreat ✔ | FKDR 6.70 | MFKDR: 4.20' : '[RED] StarThreat: FKDR: 6.70 MFKDR: 4.20'
+            : fancy ? '[RED] [1200✫] StarThreat ✔' : '[RED] [1200✫] StarThreat';
+        assert.strictEqual(line, expected, 'Use the scan reasons rather than guessing from the numeric stats');
         const { formatLineComponent } = require('../../src/overlay/shareTags');
-        const { extractText } = require('../../features/minecraft_chat');
-        assert.equal(extractText(formatLineComponent(row, 'BEDWARS', include, fancy)), line,
+        const { extractText, sendChat } = require('../../features/minecraft_chat');
+        const component = formatLineComponent(row, 'BEDWARS', include, fancy);
+        assert.equal(extractText(component), line,
             'Local recoloring matches the outgoing threat message');
-        const fkdrOnly = { ...row, starThreat: false };
-        const plainLine = formatLine(fkdrOnly, 'BEDWARS', include, fancy);
-        assert(!plainLine.includes('✫'), 'FKDR-only threats omit the star badge in both styles');
-        assert.equal(extractText(formatLineComponent(fkdrOnly, 'BEDWARS', include, fancy)), plainLine);
+        const packets = [];
+        sendChat({ write: (_name, packet) => packets.push(packet) }, component);
+        assert.strictEqual(extractText(JSON.parse(packets[0].message)), line, 'Production chat serialization retains the selected stat');
+        assert.strictEqual(component.extra.find(node => node.text === row.name).clickEvent.value, '/urchin StarThreat');
     }
 }
 

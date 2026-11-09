@@ -190,12 +190,12 @@ function mount({document}) {
     const identityPanel=el('div','ia-panel');
     for(const [id,title] of [['denick-real-ign-nametags','Show real in-game name'],['denick-real-skin','Show real skin'],['denick-real-ign-chat','Show real name in chat']]) identityPanel.append(row(title,id));
     identity.append(identityPanel,el('p','ia-note','For players identified by nickname detection.'));
-    const event=el('section','ia-preview-setting'),score=el('section','ia-preview-setting');
+    const event=el('section','ia-preview-setting ia-event-setting'),score=el('section','ia-preview-setting');
     event.append(row('BedWars event text color','accent-bedwars-event-labels-enabled','Use the closest Minecraft color to your accent.'));
     score.append(row('Enhanced scoreboard','bedwars-sidebar-team-colors-enabled','Color-coded BedWars teams.'));
     const chat=el('div','ia-live-panel'),board=el('div','ia-live-panel');chat.append(el('h3','ia-section-title','Live preview'));board.append(el('h3','ia-section-title','Live preview'));
     const caption=el('div','ia-accent-caption');caption.append(el('span','','Uses launcher accent'),el('i','ia-accent-swatch'));chat.append(caption);
-    const chatSample=el('div','ia-chat-sample');chatSample.innerHTML=`<div><b class="ia-event-label ia-bed-label">BED DESTRUCTION</b> ${mc('>')} ${mc('Blue Bed','9')} ${mc('was bed ','7')}${mc('#10,186','e')} ${mc('destroyed by','7')} ${mc('JonathanArntzen!','a')}</div><div>${mc('Zayn_malik69','8')} ${mc('was killed by','7')} ${mc('ItzJosep.','c')} <b class="ia-event-label ia-final-label">FINAL KILL!</b></div>`;chat.append(chatSample);
+    const chatSample=el('div','ia-chat-sample');chatSample.innerHTML=`<div><b class="ia-event-label ia-bed-label">BED DESTRUCTION &gt;</b> ${mc('Blue Bed','9')} ${mc('was bed ','7')}${mc('#10,186','e')} ${mc('destroyed by','7')} ${mc('JonathanArntzen!','a')}</div><div>${mc('Zayn_malik69','8')} ${mc('was killed by','7')} ${mc('ItzJosep.','c')} <b class="ia-event-label ia-final-label">FINAL KILL!</b></div>`;chat.append(chatSample);
     const boardScene=el('div','ia-score-scene'),boardSample=el('div','ia-scoreboard');
     boardSample.innerHTML=`<strong>${mc('BED WARS','e')}</strong><div>${mc('09/12/26  m6708','7')}</div><p>Diamond II in ${mc('5:43','a')}</p>`;
     const teams=[['R','Red','c'],['B','Blue','9'],['G','Green','a'],['Y','Yellow','e'],['A','Aqua','b'],['W','White','f'],['P','Pink','d'],['S','Gray','7']];

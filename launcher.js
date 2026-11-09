@@ -8,10 +8,10 @@ const { superviseChild } = require('./src/bootstrap/childShutdown');
 let quitting = false, quitAllowed = false, quitOperation = null, relaunchRequested = false;
 let rendererFlushing = false, acceptedSaveFailure = false;
 const acceptedSaves = new Set();
-const durableChannels = /^(updates:dismiss|settings:save|profiles:(apply|save|duplicate|update|delete|import)|session:action|account:(select|remove)|denick:(add|remove))/;
+const durableChannels = /^(minecraft-setup:add|updates:(dismiss|seen)|settings:save|profiles:(apply|save|duplicate|update|delete|import)|session:action|account:(select|remove)|denick:(add|remove))/;
 function handleLauncherRequest(channel, handler) {
     ipcMain.handle(channel, (event, ...args) => {
-        if (quitting && !(rendererFlushing && channel.startsWith('settings:save'))) throw new Error('Fury is stopping.');
+        if (quitting && !(rendererFlushing && (channel.startsWith('settings:save') || channel === 'updates:seen'))) throw new Error('Fury is stopping.');
         const result = handler(event, ...args);
         if (durableChannels.test(channel)) {
             const pending = Promise.resolve(result);
@@ -1180,10 +1180,11 @@ function checkPort(port) {
     });
 }
 
-async function getProxyHealth(settings, { overlayVisible, includeSessions = false, account = null } = {}) {
+async function getProxyHealth(settings, { overlayVisible, includeSessions = false, includeDenicks = false, account = null } = {}) {
     const owner = services.proxy.child;
     try {
         const query = new URLSearchParams();
+        if (includeDenicks) query.set('includeDenicks', '1');
         if (typeof overlayVisible === 'boolean') query.set('overlayVisible', overlayVisible ? '1' : '0');
         // Keyed like the proxy scopes it, so sign-in state changes do not count.
         const sessionScope = includeSessions ? JSON.stringify(normalizeAccount(account)) : null;
@@ -1486,7 +1487,7 @@ async function launcherState(event, options = {}) {
     const overlayVisible = activePage === 'overlay'
         && Boolean(senderWin && !senderWin.isDestroyed() && senderWin.isVisible() && !senderWin.isMinimized());
     const [proxyHealth, portStates, apiStatus] = await Promise.all([
-        getProxyHealth(settings, { overlayVisible, includeSessions, account: viewedAccount }),
+        getProxyHealth(settings, { overlayVisible, includeSessions, includeDenicks, account: viewedAccount }),
         Promise.all([
             checkPort(settings.server.proxyDirectPort),
             checkPort(settings.server.proxyFailoverPort),
@@ -1525,6 +1526,10 @@ async function launcherState(event, options = {}) {
     return compact ? historyResponses.respond(event.sender.id, ticket, result, options.historyContract) : result;
 }
 
+function isLauncherWindowActive(target) {
+    return Boolean(target && !target.isDestroyed() && target.isFocused() && target.isVisible() && !target.isMinimized());
+}
+
 function createWindow() {
     win = new BrowserWindow({
         width: 1440,
@@ -1550,7 +1555,25 @@ function createWindow() {
         callback(permission === 'media');
     });
 
+    // Native window focus is authoritative for optional launcher animations.
+    // Send only changes; re-send the initial value after each renderer reload.
+    const activityWindow = win;
+    let lastWindowActivity;
+    const publishWindowActivity = () => {
+        if (activityWindow.isDestroyed() || activityWindow.webContents.isDestroyed()) return;
+        const active = isLauncherWindowActive(activityWindow);
+        if (active === lastWindowActivity) return;
+        lastWindowActivity = active;
+        activityWindow.webContents.send('window:activity', active);
+    };
+    for (const event of ['focus', 'blur', 'show', 'hide', 'minimize', 'restore']) activityWindow.on(event, publishWindowActivity);
+    activityWindow.webContents.on('did-finish-load', () => { lastWindowActivity = undefined; publishWindowActivity(); });
     win.loadFile(path.join(__dirname, 'launcher.html'));
+    // A silent NSIS parent can supply a hidden initial window state. Show the
+    // completed replacement explicitly, after its first inherited ShowWindow.
+    if (app.isPackaged && process.platform === 'win32' && process.argv.includes('--updated')) {
+        win.once('ready-to-show', () => { if (win && !win.isDestroyed()) { win.show(); win.focus(); } });
+    }
     win.on('close', event => { if (!quitAllowed) { event.preventDefault(); void requestQuit('window-close'); } });
     win.on('query-session-end', event => { if (!quitAllowed) { event.preventDefault(); void requestQuit('system-shutdown'); } });
     win.on('closed', () => {
@@ -2153,6 +2176,7 @@ handleLauncherRequest('auth:microsoft-cancel', () => {
     microsoftLogin.worker.kill();
     return true;
 });
+handleLauncherRequest('window:activity:get', event => isLauncherWindowActive(BrowserWindow.fromWebContents(event.sender)));
 handleLauncherRequest('window:control', (event, action) => {
     const target = BrowserWindow.fromWebContents(event.sender);
     if (!target) return false;
@@ -2310,6 +2334,11 @@ app.whenReady().then(() => {
 handleLauncherRequest('api-key:test', (event, payload = {}) => testApiKey(payload.provider, payload.key));
 handleLauncherRequest('reminders:check', () => refreshRememberedReminders({ force: true }));
 handleLauncherRequest('network:validate', (event, payload = {}) => validateNetworkConfiguration(payload));
+const minecraftSetup = require('./src/launcher/minecraftSetupIpc').registerMinecraftSetup({
+    handle: handleLauncherRequest, app, dialog, getWindow: () => win, authorize: updateSender,
+    getServerSettings: () => loadAllSettings().server, directory: dataPath('launcher_data')
+});
+app.on('before-quit', () => minecraftSetup.dispose());
 
 // Renderer readiness triggers one optional, anonymous check. This is outside
 // launcher state/history refresh and never participates in persistence drains.
@@ -2338,6 +2367,7 @@ function getInstallerUpdates() {
         canInstall: () => require('./src/updates/windowsInstallation').canInstallWithCurrentProcesses(),
         onChange: state => { if (win && !win.isDestroyed() && !win.webContents.isDestroyed()) win.webContents.send('updates:state-changed', state); },
         requestInstall: handoff => requestQuit('update', handoff),
+        attempt: require('./src/updates/windowsUpdateAttempt').createUpdateAttempt(dataPath('launcher_data', 'windows-update-attempt.json')),
         log: message => pushLog('proxy', `[Launcher] ${message}`)
     });
 }
@@ -2347,6 +2377,7 @@ handleLauncherRequest('updates:check', event => {
 });
 handleLauncherRequest('updates:notes', event => updateSender(event) ? getReleaseExperience().notes() : null);
 handleLauncherRequest('updates:dismiss', (event, version) => updateSender(event) ? getReleaseExperience().dismiss(version) : false);
+handleLauncherRequest('updates:seen', (event, payload) => updateSender(event) ? getReleaseExperience().markSeen(payload) : null);
 handleLauncherRequest('updates:open', event => updateSender(event) && updateNotifications
     ? updateNotifications.open() : false);
 handleLauncherRequest('updates:state', event => updateSender(event) ? getInstallerUpdates().getState() : null);

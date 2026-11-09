@@ -17,6 +17,7 @@ const GAME_EVENT_TYPES = [
     'reconnect',
     'victory',
     'defeat',
+    'draw',
     'note'
 ];
 
@@ -103,6 +104,8 @@ function resolveSessionGameVariant(mode, {
     bedwarsQueue = null,
     previousVariant = null
 } = {}) {
+    const previous = String(previousVariant || '').trim();
+    if (previous && !/^(unknown|unspecified|unavailable)$/i.test(previous)) return previous;
     if (mode === 'DUELS') return String(duelsModeName || '').trim() || null;
     if (mode === 'BEDWARS' && bedwarsQueue && !bedwarsQueue.fallback) {
         return String(bedwarsQueue.label || '').trim() || String(previousVariant || '').trim() || null;
@@ -191,6 +194,7 @@ function parseGameEvents(text, {
     }
     if (!parsed && /^VICTORY\s*!?$/i.test(line)) parsed = { type: 'victory', confidence: 'confirmed' };
     if (!parsed && /^DEFEAT\s*!?$/i.test(line)) parsed = { type: 'defeat', confidence: 'confirmed' };
+    if (!parsed && /^(?:DRAW|TIE)\s*!?$/i.test(line)) parsed = { type: 'draw', confidence: 'confirmed' };
     if (!parsed) {
         const reconnect = line.match(/\b([A-Za-z0-9_]{2,16})\s+reconnected[.!]?$/i);
         if (reconnect) parsed = { type: 'reconnect', actor: cleanName(reconnect[1]), confidence: 'confirmed' };
@@ -217,6 +221,7 @@ function parseResultBanner(text, { mode = null, at = Date.now(), startedAt = 0 }
     let parsed = null;
     if (/^VICTORY\s*!?$/i.test(line)) parsed = { type: 'victory' };
     else if (/^DEFEAT\s*!?$/i.test(line)) parsed = { type: 'defeat' };
+    else if (/^(?:DRAW|TIE)\s*!?$/i.test(line)) parsed = { type: 'draw' };
     else if (/^GAME OVER\s*!?$/i.test(line) && mode === 'BEDWARS') parsed = { type: 'defeat', cause: 'game_over' };
     if (!parsed) return null;
     return normalizeGameEvent({

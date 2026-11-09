@@ -4,7 +4,7 @@ const {buildCalendarStats,validTimezone,dayAt}=require('../../session/calendarSt
 const cards=require('./launcher_session_card');
 const TITLES={daily:'Daily',weekly:'Weekly',monthly:'Monthly'};
 
-function mount({document,node,button,svg,escape,toolbar,dateSelect,specificDay,getState,openManager,notify,clipboard,nativeImage,onChange}) {
+function mount({document,node,button,svg,escape,toolbar,dateSelect,specificDay,getState,openManager,notify,clipboard,nativeImage,toggleList,viewCard,cardMenu,onChange}) {
     const list=document.querySelector('#session-history-list');
     const tabs=node('div','fury-period-tabs');tabs.setAttribute('role','tablist');tabs.setAttribute('aria-label','Session history period');
     toolbar.before(tabs);
@@ -73,7 +73,8 @@ function mount({document,node,button,svg,escape,toolbar,dateSelect,specificDay,g
         }
         rows.clear();for(const [id,row]of retained)rows.set(id,row);
         if(!periods.length)content.append(node('div','fury-empty',`<span class="fury-empty-icon">${svg('sessions')}</span><h3>No ${kind} stats yet</h3><p>${currentAccount?'Play through Fury to record stats for this account and mode.':'Select an account to view its stats.'}</p>`));
-        panel.replaceChildren(heading,content,node('p','fury-calendar-footnote',`Calendar weeks start Monday · Local time (${escape(timeZone)}) · Stats recorded by Fury`));
+        const noun={daily:'day',weekly:'week',monthly:'month'}[kind];
+        panel.replaceChildren(heading,content,node('p','fury-calendar-footnote',`Calendar weeks start Monday · Local time (${escape(timeZone)}) · Stats recorded by Fury`),node('aside','fury-calendar-placeholder',periods.length?`Select a ${noun}`:''));
         for(const record of rows.values())if(record.row.open)record.generate();
         return true;
     }
@@ -82,17 +83,14 @@ function mount({document,node,button,svg,escape,toolbar,dateSelect,specificDay,g
         if(period.active)row.classList.add('fury-period-current');
         const c=period.calendar;
         const label=period.active?{daily:'Today',weekly:'This week',monthly:'This month'}[kind]:c.label;
-        const summary=node('summary','');
-        const identity=node('div','fury-period-identity',`<strong>${escape(label)} ${period.active?'<span class="fury-period-badge">In progress</span>':''}${c.partial?'<span class="fury-period-badge partial" title="Some stats cannot be assigned reliably to this period">Partial</span>':''}</strong>${period.active?`<span class="note">${escape(c.label)}</span>`:''}<span class="note">${c.sessionIds.length} ${c.sessionIds.length===1?'session':'sessions'} · ${cards.duration(period.durationMs)} tracked</span>`);
-        summary.append(node('span','fury-session-icon',svg('sessions')),identity);
-        const totals=key=>period.modes.every(m=>Number.isFinite(m[key]))?period.modes.reduce((n,m)=>n+m[key],0):null;
-        const games=totals('games'),wins=totals('wins');
-        const selected=period.modes[0];const bedwars=period.modes.length===1&&selected.mode==='BEDWARS';
-        const stats=node('span','fury-period-metrics');
-        const items=[['Games',games,''],['Wins',wins,'green'],[bedwars?'FKDR':'KDR',period.modes.length===1?selected[bedwars?'fkdr':'kdr']:undefined,'gold'],[bedwars?'Stars':'Kills',bedwars?selected.stars:totals('kills'),bedwars?'cyan':'']];
-        for(const [name,value,color]of items){const valueText=Number.isFinite(value)?(name==='Stars'?`+${value.toFixed(2)}`:['FKDR','KDR'].includes(name)?value.toFixed(2):value.toLocaleString('en-US')):'—';stats.append(node('span',`fury-period-metric ${color}`,`<span>${name}</span><strong>${valueText}</strong>`));}
-        summary.append(stats,node('span','fury-view-label',`View card ${svg('chevron')}`));row.append(summary);
+        const sessionsText=`${c.sessionIds.length} ${c.sessionIds.length===1?'session':'sessions'}`;
+        // Rows name the period; its numbers live on the card.
+        const summary=node('summary','',`<span class="fury-session-icon fury-period-icon">${svg('sessions')}</span><div class="fury-period-identity"><strong><span>${escape(label)}</span>${period.active?'<i class="fury-live-dot" title="In progress"></i>':''}</strong><span class="note">${period.active?`${escape(c.label)} <i>·</i> `:''}${sessionsText} <i>·</i> <b>${cards.duration(period.durationMs)}</b></span></div><span class="fury-view-label">View card ${svg('chevron')}</span>`);
+        row.append(summary);
+        const selected=period.modes[0];
         const body=node('div','fury-session-content'),controls=node('div','fury-card-toolbar',`<strong>${TITLES[kind]} card</strong>`),host=node('div','fury-card-stage');
+        const head=node('div','fury-session-detail-head'),actions=node('div','fury-session-detail-actions');
+        const heading=node('div','fury-session-detail-title',`<h3><span>${escape(label)}</span></h3><p class="note">${period.active?`${escape(c.label)} <i>·</i> `:''}${sessionsText} <i>·</i> ${cards.duration(period.durationMs)} tracked</p>`);
         let selectedMode=period.modes.some(m=>m.mode===previousMode)?previousMode:selected?.mode,selectedSubmode=previousSubmode||'overall',result=null,request=0,rendered=false;
         function slider(label,choices,value,onSelect){
             const group=node('div','fury-card-mode fury-card-mode-options fury-card-submode-options');
@@ -109,7 +107,7 @@ function mount({document,node,button,svg,escape,toolbar,dateSelect,specificDay,g
             return group;
         }
         if(period.modes.length>1)controls.append(slider('Calendar card game mode',period.modes.map(m=>({id:m.mode,label:m.label})),selectedMode,value=>{selectedMode=value;selectedSubmode='overall';updateSubmodes();rendered=false;generate();}));
-        else controls.append(node('span','fury-card-mode',escape(selected?.label||'')));
+        else{const only=node('span','fury-card-mode',escape(selected?.label||''));only.hidden=true;controls.append(only);}
         const submodeHost=node('div','fury-calendar-submodes');
         function updateSubmodes(){
             const choices=[{id:'overall',label:'Overall'},...(period.modes.find(m=>m.mode===selectedMode)?.submodes||[])];
@@ -118,12 +116,17 @@ function mount({document,node,button,svg,escape,toolbar,dateSelect,specificDay,g
             submodeHost.hidden=choices.length===1;
         }
         updateSubmodes();controls.append(submodeHost);
-        const copy=button(`${svg('copy')}Copy image`,()=>exportImage(false),'fury-calendar-copy');
-        const download=button(`${svg('download')}Download PNG`,()=>exportImage(true),'fury-gold-outline');copy.disabled=download.disabled=true;controls.append(copy,download);
-        const contributions=button(`View ${c.sessionIds.length} contributing ${c.sessionIds.length===1?'session':'sessions'}`,()=>{
+        const copy=button(svg('copy'),()=>exportImage(false),'fury-calendar-copy');
+        const download=button(`${svg('download')}<span>Save</span>`,()=>exportImage(true),'primary fury-calendar-save');copy.disabled=download.disabled=true;
+        copy.setAttribute('aria-label','Copy image');copy.title='Copy image (Ctrl+C)';download.setAttribute('aria-label','Save as PNG');download.title='Save as PNG (Ctrl+S)';
+        row.cardActions={zoom:()=>viewCard(result,`${TITLES[kind]} card: ${label}`),remove:null};
+        const more=button(svg('more'),()=>cardMenu(more,row),'fury-card-more');
+        actions.append(copy,download,more);head.append(heading,actions);
+        host.addEventListener('click',event=>{if(event.target.closest('canvas'))row.cardActions.zoom();});
+        const contributions=button(`View ${sessionsText} in this ${{daily:'day',weekly:'week',monthly:'month'}[kind]}`,()=>{
             api.sessionIds=c.sessionIds;kind='sessions';dateSelect.value='all';dateSelect.dispatchEvent(new Event('change',{bubbles:true}));onChange();
         },'fury-contributions');
-        body.append(controls,host,contributions);row.append(body);
+        body.append(head,controls,host,contributions);row.append(body);
         async function generate(){
             if(rendered||!row.isConnected)return;rendered=true;const id=++request;copy.disabled=download.disabled=true;result=null;
             if(!host.querySelector('canvas'))host.textContent='Generating card…';

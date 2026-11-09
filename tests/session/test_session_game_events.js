@@ -45,6 +45,12 @@ assert.strictEqual(
     'BedWars still takes its detected queue label'
 );
 assert.strictEqual(resolveSessionGameVariant('DUELS', { duelsModeName: 'Bridge Duel' }), 'Bridge Duel');
+assert.strictEqual(resolveSessionGameVariant('BEDWARS', {
+    previousVariant: 'Doubles', bedwarsQueue: { label: 'Fours', fallback: false }
+}), 'Doubles', 'A tracked match keeps its mode while the next lobby loads');
+assert.strictEqual(resolveSessionGameVariant('BEDWARS', {
+    previousVariant: 'Unspecified', bedwarsQueue: { label: 'Doubles', fallback: false }
+}), 'Doubles', 'A placeholder cannot block later mode evidence');
 
 const final = parseGameEvents("Rival was Tester's final #42. FINAL KILL!", context)[0];
 assert.strictEqual(final.type, 'final_kill');

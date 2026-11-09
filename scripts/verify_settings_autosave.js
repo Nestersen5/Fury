@@ -58,7 +58,6 @@ const target=require('./launcher_verification_target').verificationTarget('setti
   await edit('proxy-direct-host','bad/host');await settled();
   assert.equal(await page.evaluate('state.settings.server.proxyDirectHost'),'example.com');
   await edit('proxy-direct-host','mc.hypixel.net');await settled();
-  assert(await page.$eval('[data-copy-connection="custom"]',e=>e.disabled),'An unconfigured connection cannot be copied');
   await page.evaluate(()=>{
     document.getElementById('network-safe-defaults').click();
   });await settled();
@@ -68,65 +67,33 @@ const target=require('./launcher_verification_target').verificationTarget('setti
     assert.equal(JSON.parse(fs.readFileSync(path.join(profile,'server_config.json')))[key],serverDefaults[key],`Reset persists ${key}`);
   }
   assert.equal(await page.evaluate('state.settings.server.healthPort'),healthPort,'Connection reset preserves the monitoring port');
-  await page.evaluate(()=>{
-    activateSettingsSubpage('network',false);
-    window.connectionCopyWrites=[];
-    window.connectionCopyOriginal=clipboard.writeText;
-    clipboard.writeText=value=>{
-      if(window.failConnectionCopy)throw new Error('Fixture clipboard failure');
-      window.connectionCopyWrites.push(value);
-    };
-  });
-  try{
-    const copySelector=key=>`[data-copy-connection="${key}"]`;
-    for(const [key,setting] of [['direct','proxyDirectPort'],['failover','proxyFailoverPort'],['custom','proxyCustomPort']]){
-      const selector=copySelector(key);
-      assert(await page.$eval(selector,e=>e.checkVisibility()&&!e.disabled&&e.getAttribute('aria-label').includes('Minecraft address')));
-      await page.click(selector);
-      assert.equal(await page.evaluate('connectionCopyWrites.at(-1)'),`localhost:${serverDefaults[setting]}`);
-      assert.equal(await page.$eval(selector,e=>e.textContent),'Copied');
-    }
-    const directCopy=copySelector('direct');
-    await page.waitForFunction(selector=>document.querySelector(selector).textContent==='Copy',{},directCopy);
-    await edit('proxy-direct-port','34567',false);
-    assert.equal(await page.$eval('.fury-connection-address',e=>e.textContent),'Minecraft address: localhost:34567');
-    await page.focus(directCopy);await page.keyboard.press('Enter');
-    assert.equal(await page.evaluate('connectionCopyWrites.at(-1)'),'localhost:34567','Keyboard copy uses the current edited address');
-    for(const invalid of ['65536','0','1.5','']){
-      await edit('proxy-direct-port',invalid,false);
-      assert(await page.$eval(directCopy,e=>e.disabled),`Cannot copy invalid port ${invalid}`);
-      const count=await page.evaluate('connectionCopyWrites.length');
-      await page.$eval(directCopy,e=>e.click());
-      assert.equal(await page.evaluate('connectionCopyWrites.length'),count);
-    }
-    await edit('proxy-direct-port',String(serverDefaults.proxyDirectPort));await settled();
-    await page.evaluate('window.failConnectionCopy=true');
-    await page.click(directCopy);
-    assert.equal(await page.$eval(directCopy,e=>e.textContent),'Copy','Clipboard errors do not show success');
-    assert.equal(await page.$eval('#save-status',e=>e.textContent),'Could not copy the Minecraft address. Try again.');
-    await page.evaluate('window.failConnectionCopy=false');
-    await page.focus(directCopy);await page.keyboard.press('Space');
-    assert.equal(await page.evaluate('connectionCopyWrites.at(-1)'),`localhost:${serverDefaults.proxyDirectPort}`);
-    await page.evaluate('refresh()');
-    assert.equal(await page.$eval(directCopy,e=>e.textContent),'Copied','Refreshing saved settings preserves feedback');
-    await page.evaluate(()=>document.querySelectorAll('.fury-notification button').forEach(button=>button.click()));
-    await page.waitForFunction(()=>!document.querySelector('.fury-notification'));
-    const originalTheme=await page.evaluate('document.documentElement.dataset.theme');
-    for(const [theme,width,height] of [['dark',1440,900],['light',1024,768]]){
-      await page.setViewport({width,height});
-      await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;},theme);
-      assert(await page.$$eval('.fury-connection-address-row',rows=>rows.length===3&&rows.every(row=>{
-        const text=row.querySelector('p').getBoundingClientRect(),button=row.querySelector('button').getBoundingClientRect(),bounds=row.getBoundingClientRect();
-        return button.width>0&&button.right<=bounds.right+1&&(button.left>=text.right||button.top>=text.bottom);
-      })),`${theme} address buttons fit without overlapping their text`);
-      const card=await page.$('.fury-connection-card');
-      await card.screenshot({path:path.join(output,`connection-copy-${theme}.png`)});
-    }
-    await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;},originalTheme);
-    await page.setViewport({width:1440,height:900});
-  }finally{
-    await page.evaluate(()=>{clipboard.writeText=window.connectionCopyOriginal;});
+  await page.evaluate(()=>activateSettingsSubpage('network',false));
+  // Connection settings are three plain rows: name and status, port, then game server.
+  assert.deepEqual(await page.$$eval('.fury-connection-row',rows=>rows.map(row=>[row.querySelector('h3').textContent,...[...row.querySelectorAll('input')].map(input=>input.id)])),[
+    ['Direct','proxy-direct-port','proxy-direct-host'],['Proxy','proxy-failover-port','proxy-failover-host'],['Proxy','proxy-custom-port','proxy-custom-host']]);
+  assert.deepEqual(await page.$$eval('#proxy-failover-port,#proxy-custom-port',inputs=>inputs.map(input=>input.getAttribute('aria-label'))),['Proxy port','Second proxy port'],'Both proxies keep distinct accessible names');
+  assert.equal(await page.$$eval('[data-copy-connection],.fury-connection-address,#network-copy-config',els=>els.filter(e=>e.checkVisibility()).length),0,'Connection settings show no copy buttons or Minecraft addresses');
+  assert.equal(await page.$eval('#health-port',e=>e.checkVisibility()),false,'The monitoring port stays out of connection settings');
+  // A validation problem replaces the row's short status with the specific message.
+  const duplicateMessage='Each Fury endpoint needs a different port.';
+  await edit('proxy-direct-port',String(serverDefaults.proxyFailoverPort),false);
+  await page.waitForFunction(message=>document.querySelector('[data-network-detail="direct"]').textContent===message,{},duplicateMessage);
+  assert(await page.$eval('[data-network-detail="direct"]',e=>e.checkVisibility()),'The problem is shown in the row');
+  assert.equal(await page.$eval('[data-network-status="direct"]',e=>e.checkVisibility()),false,'The short status gives way to the problem');
+  await edit('proxy-direct-port',String(serverDefaults.proxyDirectPort));await settled();
+  await page.waitForFunction(message=>document.querySelector('[data-network-detail="direct"]').textContent!==message,{},duplicateMessage);
+  const originalTheme=await page.evaluate('document.documentElement.dataset.theme');
+  for(const [theme,width,height] of [['dark',1440,900],['light',1024,768]]){
+    await page.setViewport({width,height});
+    await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;},theme);
+    assert(await page.$$eval('.fury-connection-row',rows=>rows.length===3&&rows.every(row=>{
+      const bounds=row.getBoundingClientRect(),parts=[...row.children].map(e=>e.getBoundingClientRect());
+      return parts.every((part,i)=>part.width>0&&part.left>=bounds.left-1&&part.right<=bounds.right+1&&(i===0||part.left>=parts[i-1].right));
+    })),`${theme} connection rows fit without overlapping`);
+    await (await page.$('.fury-connections')).screenshot({path:path.join(output,`connection-rows-${theme}.png`)});
   }
+  await page.evaluate(theme=>{document.documentElement.dataset.theme=theme;},originalTheme);
+  await page.setViewport({width:1440,height:900});
   assert(await page.$eval('#save-settings',e=>!e.checkVisibility()));
   assert.equal(await page.$('.fury-api-save'),null);
   await page.evaluate(()=>{
@@ -166,7 +133,7 @@ const target=require('./launcher_verification_target').verificationTarget('setti
   assert.notEqual(await page.evaluate('state.services.proxy.pid'),oldPid);
   await page.evaluate(async()=>{await ipcRenderer.invoke('service:stop','proxy');});
   assert.deepEqual(errors,[]);
-  console.log('PASS autosave field isolation, thresholds, keys, invalid values, failure/retry, network reset, address copy and keyboard/error/disabled states, feature saves and restart status');
+  console.log('PASS autosave field isolation, thresholds, keys, invalid values, failure/retry, network reset, connection rows and validation messages, feature saves and restart status');
  target.record();
  }finally{if(browser)await browser.disconnect();await stopChild(child);}
 })().catch(e=>{console.error(e);process.exitCode=1;});

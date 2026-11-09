@@ -1,0 +1,74 @@
+/* Seasonal appearance is a launcher-only layer over the current theme/accent. */
+#fury-design-a .fury-seasonal-panel { margin-top:30px;padding:0;border:0;background:none;border-radius:0; }
+#fury-design-a .fury-seasonal-heading { margin:0 0 14px 2px; }
+#fury-design-a .fury-seasonal-heading h3 { margin:0!important;font-size:14px!important;font-weight:500!important;color:var(--fury-muted); }
+#fury-design-a .fury-seasonal-list { display:grid;gap:6px;padding:8px;border-radius:17px;background:var(--fury-panel); }
+#fury-design-a .fury-seasonal-row { position:relative;isolation:isolate;display:flex;align-items:center;gap:12px;height:56px;min-width:0;padding:0 16px;border:1px solid transparent;border-radius:11px;overflow:hidden;cursor:pointer; }
+#fury-design-a .fury-seasonal-row:not(.fury-seasonal-winter):hover { background:color-mix(in srgb,var(--fury-text) 4%,transparent); }
+#fury-design-a .fury-seasonal-row:has(input:checked) { border-color:var(--fury-gold);background:color-mix(in srgb,var(--fury-gold) 6%,var(--fury-panel)); }
+#fury-design-a .fury-seasonal-row:has(input:focus-visible) { outline:2px solid var(--fury-gold);outline-offset:2px; }
+#fury-design-a .fury-seasonal-row>input { position:absolute;width:1px;height:1px;opacity:0;margin:0; }
+/* Frame the panorama's shallow forest band while keeping the image's DOM
+   bounds inside the row, including for the snowfall's content protection. */
+#fury-design-a .fury-seasonal-art { position:absolute;inset:0;z-index:0;width:100%;height:100%;object-fit:fill;object-view-box:inset(27% 0 62% 0);object-position:center;pointer-events:none; }
+#fury-design-a .fury-seasonal-icon { position:relative;z-index:2;display:grid;place-items:center;flex:none;width:32px;height:32px;border-radius:9px;background:color-mix(in srgb,var(--fury-text) 5%,var(--fury-panel));color:var(--fury-muted); }
+#fury-design-a .fury-seasonal-icon svg { width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round; }
+#fury-design-a .fury-seasonal-winter .fury-seasonal-icon { background:#243653c9;color:#d6eaff; }
+#fury-design-a .fury-seasonal-copy { position:relative;z-index:2;flex:1;min-width:0; }
+#fury-design-a .fury-seasonal-copy strong { display:block;font-size:13px;font-weight:500;line-height:1.4;color:var(--fury-text); }
+#fury-design-a .fury-seasonal-copy small { display:block;margin-top:2px;font-size:11px!important;font-weight:400;line-height:16px!important;color:var(--fury-muted); }
+#fury-design-a .fury-seasonal-winter .fury-seasonal-copy strong { color:#173341; }
+#fury-design-a .fury-seasonal-winter .fury-seasonal-copy small { color:#000; }
+#fury-design-a .fury-seasonal-selected { position:relative;z-index:2;display:grid;place-items:center;flex:none;width:20px;height:20px;border-radius:50%;border:1px solid color-mix(in srgb,var(--fury-text) 18%,transparent);background:var(--fury-panel); }
+#fury-design-a .fury-seasonal-selected svg { width:12px;height:12px;opacity:0;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round; }
+#fury-design-a .fury-seasonal-row:has(input:checked) .fury-seasonal-selected { background:var(--fury-gold);border-color:var(--fury-gold);color:var(--fury-selection-ink,#1b1606); }
+#fury-design-a .fury-seasonal-row:has(input:checked) .fury-seasonal-selected svg { opacity:1; }
+#fury-design-a .fury-seasonal-preview-snow { position:absolute;inset:0;width:100%;z-index:1;pointer-events:none;color:#dcecff; }
+#fury-design-a .fury-seasonal-preview-snow i { position:absolute;left:var(--x);top:var(--y);font-size:8px;font-style:normal;opacity:.65; }
+html[data-seasonal-motion="running"] .fury-seasonal-winter:hover .fury-seasonal-preview-snow i { animation:fury-seasonal-preview-drift 3.8s ease-in-out infinite; }
+@keyframes fury-seasonal-preview-drift { 50% { translate:2px 9px;opacity:.25; } }
+#fury-design-a .fury-seasonal-options { margin-top:18px;padding:0 20px;border-radius:17px;background:var(--fury-panel); }
+#fury-design-a .fury-seasonal-options-heading { display:flex;align-items:center;justify-content:space-between;gap:10px;padding:17px 0;border-bottom:1px solid var(--fury-border); }
+#fury-design-a .fury-seasonal-options-heading h4 { margin:0;font-size:13px;font-weight:600; }
+#fury-design-a #seasonal-preview { border:0;background:none;padding:3px;color:var(--fury-muted);font-size:11px; }
+#fury-design-a .fury-seasonal-effect-list { display:flex;flex-wrap:wrap;gap:12px 24px;padding:16px 0; }
+#fury-design-a .fury-seasonal-effect-list label { display:flex;align-items:center;gap:9px;font-size:12px;cursor:pointer; }
+#fury-design-a .fury-seasonal-effect-list input { appearance:none;position:relative;width:15px;height:15px;flex:none;border:1px solid color-mix(in srgb,var(--fury-text) 25%,transparent);border-radius:4px;margin:0;background:transparent;cursor:pointer; }
+#fury-design-a .fury-seasonal-effect-list input:checked { border-color:var(--fury-gold);background:var(--fury-gold); }
+#fury-design-a .fury-seasonal-effect-list input:checked::after { content:'';position:absolute;left:4px;top:1px;width:4px;height:8px;border:solid var(--fury-selection-ink,#1b1606);border-width:0 1.5px 1.5px 0;transform:rotate(45deg); }
+#fury-design-a .fury-seasonal-effect-list input:focus-visible { outline:2px solid var(--fury-gold);outline-offset:3px; }
+#fury-design-a .fury-seasonal-note { margin:14px 2px 0;color:var(--fury-muted);font-size:11px;line-height:1.5; }
+.fury-seasonal-dialog { width:min(760px,calc(100vw - 40px));max-height:calc(100vh - 40px);padding:0;border:1px solid var(--fury-border);border-radius:17px;background:var(--fury-panel);color:var(--fury-text);overflow:auto; }
+.fury-seasonal-dialog:not([open]) { display:none!important; }
+.fury-seasonal-dialog::backdrop { background:#000b; }
+.fury-seasonal-dialog>img { display:block;width:100%;aspect-ratio:3/1;object-fit:cover; }
+.fury-seasonal-dialog-copy { padding:22px; }
+.fury-seasonal-dialog-copy h2 { margin:0;font-size:20px; }
+.fury-seasonal-dialog-copy p { color:var(--fury-muted);font-size:13px;line-height:1.6; }
+.fury-seasonal-dialog-actions { display:flex;justify-content:end;gap:8px;margin-top:20px; }
+.fury-seasonal-dialog-actions button { min-height:36px;padding:8px 14px;border:1px solid var(--fury-border);border-radius:9px;background:var(--fury-inset);color:var(--fury-text); }
+.fury-seasonal-dialog-actions .primary { background:var(--fury-gold);color:var(--fury-selection-ink,#1b1606); }
+
+/* All decorations are clipped to the launcher and never intercept input. */
+.fury-seasonal-layer { position:fixed;inset:0;z-index:40;overflow:hidden;pointer-events:none!important;contain:strict; }
+.fury-seasonal-layer * { pointer-events:none!important; }
+.fury-seasonal-layer[hidden] { display:none!important; }
+.fury-seasonal-canvas { position:absolute;inset:0;width:100%;height:100%; }
+.fury-seasonal-bank { position:absolute;left:0;right:0;bottom:0;width:100%;height:64px;fill:#d7e8ef;opacity:.95; }
+.fury-seasonal-bank .back { fill:#b6ccd7; }
+.fury-seasonal-lights { position:absolute;left:calc(var(--fury-rail,272px) + 12px);right:20px;top:12px;display:flex;justify-content:space-around;height:10px; }
+.fury-seasonal-lights::before { content:'';position:absolute;top:-2px;left:0;right:0;height:4px;border-bottom:1px solid #46725a80;border-radius:0 0 50% 50%; }
+.fury-seasonal-lights i { width:4px;height:6px;flex:none;border-radius:1px 1px 3px 3px;background:var(--bulb);box-shadow:0 1px 8px color-mix(in srgb,var(--bulb) 35%,transparent); }
+html[data-seasonal-motion="running"][data-seasonal-lights="true"] .fury-seasonal-lights { animation:fury-seasonal-lights 4.5s ease-in-out infinite alternate; }
+@keyframes fury-seasonal-lights { to { opacity:.65; } }
+html[data-seasonal-edges="false"] .fury-seasonal-bank,html[data-seasonal-lights="false"] .fury-seasonal-lights { display:none; }
+html:root.fury-redesign.fury-design-a.fury-settings-roomy[data-seasonal-theme="christmas"][data-seasonal-edges="true"] .layout { height:calc(100vh - 54px)!important; }
+html[data-seasonal-theme="christmas"][data-seasonal-edges="true"] :is(.da-server-strip,.da-recent,.ds-reminder-summary) { position:relative; }
+html[data-seasonal-theme="christmas"][data-seasonal-edges="true"] :is(.da-server-strip,.da-recent,.ds-reminder-summary)::before { content:'';position:absolute;top:-4px;left:22px;width:100px;height:8px;border-radius:80% 50% 65% 35%;background:#d7e8ef;pointer-events:none; }
+html[data-seasonal-theme="christmas"][data-seasonal-edges="true"] .da-recent::before { left:auto;right:22px;width:75px; }
+html[data-seasonal-theme="christmas"][data-seasonal-edges="true"] .ds-reminder-summary::before { width:65px; }
+html[data-seasonal-theme="christmas"][data-seasonal-edges="true"] .da-recent::after { content:'';position:absolute;right:0;bottom:0;width:80px;height:55px;border-bottom-right-radius:20px;background:radial-gradient(ellipse at bottom right,#c4e6f11f,transparent 75%);pointer-events:none; }
+html:is([data-theme="light"],[data-theme="frost"]) .fury-seasonal-bank { fill:#c5d9e4; }
+html:is([data-theme="light"],[data-theme="frost"]) .fury-seasonal-bank .back { fill:#afc6d5; }
+@media(max-width:1100px) { #fury-design-a .fury-seasonal-effect-list { gap:14px 20px; } }
+@media(prefers-reduced-motion:reduce) { .fury-seasonal-lights,.fury-seasonal-preview-snow i { animation:none!important; } }

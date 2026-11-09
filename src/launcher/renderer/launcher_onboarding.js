@@ -13,7 +13,7 @@ function mount({document,node,button,invoke,clipboard,navigate,getState,refresh,
         const connected=state?.proxyHealth?.connectedAccount;
         if(state?.proxyHealth?.connectionReady&&connected&&account?.name?.toLowerCase()===connected.toLowerCase()) {localStorage.setItem('fury-onboarded:'+key(),'yes');forceReady=false;}
         if(!pending){phase=error?'error':missing?'welcome':forceReady||(!completed&&!state?.sessionHistory?.sessions?.length)?'ready':'hidden';}
-        panel.hidden=phase==='hidden';grid.classList.toggle('fury-onboarding-active',!panel.hidden);
+        panel.hidden=phase==='hidden';panel.dataset.phase=phase;grid.classList.toggle('fury-onboarding-active',!panel.hidden);
         if(panel.hidden)return;
         const nextSignature=JSON.stringify([phase,code,url,error,connectionError,key(),account?.name,state?.settings?.server?.proxyDirectPort]);
         if(nextSignature===signature)return;signature=nextSignature;

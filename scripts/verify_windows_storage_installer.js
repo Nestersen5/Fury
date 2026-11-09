@@ -36,7 +36,7 @@ delete env.FURY_DATA_DIR;
 function execute(executable, args, timeout = 600000) {
     // NSIS /D= and _?= must be last and unquoted, even with spaces. These
     // arguments contain only script-owned mkdtemp paths, never user input.
-    const result = spawnSync(executable, args, { env, windowsHide: true, windowsVerbatimArguments: true,
+    const result = spawnSync(executable, args, { env, windowsHide: true, windowsVerbatimArguments: executable !== process.execPath,
         encoding: 'utf8', timeout, maxBuffer: 4 * 1024 * 1024 });
     if (result.error || result.status !== 0) throw Error(`Verification process failed (${result.status ?? result.error?.code}): ${path.basename(executable)}`);
     return result;
@@ -60,6 +60,14 @@ if (fs.existsSync(roaming)) fs.rmSync(roaming, { recursive: true, force: true })
 if (fs.existsSync(timeline)) fs.unlinkSync(timeline);
 fs.mkdirSync(roaming);
 fs.cpSync(prepackaged, fixtureApp, { recursive: true });
+const archive = path.join(fixtureApp, 'resources/app.asar');
+if (fs.existsSync(archive)) {
+    require('@electron/asar').extractAll(archive, fixtureSource);
+    fs.unlinkSync(archive);
+    const unpacked = archive + '.unpacked';
+    assert(path.resolve(unpacked).startsWith(sandbox + path.sep));
+    fs.rmSync(unpacked, { recursive: true, force: true });
+}
 // Refresh the implementation under test; the prepackaged runtime supplies the
 // existing production dependencies without dependency installation/rebuilding.
 for (const file of fs.readdirSync(path.join(repository, 'src/storage'))) {
@@ -91,7 +99,12 @@ else {
 const legacyInclude = path.join(sandbox, 'legacy-instrumentation.nsh');
 // The only legacy customization records entry into the old uninstaller. Its
 // actual remove-files implementation remains the locked builder's template.
-fs.writeFileSync(legacyInclude, `!macro customUnInstall
+fs.writeFileSync(legacyInclude, `!ifndef BUILD_UNINSTALLER
+!macro customCheckAppRunning
+ ; Only the fixture controller owns process cleanup; never kill by app name.
+!macroend
+!endif
+!macro customUnInstall
  FileOpen $0 "${timeline}" w
  FileWrite $0 "OLD_UNINSTALL_ENTERED$\\r$\\n"
  IfFileExists "${canonical}\\session_data.json" 0 +2
@@ -101,11 +114,29 @@ fs.writeFileSync(legacyInclude, `!macro customUnInstall
 `);
 const pkg = require('../package.json');
 function build(which, include) {
+    // The old fixture intentionally models legacy loose-file storage. The new
+    // fixture exercises the current Windows archive and external guard script.
+    if (which !== 'legacy' && pkg.build.win.asar) {
+        const authoring = path.join(sandbox, 'archive-source');
+        if (fs.existsSync(authoring)) {
+            assert.strictEqual(path.dirname(authoring), sandbox);
+            assert(!fs.lstatSync(authoring).isSymbolicLink());
+            fs.rmSync(authoring, { recursive: true });
+        }
+        fs.renameSync(fixtureSource, authoring);
+        execute(process.execPath, [path.join(path.dirname(require.resolve('@electron/asar/package.json')), 'bin/asar.js'),
+            'pack', authoring, archive, '--unpack', '**/windowsMigrationGuard.ps1']);
+    }
     const output = path.join(sandbox, which);
     const guardedInclude = path.join(sandbox, which + '-guarded.nsh');
     // Independently fail closed if a fixture ever resolves an unexpected install
     // directory. This is test containment, not part of the production hook.
-    fs.writeFileSync(guardedInclude, `!include "${include}"
+    fs.writeFileSync(guardedInclude, `!ifdef BUILD_UNINSTALLER
+!macro customCheckAppRunning
+ ; Never stop another Fury copy from a verification-only uninstaller.
+!macroend
+!endif
+!include "${include}"
 !macro customInit
  StrCpy $0 "$INSTDIR" ${sandbox.length}
  StrCmp $0 "${sandbox}" +3

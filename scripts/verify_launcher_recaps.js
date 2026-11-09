@@ -66,10 +66,14 @@ module.exports = async function verify({ page, output, profile }) {
             if (font.widths[code] + 1 !== chatCharWidth(String.fromCharCode(code))) mismatches.push(code);
         }
         const canvas = document.querySelector('#session-recap-preview canvas');
+        const box = canvas.getBoundingClientRect();
         return { width: canvas.width, height: canvas.height, mismatches,
-            cssWidth: canvas.getBoundingClientRect().width, smoothing: canvas.getContext('2d').imageSmoothingEnabled };
+            fits: box.width > 0 && box.width <= 720 + 1 && box.width <= canvas.parentElement.clientWidth + 1,
+            proportional: Math.abs(box.height / box.width - canvas.height / canvas.width) < .01,
+            pixelated: getComputedStyle(canvas).imageRendering === 'pixelated',
+            smoothing: canvas.getContext('2d').imageSmoothingEnabled };
     });
-    assert.deepEqual(geometry, { width: 648, height: 116, mismatches: [], cssWidth: 648, smoothing: false });
+    assert.deepEqual(geometry, { width: 648, height: 116, mismatches: [], fits: true, proportional: true, pixelated: true, smoothing: false });
     await capture('recap-session-and-goal');
 
     const toggle = async value => {
@@ -149,9 +153,12 @@ module.exports = async function verify({ page, output, profile }) {
     await page.setViewport({ width: 1100, height: 760, deviceScaleFactor: 1 });
     assert(await page.$eval('#session-recap-preview', el => {
         const canvas = el.querySelector('canvas');
-        return canvas.width === canvas.getBoundingClientRect().width
-            && ['auto', 'scroll'].includes(getComputedStyle(el).overflowX);
-    }), 'Narrow layouts scroll the exact pixel preview instead of stretching glyphs');
+        const box = canvas.getBoundingClientRect();
+        return canvas.width === 648 && box.width > 0 && box.width <= 720 + 1
+            && box.width <= el.clientWidth + 1 && el.scrollWidth <= el.clientWidth + 1
+            && Math.abs(box.height / box.width - canvas.height / canvas.width) < .01
+            && getComputedStyle(canvas).imageRendering === 'pixelated';
+    }), 'Narrow layouts fit the enlarged preview at its correct proportions');
     await capture('recap-minimum-width');
     await page.focus('#session-average-game-time');
     await page.keyboard.press('Space');

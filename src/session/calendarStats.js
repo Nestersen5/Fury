@@ -39,20 +39,23 @@ function nextMidnight(at, zone) {
     while (hi-lo>1) { const mid=Math.floor((lo+hi)/2); if(dayAt(mid,zone)===day)lo=mid;else hi=mid; }
     return hi;
 }
-function addMode(target, source, includeSubmodes = true) {
+function addMode(target, source, includeSubmodes = true, located = source.local === true) {
     let out=target.get(source.mode);
-    if(!out) { out={mode:source.mode,label:source.label,values:{},missing:new Set(),breakdown:new Map(),breakdownMissing:false,local:true,submodes:new Map(),submodeMissing:false};target.set(source.mode,out); }
+    if(!out) { out={mode:source.mode,label:source.label,values:{},locatedValues:{},missing:new Set(),breakdown:new Map(),breakdownMissing:false,local:true,submodes:new Map(),submodeMissing:false};target.set(source.mode,out); }
     out.local &&= source.local === true;
     if(Number.isFinite(source.localStreakAt)&&(!Number.isFinite(out.localStreakAt)||source.localStreakAt>=out.localStreakAt)){
         out.localStreakAt=source.localStreakAt;out.localStreak=source.localStreak;
     }
     for(const key of FIELDS) {
-        if(Number.isFinite(source[key]))out.values[key]=(out.values[key]||0)+source[key];
+        if(Number.isFinite(source[key])) {
+            out.values[key]=(out.values[key]||0)+source[key];
+            if(located)out.locatedValues[key]=(out.locatedValues[key]||0)+source[key];
+        }
         else out.missing.add(key);
     }
     if(includeSubmodes) {
         if(!source.submodes?.length && source.games !== 0) out.submodeMissing=true;
-        for(const sub of source.submodes||[]) addMode(out.submodes,{...sub,mode:sub.id},false);
+        for(const sub of source.submodes||[]) addMode(out.submodes,{...sub,mode:sub.id},false,located);
     }
     const breakdown=source.breakdown;
     if(!breakdown || ['partial','unavailable'].includes(breakdown.status))out.breakdownMissing=true;
@@ -63,7 +66,12 @@ function addMode(target, source, includeSubmodes = true) {
     }
 }
 function finishMode(out) {
-    const mode={mode:out.mode,label:out.label,...Object.fromEntries(Object.entries(out.values).filter(([key])=>!out.missing.has(key)))};
+    // Missing session-only gains have no day, but already located observations
+    // still do. Keep those counts without spreading the residual across days.
+    const mode={mode:out.mode,label:out.label,...Object.fromEntries(FIELDS.flatMap(key=>{
+        const value=out.missing.has(key)?out.locatedValues[key]:out.values[key];
+        return Number.isFinite(value)?[[key,value]]:[];
+    }))};
     if(out.local)mode.local=true;
     if(out.local&&Number.isFinite(out.localStreakAt)){mode.localStreakAt=out.localStreakAt;if(Number.isFinite(out.localStreak))mode.localStreak=out.localStreak;}
     for(const [key,a,b] of [['wlr','wins','losses'],['fkdr','finals','finalDeaths'],['kdr','kills','deaths'],['bblr','beds','bedsLost']]) {
@@ -95,7 +103,7 @@ function aggregate(sessions, kind, zone, now) {
         }
         const firstBucket=get(first,session);touched.add(firstBucket);
         if(periodStart(first,kind)===periodStart(last,kind)) {
-            for(const mode of session.modes||[])addMode(firstBucket.modes,mode);
+            for(const mode of session.modes||[])addMode(firstBucket.modes,mode,true,true);
             firstBucket.partial ||= (session.modes||[]).some(m=>m.local&&m.unavailable?.length);
             continue;
         }
@@ -110,7 +118,10 @@ function aggregate(sessions, kind, zone, now) {
             if(seen.has(game.id))continue;seen.add(game.id);
             const bucket=get(dayAt(game.at,zone),session);touched.add(bucket);
             if(!game.stats){bucket.partial=true;continue;}
-            addMode(allocation(bucket),game.stats);addMode(sums,game.stats);
+            const located=['local','events'].includes(game.statsSource) || game.stats.local===true
+                || (game.statsSource==='api' && game.verificationStatus==='verified'
+                    && game.stats.games<=1 && game.stats.wins+game.stats.losses===1);
+            addMode(allocation(bucket),game.stats,true,located);addMode(sums,game.stats,true,located);
             if(['pending','unverified'].includes(game.verificationStatus)||game.statsSource==='events'||game.stats?.unavailable?.length)bucket.partial=true;
         }
         // A retained match list can be incomplete. Do not spread its residual
@@ -137,7 +148,7 @@ function aggregate(sessions, kind, zone, now) {
                 }
             }
         }
-        for(const [bucket,modes]of allocations)for(const value of modes.values())addMode(bucket.modes,finishMode(value));
+        for(const [bucket,modes]of allocations)for(const value of modes.values())addMode(bucket.modes,finishMode(value),true,true);
     }
     return [...buckets.values()].map(bucket=>{
         const intervals=bucket.intervals.sort((a,b)=>a[0]-b[0]);let durationMs=0,end=0;

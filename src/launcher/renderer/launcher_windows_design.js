@@ -45,12 +45,12 @@ function mount({ document, clipboard }) {
                 <p class="join-destination">Connects to <span id="server-preview-failover-host">${SERVER_DEFAULTS.proxyFailoverHost}</span></p>
             </div>
             <div class="join-route" data-join-route="custom" hidden>
-                <label for="join-custom-address">Custom server</label>
+                <label for="join-custom-address">Proxy</label>
                 <p id="join-custom-help">Use the third connection configured in Connection settings.</p>
                 <div class="join-address-field">
                     <input id="join-custom-address" type="text" readonly spellcheck="false"
                         aria-describedby="join-custom-help" value="" placeholder="Loading address&hellip;">
-                    <button type="button" data-copy-route="custom" aria-label="Copy custom server address" disabled>Copy</button>
+                    <button type="button" data-copy-route="custom" aria-label="Copy proxy address" disabled>Copy</button>
                 </div>
                 <p class="join-destination">Connects to <span id="server-preview-custom-host">${SERVER_DEFAULTS.proxyCustomHost}</span></p>
             </div>
@@ -80,7 +80,7 @@ function mount({ document, clipboard }) {
                 clipboard.writeText(input.value);
                 button.textContent = 'Copied';
                 button.classList.add('is-copied');
-                status.textContent = `${name === 'direct' ? 'Direct' : name === 'failover' ? 'Proxy' : 'Custom server'} address copied.`;
+                status.textContent = `${name === 'direct' ? 'Direct' : 'Proxy'} address copied.`;
                 feedbackTimer = setTimeout(resetFeedback, 1800);
             } catch {
                 input.focus();

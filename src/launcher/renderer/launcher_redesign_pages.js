@@ -2,7 +2,7 @@
 
 // Move the existing functional controls into the approved page compositions.
 // Their IDs and event handlers continue to own validation and persistence.
-function mount({ document, node, button, getState, openManager, validateNetwork, clipboard, notify }) {
+function mount({ document, node, button, getState, openManager }) {
     const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
     const reminders=$('[data-page="reminders"]');
     const account=node('div','fury-reminder-account','<span class="fury-reminder-selected"></span>');
@@ -88,66 +88,42 @@ function mount({ document, node, button, getState, openManager, validateNetwork,
     overlay.querySelectorAll(':scope > .settings-subgroup').forEach(el=>el.classList.add('fury-removed'));
     const sources=$('.chat-stats-source-list'),sourcePanel=panel('Show stats for','Choose which lobby events trigger player stats.');sourcePanel.classList.add('fury-chat-sources');sourcePanel.append(sources);chatModule.append(sourcePanel);
 
-    const network=$('[data-settings-subpage="network"]'),route=$('.network-studio'),endpoints=$('.network-endpoints-module');
-    // Keep the monitor input in the hidden original form for internal use.
+    const network=$('[data-settings-subpage="network"]');
+    // The original endpoint form, including the monitor port, stays hidden for internal use.
     network.querySelectorAll(':scope >.settings-subgroup').forEach(el=>el.classList.add('fury-removed'));
-    const connections=node('div','fury-connections'),addressUpdates=[];network.append(connections);
-    const renderNetworkAddresses=()=>addressUpdates.forEach(update=>update());
-    for(const [key,title] of [['direct','MAIN CONNECTION'],['failover','PROXY CONNECTION'],['custom','CUSTOM SERVER']]){
+    const connections=node('div','fury-connections'),connectionList=node('div','fury-connection-list');
+    // Column captions are visual only; every input carries its own accessible name.
+    const captions=node('div','fury-connection-columns','<span>Connection</span><span>Port</span><span>Game server</span>');captions.setAttribute('aria-hidden','true');
+    connectionList.append(captions);connections.append(connectionList);network.append(connections);
+    // Both alternate routes are shown as proxies; the second keeps a distinct accessible name.
+    for(const [key,title,spoken=title] of [['direct','Direct'],['failover','Proxy'],['custom','Proxy','Second proxy']]){
         const old=$(`[data-network-status="${key}"]`).closest('.network-endpoint-card');
-        const card=node('details','fury-connection-card settings-search-item');card.open=true;
-        const header=node('summary','fury-connection-heading');
+        const row=node('div','fury-connection-row settings-search-item'),name=node('div','fury-connection-name');row.dataset.connection=key;
         const icon=old.querySelector('.network-endpoint-head >span');icon.setAttribute('aria-hidden','true');
+        if(key==='custom')icon.innerHTML=connectionList.querySelector('[data-connection="failover"] >span').innerHTML;
         const status=old.querySelector('[data-network-status]');status.setAttribute('aria-live','polite');
-        header.append(icon,node('h3','',title),status,node('span','fury-connection-chevron','⌃'));
-        const body=node('div','fury-connection-body'),fields=node('div','fury-connection-fields');
-        for(const [suffix,caption] of [['port','Port number'],['host','Game server']]){
-            const input=$(`#proxy-${key}-${suffix}`),label=node('label','');
-            input.dataset.plainNumber='true';input.setAttribute('aria-label',`${title.toLowerCase()} ${caption.toLowerCase()}`);
-            label.append(node('span','',caption),input);fields.append(label);
-        }
-        const check=button('Check settings',validateNetwork,'primary');check.setAttribute('aria-label',`Check ${title.toLowerCase()} settings`);fields.append(check);
-        const addressRow=node('div','fury-connection-address-row'),address=node('p','fury-connection-address');
-        const portInput=fields.querySelector('input');
-        let currentAddress='',feedbackTimer;
-        const resetFeedback=()=>{clearTimeout(feedbackTimer);copy.textContent='Copy';copy.classList.remove('is-copied');};
-        const syncAddress=()=>{
-            const port=Number(portInput.value);
-            const next=portInput.validity.valid&&Number.isInteger(port)&&port>0&&port<=65535?`localhost:${port}`:'';
-            if(next!==currentAddress){currentAddress=next;resetFeedback();}
-            const text=next?`Minecraft address: ${next}`:portInput.value?'Enter a valid local port to copy this address.':'Add a local port to enable this connection.';
-            if(address.textContent!==text)address.textContent=text;
-            copy.disabled=!next;
-        };
-        const copy=button('Copy',()=>{
-            syncAddress();if(!currentAddress)return;
-            resetFeedback();
-            try{
-                clipboard.writeText(currentAddress);
-                copy.textContent='Copied';copy.classList.add('is-copied');
-                notify(`Minecraft address copied: ${currentAddress}`);
-                feedbackTimer=setTimeout(resetFeedback,1800);
-            }catch{notify('Could not copy the Minecraft address. Try again.');}
-        });
-        copy.dataset.copyConnection=key;copy.setAttribute('aria-label',`Copy ${title.toLowerCase()} Minecraft address`);
-        document.defaultView.addEventListener('pagehide',resetFeedback,{once:true});
-        addressUpdates.push(syncAddress);addressRow.append(address,copy);
+        // Validation keeps ownership of these messages; a visible problem replaces the short status.
         const detail=old.querySelector('[data-network-detail]'),hostDetail=$(`[data-network-host-status="${key}"]`);
         for(const message of [detail,hostDetail]){message.hidden=true;message.setAttribute('role','status');}
-        body.append(fields,addressRow,detail,hostDetail);card.append(header,body);connections.append(card);syncAddress();
+        name.append(node('h3','',title),status,detail,hostDetail);row.append(icon,name);
+        for(const [suffix,caption] of [['port','port'],['host','game server']]){
+            const input=$(`#proxy-${key}-${suffix}`);
+            input.dataset.plainNumber='true';input.setAttribute('aria-label',`${spoken} ${caption}`);row.append(input);
+        }
+        connectionList.append(row);
     }
-    const networkFooter=node('div','fury-connection-footer');
+    const networkFooter=node('div','fury-connection-footer'),notes=node('div','fury-connection-notes');
     const actions=node('div','fury-connection-actions');
-    $('#network-copy-config').textContent='Copy settings';$('#network-safe-defaults').textContent='Reset to defaults';
+    $('#network-safe-defaults').textContent='Reset to defaults';
     $('#save-settings').hidden=true;
     const restart=button('Restart proxy',async()=>{
         restart.disabled=true;
         document.dispatchEvent(new CustomEvent('settings-restart-request'));
     },'primary');restart.id='connection-restart';restart.hidden=true;
-    actions.append($('#network-copy-config'),$('#network-safe-defaults'),restart);
+    actions.append($('#network-safe-defaults'),restart);
     const saveNote=node('span','','Connection changes save automatically.');saveNote.id='connection-save-status';saveNote.setAttribute('role','status');
-    networkFooter.append(saveNote,actions);connections.append(networkFooter);
-    const summary=$('#network-validation-summary');summary.hidden=true;summary.setAttribute('role','status');connections.append(summary);
+    const summary=$('#network-validation-summary');summary.hidden=true;summary.setAttribute('role','status');
+    notes.append(saveNote,summary);networkFooter.append(notes,actions);connections.append(networkFooter);
     const category=$('[data-settings-category="network"] strong')||$('[data-settings-subpage-button="network"] strong');if(category)category.textContent='Connection settings';
 
 
@@ -176,9 +152,8 @@ function mount({ document, node, button, getState, openManager, validateNetwork,
     for(const [id,text] of [['show-denicked-real-ign','Visible to you'],['denick-party-announce-enabled','Visible to party']]) {
         const badge=document.getElementById(id)?.closest('.denick-output-card')?.querySelector('.denick-card-kicker');if(badge){badge.classList.add('fury-visibility');badge.textContent=text;}
     }
-    return { renderNetworkAddresses, update(state) {
+    return { update(state) {
         document.dispatchEvent(new CustomEvent('settings-status-refresh'));
-        renderNetworkAddresses();
         updateCardPreview(state);
         const selected=state.viewedAccount;account.querySelector('.fury-reminder-selected').textContent=selected?`Status for ${selected.name}`:'Choose an account';
         const dust=state.reminders?.enderDust,amount=Number(dust?.enderDust);$('#fury-dust-progress').style.width=`${dust?.enderDust==null?0:Math.min(100,amount/300*100)}%`;

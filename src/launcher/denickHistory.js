@@ -1,6 +1,7 @@
 'use strict';
 const { randomUUID } = require('crypto');
 const { JsonFileCache } = require('../storage/json_file_cache');
+const { realAccountUuid } = require('../denick/identity');
 
 function uniquePushCaseInsensitive(items, value) {
     const clean = String(value || '').trim();
@@ -49,7 +50,8 @@ function normalizeDenickHistory(raw) {
     rows.forEach((item) => {
         const realIGN = String(item.realIGN || item.realName || '').trim();
         if (!realIGN) return;
-        const key = realIGN.toLowerCase();
+        const realUuid = realAccountUuid(item.realUuid);
+        const key = realUuid || realIGN.toLowerCase();
         const current = byRealName.get(key) || {
             realIGN,
             nicks: [],
@@ -58,6 +60,8 @@ function normalizeDenickHistory(raw) {
             lastSeen: item.lastSeen || item.at || '',
             events: []
         };
+        if (realUuid) { current.realUuid = realUuid; current.realIGN = realIGN; }
+        if (item.identityState) current.identityState = realUuid ? 'verified' : item.identityState;
 
         const nicks = Array.isArray(item.nicks) ? item.nicks : (item.nick ? [item.nick] : []);
         nicks.forEach(nick => uniquePushCaseInsensitive(current.nicks, nick));
@@ -95,7 +99,7 @@ function normalizeDenickHistory(raw) {
 }
 
 function projectDenickHistory(raw, fileExists = true) {
-    const players = normalizeDenickHistory(raw);
+    const players = normalizeDenickHistory(raw).filter(player => player.identityState !== 'missing');
     const methods = {};
     let totalNicks = 0;
     let totalEvents = 0;

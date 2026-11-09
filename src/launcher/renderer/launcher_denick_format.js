@@ -7,7 +7,11 @@ const palette = Object.fromEntries(MINECRAFT_LEGACY_PALETTE.map(color => [color.
 const escape = value => String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 function legacyHtml(value) {
-    return legacyTextToSegments(value).map(segment => {
+    return segmentsHtml(legacyTextToSegments(value));
+}
+
+function segmentsHtml(segments) {
+    return segments.map(segment => {
         const style = [palette[segment.color] ? `color:${palette[segment.color]}` : '', segment.bold ? 'font-weight:700' : ''].filter(Boolean).join(';');
         return `<span${style ? ` style="${style}"` : ''}>${escape(segment.text)}</span>`;
     }).join('');
@@ -26,4 +30,4 @@ function statValue(key, value, ratio) {
     return legacyHtml(`${prefix}${ratio ? value.toFixed(2) : value.toLocaleString()}`);
 }
 
-module.exports = { identity, statValue, legacyHtml };
+module.exports = { identity, statValue, legacyHtml, segmentsHtml };

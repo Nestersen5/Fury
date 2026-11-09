@@ -62,7 +62,8 @@ function run({ app, dialog, projectRoot, argv = process.argv }) {
         // shell interpolation and no PowerShell profile scripts are involved.
         const powershell = path.join(process.env.SystemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
         const result = spawnSync(powershell, ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
-            '-File', path.join(__dirname, 'windowsMigrationGuard.ps1'), '-RequestFile', requestFile],
+            '-File', path.join(projectRoot.endsWith('app.asar') ? projectRoot + '.unpacked' : projectRoot,
+                'src', 'storage', 'windowsMigrationGuard.ps1'), '-RequestFile', requestFile],
         { windowsHide: true, encoding: 'utf8', timeout: 31 * 60 * 1000 });
         if (result.error || result.status !== 0) {
             const code = /^[A-Z_]{3,50}$/.test(result.stderr || '') ? result.stderr : 'MIGRATION_ACCESS_OR_SAFETY_FAILURE';

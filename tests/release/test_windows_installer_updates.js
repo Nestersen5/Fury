@@ -140,3 +140,33 @@ test('real cached file verification rejects changed and truncated installers', a
         fs.writeFileSync(file, 'short'); await assert.rejects(verifyInstaller(file, metadata));
     } finally { fs.rmSync(directory, { recursive: true, force: true }); }
 });
+
+test('installer handoff is not reported as successful when shutdown never invokes it', async () => {
+    const f = fixture({ requestInstall: async () => ({ clean: false, outcome: 'FORCED' }) });
+    await f.service.download();
+    assert.equal(await f.service.install(), false);
+    assert.equal((await f.service.getState()).status, 'ready');
+});
+
+test('update intent is durable before handoff and detects a version that did not change', async () => {
+    const { createUpdateAttempt } = require('../../src/updates/windowsUpdateAttempt');
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'fury-update-attempt-'));
+    try {
+        const file = path.join(directory, 'attempt.json'), attempt = createUpdateAttempt(file);
+        assert.equal(await attempt.pending('1.1.3'), false);
+        const f = fixture({ attempt, requestInstall: async handoff => {
+            assert.equal(await attempt.pending('1.1.3'), true); handoff();
+        } });
+        await f.service.download(); assert.equal(await f.service.install(), true);
+        const retry = fixture({ attempt });
+        assert((await retry.service.getState()).message.includes('previous update did not finish'));
+        assert.equal(await attempt.pending(version), false); assert(!fs.existsSync(file));
+        await attempt.begin('1.1.3', version);
+        assert.equal(await attempt.pending('3.0.0'), false);
+        fs.writeFileSync(file, '{broken'); assert.equal(await attempt.pending(version), false);
+        await assert.rejects(attempt.begin(version, '1.1.3'));
+        const blocked = fixture({ attempt, requestInstall: async () => ({ clean: false }) });
+        await blocked.service.download(); assert.equal(await blocked.service.install(), false);
+        assert(!fs.existsSync(file), 'A handoff that never ran leaves no pending intent');
+    } finally { fs.rmSync(directory, { recursive: true, force: true }); }
+});

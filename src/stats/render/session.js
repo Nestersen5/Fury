@@ -378,7 +378,6 @@ function createSessionRender({ helpers, deps } = {}) {
             sendChat(client, `§6§l${GAME_LABELS[game] || game}`);
             if (rows.length) sendSessionRows(client, rows);
             else sendChat(client, '§7No observed counters for this mode.');
-            if (incomplete) sendChat(client, '§8Incomplete coverage — uncertain stats hidden.');
         });
 
         sendChat(client, `${wideLine}\n`);
@@ -644,7 +643,7 @@ function createSessionRender({ helpers, deps } = {}) {
     // the most movement, with its W/L and headline ratio.
     function historyHeadline(delta) {
         if (!delta) return null;
-        if (delta.local) return '§eLocal tracking §8· §7verified counters only';
+        if (delta.local) return '§eLocal tracking';
         const game = GAME_BLOCKS
             .map(([name]) => name)
             .filter(name => hasMovement(delta.stats?.[name]))

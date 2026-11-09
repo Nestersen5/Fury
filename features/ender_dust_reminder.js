@@ -5,6 +5,10 @@ const DEFAULT_ENDER_DUST_THRESHOLD = 250;
 const DEFAULT_REMINDER_COOLDOWN_MS = 2 * 60 * 60 * 1000;
 const DEFAULT_REMINDER_POLL_INTERVAL_MS = 15 * 60 * 1000;
 
+function enderDustReminderMessage(amount, capacity = MINION_ENDER_DUST_CAPACITY) {
+    return `§b§lFury Reminder §8» §dSlumber Minion has §f${amount}§d/§f${capacity} §dEnder Dust. §aCollect it soon!`;
+}
+
 function numberOrNull(value) {
     if (value === null || value === undefined || value === '') return null;
     const number = Number(value);
@@ -138,7 +142,7 @@ function createEnderDustReminder(options = {}) {
         if (alertDue) {
             lastAlertAt = now();
             status.lastAlertAt = lastAlertAt;
-            sendChat(`§b§lFury Reminder §8» §dSlumber Minion has §f${amount}§d/§f${status.capacity} §dEnder Dust. §aCollect it soon!`);
+            sendChat(enderDustReminderMessage(amount, status.capacity));
         } else if (manual) {
             sendChat(`§b§lFury Reminder §8» §7Slumber Minion: §f${amount}§7/§f${status.capacity} §7Ender Dust. §eReminder is already active.`);
         }
@@ -301,6 +305,7 @@ module.exports = {
     DEFAULT_ENDER_DUST_THRESHOLD,
     DEFAULT_REMINDER_COOLDOWN_MS,
     DEFAULT_REMINDER_POLL_INTERVAL_MS,
+    enderDustReminderMessage,
     extractEnderDustMinion,
     createEnderDustReminder
 };

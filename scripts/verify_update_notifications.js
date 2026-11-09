@@ -83,6 +83,10 @@ const cp=require('child_process'),spawn=cp.spawn;cp.spawn=(...args)=>{const chil
 app.whenReady().then(()=>session.defaultSession.on('will-download',event=>{status.downloads++;event.preventDefault();}));
 const updates=require(${JSON.stringify(require.resolve('../src/updates/releaseExperience'))}),create=updates.createReleaseExperience;
 updates.createReleaseExperience=options=>{const service=create(options),check=service.check;service.check=async()=>{status.checks++;const result=await check();status.result=result;status.settled++;return result;};return service;};
+${mode === 'welcome-design' ? `
+let rejectMarker=false;ipcMain.handle('fixture:reject-next-marker',()=>{rejectMarker=true;return true;});
+const baseCreate=updates.createReleaseExperience;updates.createReleaseExperience=options=>{const service=baseCreate(options),seen=service.markSeen;service.markSeen=payload=>{if(rejectMarker&&payload.settings?.length){rejectMarker=false;throw Error('Synthetic marker failure');}return seen(payload);};return service;};
+` : ''}
 ${mode === 'installer' ? `
 const installer=require(${JSON.stringify(require.resolve('../src/updates/windowsInstallerUpdates'))}),createInstaller=installer.createInstallerUpdates;
 let pendingDownload;status.installerDownloads=0;status.installs=0;
@@ -155,15 +159,15 @@ require(${JSON.stringify(path.join(root, 'launcher.js'))});
             assert.equal((await status()).settled, 0, 'Launcher must be ready before the held check finishes');
             held.get('/available').end(JSON.stringify({ schemaVersion: 1, latestVersion: latest, releasePageUrl: pageUrl,
                 summary: 'An optional Fury release. <b>This remains plain text.</b>' }));
-            await page.waitForSelector('.notification-update-action');
+            await page.waitForSelector('.da-update-notice .fury-release-card-head>.fury-release-link');
             assert.equal((await status()).opens.length, 0);
-            assert.equal(await page.$eval('.notification-update-action', e => e.closest('article').getAttribute('role')), 'status');
-            assert.equal(await page.$eval('.notification-update-action', e => e.closest('article').querySelector('.notification-title').textContent), `Fury ${latest} is available.`);
-            assert.equal(await page.$eval('.notification-update-action', e => e.closest('article').querySelector('.notification-detail b')), null);
+            assert.equal(await page.$eval('.da-update-notice', e => e.getAttribute('role')), 'status');
+            assert.equal(await page.$eval('.da-update-notice .fury-release-card-head>strong', e => e.textContent), 'A Fury update is available');
+            assert.equal(await page.$('.da-update-notice b'), null);
             for (const theme of ['graphite', 'light']) {
                 await page.evaluate(theme => { window.NesterTheme.apply(theme, false); window.NesterTheme.applyMotion(true, false); }, theme);
                 await page.setViewport({ width: theme === 'light' ? 1024 : 1440, height: theme === 'light' ? 680 : 900 });
-                await page.focus('.notification-update-action');
+                await page.focus('.da-update-notice .fury-release-card-head>.fury-release-link');
                 await page.screenshot({ path: path.join(output, `update-${theme}.png`) });
             }
             await page.keyboard.press('Enter');
@@ -174,30 +178,32 @@ require(${JSON.stringify(path.join(root, 'launcher.js'))});
             await page.click('.fury-release-dialog .primary');
             await eventually(async () => assert.deepEqual((await status()).opens, [pageUrl]), 'Explicit action opens only fixed destination');
             await page.evaluate(async () => { await Promise.all([ipcRenderer.invoke('updates:check'), ipcRenderer.invoke('updates:check')]); await refresh(); });
-            await page.waitForFunction('!document.querySelector(".notification-update-action")');
+            await page.waitForFunction('!document.querySelector(".da-update-notice")');
             await page.evaluate(() => ipcRenderer.invoke('updates:check'));
-            assert.equal(await page.$('.notification-update-action'), null);
+            assert.equal(await page.$('.da-update-notice'), null);
             // Main retains session ownership even if the renderer reloads.
             await page.reload(); await page.waitForFunction('!!furyDesign && !!state?.settings');
             await eventually(async () => assert((await status()).settled >= 5), 'Reload check completed');
-            assert.equal(await page.$('.notification-update-action'), null);
+            assert.equal(await page.$('.da-update-notice'), null);
+        } else if (mode === 'welcome-design') {
+            await require('./verify_release_discovery')({page,output,profile});
         } else if (mode.startsWith('welcome')) {
-            await page.waitForSelector('.notification-update-action');
-            assert.equal(await page.$eval('.notification-update-action', e => e.closest('article').querySelector('.notification-title').textContent), `Welcome to Fury ${installed}`);
+            await page.waitForSelector('.da-update-notice .fury-release-card-head>.fury-release-link');
+            assert.equal(await page.$eval('.da-update-notice .fury-release-card-head>strong', e => e.textContent), `What’s new in Fury ${installed}`);
             await page.evaluate(() => { document.documentElement.dataset.sidebar = 'collapsed'; });
             assert.equal(await page.$eval('.fury-release-reopen span', el => getComputedStyle(el).display), 'none');
             assert.equal(await page.$eval('.fury-release-reopen svg', el => el.getBoundingClientRect().width), 20);
             await page.screenshot({ path: path.join(output, 'welcome-collapsed.png') });
-            if (mode === 'welcome-dismiss') await page.click('.notification-update-dismiss');
+            if (mode === 'welcome-dismiss') await page.click('.da-update-notice [aria-label="Dismiss update notice"]');
             else {
-                await page.click('.notification-update-action');
+                await page.click('.da-update-notice .fury-release-card-head>.fury-release-link');
                 await page.waitForSelector('.fury-release-dialog[open]');
                 assert.equal(await page.$eval('.fury-release-dialog .primary', el => el.hidden), true);
-                assert.equal(await page.$$eval('.fury-release-content h3', els => els.map(el => el.textContent).join(',')), 'New features,Improvements,Bug fixes');
+                assert.equal(await page.$$eval('.fury-release-content h3', els => els.map(el => el.querySelector('span:not(.fury-change-icon)').textContent).join(',')), 'New features,Improvements,Bug fixes');
                 await page.screenshot({ path: path.join(output, 'welcome-changelog.png') });
                 await page.keyboard.press('Escape');
             }
-            await page.waitForFunction('!document.querySelector(".notification-update-action")');
+            await page.waitForFunction('!document.querySelector(".da-update-notice")');
             const saved = JSON.parse(fs.readFileSync(path.join(profile, 'launcher_data', 'release-notifications.json')));
             assert(saved.seen.includes(installed));
             await page.click('.fury-release-reopen');
@@ -206,7 +212,7 @@ require(${JSON.stringify(path.join(root, 'launcher.js'))});
             assert.deepEqual((await status()).opens, []);
         } else {
             await eventually(async () => assert((await status()).settled >= 1), 'Silent check completion');
-            assert.equal(await page.$('.notification-update-action'), null);
+            assert.equal(await page.$('.da-update-notice'), null);
             assert.deepEqual((await status()).opens, []);
         }
         const final = await status(); assert.equal(final.downloads, 0); assert.equal(final.installedVersion, installed);
@@ -219,6 +225,7 @@ require(${JSON.stringify(path.join(root, 'launcher.js'))});
         page.evaluate(() => ipcRenderer.invoke('window:control', 'close')).catch(() => {});
         await waitForExit(child, 7000);
         assert.equal(child.exitCode, 0, child.output);
+        if (mode === 'welcome-design') assert(JSON.parse(fs.readFileSync(path.join(profile, 'launcher_data', 'release-notifications.json'))).readVersions.includes('1.1.1'), 'Shutdown drains the queued release marker');
         for (const pid of final.pids) assert.throws(() => process.kill(pid, 0));
         results.push({ mode, readyMs: Math.round(readyMs), quitMs: Math.round(performance.now() - quitStart), requests: count, downloads: final.downloads, passed: true });
         passed = true;
@@ -244,7 +251,7 @@ require(${JSON.stringify(path.join(root, 'launcher.js'))});
 (async () => {
     fs.mkdirSync(output, { recursive: true });
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-    for (const mode of process.argv.includes('--installer-only') ? ['installer'] : ['available', 'welcome', 'welcome-dismiss', 'equal', 'malformed', 'timeout', 'dev-disabled', 'installer']) await scenario(mode);
+    for (const mode of process.argv.includes('--design-only') ? ['welcome-design'] : process.argv.includes('--installer-only') ? ['installer'] : ['welcome-design', 'available', 'welcome', 'welcome-dismiss', 'equal', 'malformed', 'timeout', 'dev-disabled', 'installer']) await scenario(mode);
     fs.writeFileSync(path.join(output, 'verification.json'), JSON.stringify({ passed: true, platform: process.platform, architecture: process.arch, packaged: false, results, requests }, null, 2));
     console.log(JSON.stringify({ passed: true, results }, null, 2));
 })().catch(error => { console.error(error); process.exitCode = 1; }).finally(async () => {

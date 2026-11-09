@@ -15,6 +15,7 @@ function checkScoreboardTransitions(proxy) {
     let board = '';
     const context = vm.createContext({
         gameActive: true, currentGamemode: 'BEDWARS', activeMatchServerId: 'mini1A',
+        sessionGameFinalized: false, sessionTracker: { noteServerId() {} },
         gameStartTime: 1000000, activeSessionGameMetadata: { serverId: 'mini1A' },
         bedwarsPregameActive: false, bedwarsPregameLobbyId: null,
         bedwarsPregameLocalQueue: null, bedwarsPregameLocalUnsupported: false,
@@ -117,7 +118,7 @@ const start = { mode: 'BEDWARS', sessionKey: 'mini1:1000000', ownTeam: 'Aqua',
         const apiStore = createSessionStore(storeOptions('api.json'));
         let apiStats = { wins_bedwars: 0, losses_bedwars: 0, games_played_bedwars: 0 };
         const apiTracker = createSessionTracker({ store: apiStore, now: () => stamp,
-            getIdentity: () => owner, isApiAvailable: () => true, gameEndDelayMs: 0,
+            getIdentity: () => owner, isApiAvailable: () => true, gameEndDelayMs: 0, apiSettleMs: 0,
             fetchOwnStats: async () => ({ ...owner, stats: { Bedwars: apiStats } }), ...timers });
         await apiTracker.onGameStart({ mode: 'BEDWARS' });
         stamp += 60000;

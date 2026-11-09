@@ -15,10 +15,11 @@ module.exports = async function ({ page, output }) {
         const values = () => page.$$eval(test.inputs, nodes => nodes.map(node => node.value));
         const verify = async enabled => {
             assert.strictEqual(await page.$eval(test.toggle, input => input.checked), enabled);
-            const groups = await page.$$eval(`[data-stat-threat-threshold="${test.group}"]`, nodes => nodes.map(node => ({ hidden: node.hidden, display: getComputedStyle(node).display })));
+            const groups = await page.$$eval(`[data-stat-threat-threshold="${test.group}"]`, nodes => nodes.map(node => ({ hidden: node.hidden, display: getComputedStyle(node).display, decorative: node.classList.contains('auto-dodge-threshold-or') })));
             assert.strictEqual(groups.length, test.group === 'dodge' ? 3 : 1);
-            assert.ok(groups.every(group => group.hidden === !enabled && (group.display !== 'none') === enabled));
-            assert.strictEqual(await page.$$eval(test.inputs, nodes => nodes.every(node => node.getClientRects().length > 0)), enabled, 'hidden fields are removed from the visible layout');
+            assert.ok(groups.every(group => group.hidden === !enabled && (group.decorative || (group.display !== 'none') === enabled)));
+            const visible = await page.$$eval(test.inputs, nodes => nodes.filter(node => node.getClientRects().length > 0).map(node => node.id));
+            assert.deepStrictEqual(visible, enabled ? (test.group === 'dodge' ? ['auto-dodge-min-fkdr','auto-dodge-min-stars'] : ['min-fkdr','min-stars']) : [], 'only the active game limits occupy the visible layout');
             if (test.group === 'dodge') assert.ok(await page.$eval('#auto-dodge-leave-mode', node => node.closest('.stat-select-shell').getClientRects().length > 0), 'leave timing stays available');
         };
         await open();

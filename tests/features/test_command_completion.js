@@ -122,6 +122,12 @@ assert(PROXY_COMMANDS.includes('/wdr'));
 assert(completer('/wd').includes('/wdr'));
 assert.deepStrictEqual(completer('/wdr sta'), ['status']);
 assert.deepStrictEqual(completer('/wdr Demo'), ['DemoPlayer_']);
+assert.deepStrictEqual(completer('/wdr ReD'), ['red'], 'Team completion ignores case');
+assert.deepStrictEqual(completer('/wdr bl'), ['blue']);
+for (const team of ['red', 'blue', 'green', 'yellow', 'aqua', 'cyan', 'white', 'pink', 'gray', 'grey']) {
+    assert(completer('/wdr ').includes(team), `Report team completion includes ${team}`);
+}
+assert.deepStrictEqual(completer('/wdr red '), [], 'A team ends the command');
 assert.deepStrictEqual(completer('/wdr DemoPlayer_ Ne'), [], 'No second player suggestion');
 assert.deepStrictEqual(completer('/wdr DemoPlayer_ '), [], 'One completed player ends the command');
 assert.strictEqual(completer('/watchdogreport DemoPlayer_ fly'), null, 'Original server command stays server-controlled');
@@ -222,6 +228,9 @@ assert.deepStrictEqual(completer('/chatstats source m'), ['mention']);
 assert.deepStrictEqual(completer('/chatstats source mention '), ['on', 'off']);
 assert.deepStrictEqual(completer('/chatstats only d'), ['dm']);
 assert.deepStrictEqual(completer('/denick autoskin '), ['on', 'off']);
+assert.deepStrictEqual(completer('/denick not'), ['notice']);
+assert.deepStrictEqual(completer('/denick notice '), ['on', 'off']);
+assert.deepStrictEqual(completer('/denick notice off '), []);
 assert.deepStrictEqual(completer('/denick nametags '), ['on', 'off']);
 assert(completer('/denick ann').includes('announcements'), '/denick should complete automation toggles');
 assert.deepStrictEqual(completer('/denick party '), ['review', 'confirm', 'choose', 'test', 'cancel']);

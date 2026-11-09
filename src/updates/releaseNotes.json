@@ -116,6 +116,43 @@
         "Reconnecting quickly no longer crashes Fury while restoring your party.",
         "Players removed from your party after disconnecting no longer stay on Fury's party list."
       ]
+    },
+    {
+      "version": "1.2.0",
+      "features": [
+        "Choose a Christmas look in Appearance with snowfall, snowy edges, warm lights and a snowflake mouse trail.",
+        "Find changed settings with New and Updated tags that clear after you’ve seen them.",
+        "Add Fury servers to Minecraft with automatic client detection on Windows, clear status, the main connection first and existing connections reused.",
+        "Report a Bed Wars team with `/wdr <team>`, with automatic pauses while you move or use inventory.",
+        "On the Sessions page, use the arrow keys to move between sessions, click a card or press Space to see it full size, or hide the list for a bigger card."
+      ],
+      "improvements": [
+        "New installs start with party denick announcements, automatic scan sharing and Ender Dust reminders turned off.",
+        "Windows updates install faster, can use smaller downloads and show a retry message if installation did not finish.",
+        "Browse updates by version in a clearer What’s new window, with larger text, Dashboard highlights and links to settings.",
+        "Nicks shows saved matches in a compact, sortable table, with details available when you open a match.",
+        "The redesigned launcher has clearer navigation, reorganized settings and Start/Stop controls on the Dashboard.",
+        "Session and mode stats keep your recorded kills, finals and beds visible and catch up when Hypixel updates late.",
+        "Bed Wars recaps are easier to read with gold labels and different greens for stats and averages.",
+        "Session cards are easier to read, with your main stats in large numbers and a clearer games-by-mode bar; copied and saved images use the new look.",
+        "The session list shows a Minecraft item for each game, so it's easier to find a session at a glance.",
+        "Connection settings are simpler, with one row per connection and any problem shown on that row; copy your Minecraft address from the Dashboard.",
+        "Scanning and Auto Dodge sliders feel smoother, give common values more room and let you hold Shift while dragging for finer control."
+      ],
+      "fixes": [
+        "The Players preview now matches shared party messages and follows your chosen settings.",
+        "Shared stat threats show the stat that triggered them, using FKDR when both FKDR and stars qualify.",
+        "Scaffold alerts show the real IGN for players with a known denick.",
+        "Saved denicks keep the right player's stats after name changes.",
+        "Party Broadcast now shares saved opponent nicknames at game start and includes their stats when available.",
+        "Games in session history keep their detected mode instead of appearing as Unspecified.",
+        "Fixed missed stats in sessions and saved games after reconnects, quick requeues, slow starts and late nickname, team or kill messages.",
+        "Fixed missing or incorrect wins in session history, including when you confirm a BedWars result yourself.",
+        "Session history keeps the correct game total and win rate when older game details are cleared.",
+        "Daily stats keep recorded kills, finals and wins when a session crosses midnight.",
+        "Session stats keep counting when you turn API requests on or off.",
+        "Draws count as games without adding a win or loss."
+      ]
     }
   ]
 }

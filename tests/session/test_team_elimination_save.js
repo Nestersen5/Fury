@@ -44,7 +44,7 @@ async function run(apiAvailable) {
     const recaps = [];
     const tracker = createSessionTracker({ store, now: () => stamp,
         onGameRecap: recap => recaps.push(recap),
-        getIdentity: () => ({ uuid, name: 'Tester' }), isApiAvailable: () => apiAvailable,
+        getIdentity: () => ({ uuid, name: 'Tester' }), isApiAvailable: () => apiAvailable, apiSettleMs: 0,
         fetchOwnStats: async () => { fetches++; return { uuid, displayname: 'Tester', stats: { Bedwars: stats } }; },
         setTimeoutImpl: (fn, delay) => { timers.set(++timerId, { fn, at: stamp + delay }); return timerId; },
         clearTimeoutImpl: id => timers.delete(id) });
@@ -54,7 +54,7 @@ async function run(apiAvailable) {
     const context = vm.createContext({
         console, Promise, Date: { now: () => stamp }, state: { sessionTrackingEnabled: true },
         gameActive: true, gameStartTime: stamp, gameSessionId: 1, currentGamemode: 'BEDWARS',
-        activeMatchServerId: 'server', sessionGameFinalized: false, localDuelKey: null,
+        activeMatchServerId: 'server', activeSessionGameKey: start.sessionKey, sessionGameFinalized: false, localDuelKey: null,
         pendingBedwarsResultPrompt: null,
         activeSessionGameEvents: [], activeSessionGameMetadata: {}, sessionTracker: tracker,
         bedwarsStatsDebug: { status: () => ({ active: false }), observeChat() {}, end() {} },
@@ -62,6 +62,7 @@ async function run(apiAvailable) {
         detectKnownKillMessageForStats: killMessages.detectKnownKillMessageForStats,
         client: { username: 'Tester' }, getOwnKnownNames: () => ['Tester'],
         localSessionIdentity: () => ({ ownNames: ['Tester'], identityKnown: true }),
+        resolveOwnBedwarsTeam: () => 'Aqua',
         buildSessionGameMetadata: () => ({ team: 'Aqua', observedFromStart: true }),
         resolveBedwarsTeamName: name => name === 'Tester' ? 'Aqua' : 'Red',
         detectKillMessageOwner: () => null,

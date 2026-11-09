@@ -56,7 +56,9 @@ assert.deepStrictEqual(history.sessions[0].modes.map(mode => mode.mode), ['BEDWA
 assert.strictEqual(history.sessions[0].modes[1].games, 2, 'Duels falls back to rounds when no games counter exists');
 assert.strictEqual(history.sessions[0].games[0].stats.finals, 4);
 assert.strictEqual(history.summary.wins, 3);
-assert.strictEqual(history.summary.games, 1, 'tracked games are counted from saved recap records');
+assert.strictEqual(history.summary.games, 5, 'all completed games count even when only one recap detail is retained');
+assert.strictEqual(history.sessions[0].metrics.games, 5);
+assert.strictEqual(history.sessions[0].metrics.winRate, 60);
 assert.strictEqual(Object.hasOwn(history.sessions[0], 'baseline'), false, 'launcher payload omits raw Hypixel snapshots');
 assert.strictEqual(JSON.stringify(history).includes('wins_bedwars'), false, 'launcher payload contains only named display metrics');
 

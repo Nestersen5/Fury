@@ -130,7 +130,7 @@ const {
     DENICK_PROJECTILE_TRAIL_NAMES
 } = require('./src/cosmetics/cosmetic_name_catalog.js');
 
-const { getRealNameFromSkin } = require('./src/denick/skin_denicker.js');
+const { getRealNameFromSkin, getIdentityFromSkin } = require('./src/denick/skin_denicker.js');
 const express = require('express');
 const { paths: appConfigPaths, loadKeys, loadKeyMeta, saveKeys, loadScanSettings, saveScanSettings, loadFeatureSettings, saveFeatureSettings, loadChatTriggerSettings, saveChatTriggerSettings, loadServerSettings, normalizeTabStatsModeSetting, normalizeShareDestination, normalizeNametagScope } = require('./app_config.js');
 const {
@@ -252,6 +252,7 @@ const { normalizeGameEvent, parseGameEvents, parseResultBanner, eventSignature, 
 const { isOwnTeamElimination, inferGameResult } = require('./src/session/gameResult.js');
 const { createStatsLookup } = require('./src/stats/lookup.js');
 const { createStatsFetch } = require('./src/stats/fetch.js');
+const { getCachedPlayerProfile, getCachedAccountUuid } = require('./src/stats/profileCache.js');
 const {
     createStatsSources,
     makePingData,
@@ -319,6 +320,7 @@ const shutdownConnections = new Set();
 const cancelConnectionWork = new Set();
 const ownedListeners = [];
 let proxyStopping = false;
+let denickIdentityMigration = null;
 
 const MINECRAFT_CHAT_MESSAGE_MAX_LENGTH = 100;
 const AURORA_PING_CACHE_DURATION = 30 * 60 * 1000;
@@ -664,12 +666,23 @@ const { createDenickDisplayNames } = require('./src/denick/displayNames.js');
 const { createRealSkinTextureResolver } = require('./src/denick/skinTextures.js');
 const realSkinTextureResolver = createRealSkinTextureResolver({ httpClient: axios });
 const { createDenickHistory } = require('./src/denick/history.js');
+const { createDenickIdentityMigration } = require('./src/denick/identityMigration.js');
+const { createDenickMigrationNotice } = require('./src/denick/migrationNotice.js');
+const { realAccountUuid } = require('./src/denick/identity.js');
 const { canAutoSaveTeammateNick } = require('./src/denick/teammateAutoSave.js');
 const { createNicknameSharing } = require('./src/party/nicknameSharing.js');
 const denickHistory = createDenickHistory({
     historyFile: DENICKED_HISTORY_FILE,
     writeJsonOffThread,
+    requireVerifiedIdentity: true,
+    getVerifiedAccountUuid: name => getCachedAccountUuid(globalCache, name),
     onError: error => console.error('[DenickHistory]', error.message)
+});
+const denickMigrationNotice = createDenickMigrationNotice({
+    file: dataPath('launcher_data', 'denick-migration-notice.json'),
+    getStatus: () => denickIdentityMigration?.getStatus(),
+    sendChat,
+    track: work => commandDrains.track(work)
 });
 const {
     loadDenickHistoryStore,
@@ -966,6 +979,7 @@ function loadFeatureConfig(options = {}) {
     nametagStarBracketsEnabled = features.nametagStarBracketsEnabled !== false;
     nametagTagDisplayMode = normalizeNametagTagDisplayMode(features.nametagTagDisplayMode, 'acronyms');
     state.apiKillSwitchEnabled = features.apiKillSwitchEnabled;
+    denickIdentityMigration?.resume();
     state.dailyReward = features.dailyReward;
     state.lobbySpamEnabled = features.lobbySpamEnabled;
     state.lobbySpamSensitivity = features.lobbySpamSensitivity;
@@ -1517,6 +1531,7 @@ const healthServer = createHealthServer({
     getKeys: () => keys,
     getServerConfigs: () => serverConfigs,
     getLastScanSummary: () => lastScanSummary,
+    getDenickMigrationStatus: () => denickIdentityMigration?.getStatus() || null,
     getEnderDustReminderStatus: () => activeUser?.getEnderDustReminderStatus
         ? activeUser.getEnderDustReminderStatus()
         : null,
@@ -2051,6 +2066,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         let denickTracker = null; // initialized below once closure deps are reachable
         let autoDenickStats, autoDenickResults, autoDenickNickChecks, autoSkinDenickAttempts;
         const autoDenickRetryTimers = new Map();
+        let partyDenickAnnouncements = new Set();
         let ownIdentity = null; // initialized below once nickKey/isValidPlayerName/normalizeUuid are reachable
         let myTeam = null;
         let gameStartTime = null;
@@ -2068,6 +2084,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         // sidebar has usually already flipped away and reading it there yields
         // nothing at all. See getFreshLastMatchSnapshot for what it is for.
         let activeMatchServerId = null;
+        let activeSessionGameKey = null;
         let currentGamemode = null;
         // Duels is tracked separately from currentGamemode so the Bedwars/SkyWars
         // tab-stats / nametag / overlay machinery (all gated on
@@ -3453,7 +3470,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 const known = findKnownDenickByNick(nick);
                 // Private observation must not overwrite somebody's explicit correction.
                 if (known?.source === 'manual' || nickKey(known?.realName) === nickKey(realName)) return;
-                appendDenickHistory({ nick, realIGN: realName, method: 'own_nick', account: realName,
+                appendDenickHistory({ nick, realIGN: realName, realUuid: client.uuid, method: 'own_nick', account: realName,
                     gameMode: nicknameGameContext().mode });
             },
             getPeers: () => partyCoordination?.nicknameEvidence() || [],
@@ -3468,7 +3485,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 const live = getAutoDenickResult(peer.nick);
                 if ((saved && nickKey(saved.realName) !== nickKey(realName))
                     || (live?.realName && nickKey(live.realName) !== nickKey(realName))) return false;
-                if (!saved && !storeDenickResult(peer.nick, realName, 'party_shared')) return false;
+                if (!saved && !storeDenickResult(peer.nick, realName, 'party_shared', peer.uuid)) return false;
                 const mappingVersion = denickTracker.mappingVersion(peer.nick);
                 await denickHistory.flush({ strict: true });
                 if (!stillValid() || denickTracker.mappingVersion(peer.nick) !== mappingVersion
@@ -3903,15 +3920,19 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             isChatReplacementEnabled: () => state.denickRealIgnChat || friendAliasesActive('chat'),
             resolveChatRankedName: (nick) => {
                 if (!state.denickRealIgnChat || isOwnPlayerName(nick)) return null;
-                const real = getAutoDenickResult(nick)?.realName || findKnownDenickByNick(nick)?.realIGN;
+                const identity = getAutoDenickResult(nick) || findKnownDenickByNick(nick);
+                const real = identity?.realName;
                 if (!real || nickKey(real) === nickKey(nick)) return null;
-                const profile = globalCache.get(nickKey(real));
+                const profile = getCachedPlayerProfile(globalCache, real, identity.realUuid);
                 if (!profile?.data?.player || profile.data.isNicked || profile.data.lookupFailed) return null;
                 const alias = friendAliasesActive('chat') && (findFriendAlias(real) || findFriendAlias(nick));
                 const rank = resolveHypixelRank(profile.data.player);
                 return `${rank.prefix ? `${rank.prefix} ` : ''}${rank.nameColor}${alias?.alias || real}`;
             },
-            resolveSkinProperties: (realName) => realSkinTextureResolver.resolve(realName),
+            resolveSkinProperties: (realName, nick) => {
+                const identity = getAutoDenickResult(nick) || findKnownDenickByNick(nick);
+                return realSkinTextureResolver.resolve(realName, identity?.realUuid);
+            },
             // Two layers, in this order:
             //   1. denick  - the account behind the name Hypixel is showing
             //   2. alias   - your own name for that account
@@ -4155,7 +4176,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 && !isSameTeamAsClient(name);
         }
 
-        function storeDenickResult(name, realName, source = 'skin') {
+        function storeDenickResult(name, realName, source = 'skin', realUuid = null) {
             if (!isValidPlayerName(name) || !isValidPlayerName(realName)) return false;
             if (nickKey(name) === nickKey(realName)) return false;
             if (!denickTracker.canAutoDenick(name)) return false;
@@ -4169,10 +4190,16 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             const existing = autoDenickResults.get(key) || {};
             if (existing.realName) return false;
 
+            if (!realUuid && (source === 'skin' || source === 'skin_manual')) {
+                realUuid = getIdentityFromSkin(lobbyPlayers.get(name)?.properties)?.realUuid;
+            }
+            realUuid = realAccountUuid(realUuid) || getCachedAccountUuid(globalCache, realName);
+
             autoDenickResults.set(key, {
                 ...existing,
                 nick: name,
                 realName,
+                realUuid,
                 source,
                 skinDenicked: source === 'skin' || source === 'skin_manual',
                 at: Date.now()
@@ -4181,6 +4208,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             appendDenickHistory({
                 nick: name,
                 realIGN: realName,
+                realUuid,
                 method: source,
                 stats: source === 'stats' ? {
                     finals: existing.finals ?? existing.observedFinals ?? null,
@@ -4221,7 +4249,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             };
             let profile;
             try {
-                profile = await getPlayerData(realName, { includeErrors: true });
+                profile = await getPlayerData(realName, { includeErrors: true, realUuid: result.realUuid });
             } catch (_) { /* Keep the confirmed identity even if stats fail. */ }
             if (!isCurrent() || (!preview && shouldSuppressDenickAnnouncement(name))) return;
             if (profile?.error || !profile?.data?.player || profile.data.lookupFailed || profile.data.isNicked) {
@@ -4257,11 +4285,14 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         }
 
         function announceDenickToParty(nick, realName, data) {
-            if (!partyTracker.isInParty() || currentGamemode === 'SKYWARS') return;
-            // Fresh skin/stats matches must protect party members just like saved denicks.
-            if (partyTracker.isTrackedMember(realName)) return;
+            if (!data?.player) return;
+            return queueDenickPartyAnnouncement(nick, realName, { data }, `denick-party:${nick}:${realName}`);
+        }
+
+        function formatDenickPartyCommand(nick, realName, data) {
+            const identity = `/pc [Denick] ${realName} is nicked as ${nick}`;
             const player = data?.player;
-            if (!player) return;
+            if (!player || data.lookupFailed || data.isNicked) return identity;
             const bedwars = player.stats?.Bedwars || {};
             const stars = numberOr(player.achievements?.bedwars_level, 0);
             const fkdr = ratioValue(bedwars.final_kills_bedwars, bedwars.final_deaths_bedwars);
@@ -4269,30 +4300,66 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             const winstreak = numberOr(bedwars.winstreak, 0);
             const tagRow = { uTag: data.urchin?.tag, urchinRaw: data.urchin };
             const tags = data.urchin?.ok !== false && hasTag(tagRow) ? ` | ${formatTagDescriptor(tagRow)}` : '';
-            const message = `/pc [Denick] ${realName} is nicked as ${nick} | ${Math.round(stars)}★ FKDR ${fkdr.toFixed(2)} WLR ${wlr.toFixed(2)} WS ${winstreak}${tags}`;
-            const command = message.length > MAX_PC_LENGTH ? `${message.slice(0, MAX_PC_LENGTH - 3)}...` : message;
-            void sendHypixelCommand(command, {
-                priority: 85,
-                dedupeKey: `denick-party:${nick}:${realName}`,
-                dedupeMs: 5_000
-            });
+            const message = `${identity} | ${Math.round(stars)}★ FKDR ${fkdr.toFixed(2)} WLR ${wlr.toFixed(2)} WS ${winstreak}${tags}`;
+            return message.length > MAX_PC_LENGTH ? `${message.slice(0, MAX_PC_LENGTH - 3)}...` : message;
         }
 
-        function announceKnownPregameDenickToParty(nick, realName) {
-            // Party Announcements covers saved denicks too. Unlike a fresh
-            // automatic denick, this identity is already known, so announce it
-            // immediately instead of waiting for a second stats lookup.
-            if (!denickPartyAnnounceEnabled || !partyTracker.isInParty() || currentGamemode === 'SKYWARS') return;
-            // A saved identity may be one of our own teammates. Their nick is
-            // useful to Auto Dodge as a no-dodge guard, but repeating their
-            // real IGN into party chat reveals them to the whole party.
-            if (partyTracker.isTrackedMember(realName)) return;
-            const message = `[Denick] ${realName} is nicked as ${nick}`;
-            void sendHypixelCommand(`/pc ${message}`, {
-                priority: 85,
-                dedupeKey: `known-denick-party:${nick}:${realName}`,
-                dedupeMs: 5_000
-            });
+        async function queueDenickPartyAnnouncement(nick, realName, details, dedupeKey, isCurrent = () => true) {
+            const canSend = () => denickPartyAnnounceEnabled && partyTracker.isInParty()
+                && currentGamemode !== 'SKYWARS' && !shouldSuppressDenickAnnouncement(nick)
+                && !partyTracker.isTrackedMember(realName) && isCurrent();
+            if (!canSend()) return;
+            const announcements = partyDenickAnnouncements;
+            const key = `${nickKey(nick)}:${nickKey(realName)}`;
+            if (announcements.has(key)) return;
+            // Reserve before a saved-profile lookup so repeated roster updates
+            // and fresh denicks cannot schedule another announcement meanwhile.
+            announcements.add(key);
+            let resolvedKey = key;
+            let sent = false;
+            const contextKey = `${dedupeKey}:${gameSessionId}:${bedwarsPregameSessionId}`;
+            try {
+                const prepared = typeof details === 'function' ? await details() : details;
+                realName = prepared.realName || realName;
+                if (partyDenickAnnouncements !== announcements || !canSend()) return;
+                const updatedKey = `${nickKey(nick)}:${nickKey(realName)}`;
+                if (updatedKey !== key) {
+                    if (announcements.has(updatedKey)) return;
+                    resolvedKey = updatedKey;
+                    announcements.add(resolvedKey);
+                }
+                const result = await sendHypixelCommand(formatDenickPartyCommand(nick, realName, prepared.data), {
+                    priority: 85, dedupeKey: contextKey, dedupeMs: 5_000,
+                    shouldSend: () => partyDenickAnnouncements === announcements && canSend()
+                });
+                sent = result.sent;
+            } catch (_) { /* A cancelled/failed send may be attempted again. */ }
+            finally {
+                if (!sent) {
+                    announcements.delete(key);
+                    announcements.delete(resolvedKey);
+                }
+            }
+        }
+
+        function announceKnownPregameDenickToParty(nick, realName, options = {}) {
+            const known = options.knownDenick || getAutoDenickResult(nick) || findKnownDenickByNick(nick);
+            const isCurrent = () => {
+                if (!known) return true;
+                const current = getAutoDenickResult(nick) || findKnownDenickByNick(nick);
+                return known.realUuid ? current?.realUuid === known.realUuid
+                    : nickKey(current?.realName) === nickKey(realName);
+            };
+            return queueDenickPartyAnnouncement(nick, realName, async () => {
+                let profile;
+                try {
+                    profile = Object.prototype.hasOwnProperty.call(options, 'profile') ? options.profile
+                        : await getPlayerData(realName, { includeErrors: true, preferCache: true, realUuid: known?.realUuid });
+                } catch (_) { /* Still announce the saved identity if stats fail. */ }
+                const data = profile?.error ? null : profile?.data;
+                const available = data?.player && !data.lookupFailed && !data.isNicked;
+                return { data, realName: available ? data.player.displayname || realName : realName };
+            }, `known-denick-party:${nick}:${realName}`, isCurrent);
         }
 
         function queueAutoSkinDenick(name, source = 'unknown') {
@@ -4938,6 +5005,13 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         }
         function observeSessionGameChat(text) {
             if (gameActive && currentGamemode === 'BEDWARS' && activeSessionGameMetadata?.privateGame) return;
+            if (!localDuelKey && (!gameActive || sessionGameFinalized)) {
+                sessionTracker.observeTrailingChat(text, {
+                    ...(gameActive ? { mode: currentGamemode, sessionKey: activeSessionGameKey } : {}),
+                    serverId: activeMatchServerId || null,
+                    ownTeam: resolveOwnBedwarsTeam(), detectKnownKillMessageForStats, ...localSessionIdentity()
+                });
+            }
             if(localDuelKey&&state.sessionTrackingEnabled){
                 sessionTracker.observeLocalChat(text,{mode:'DUELS',sessionKey:localDuelKey,...localSessionIdentity()});
                 if(sessionTracker.observeLocalResult(text)&&sessionTracker.getObservedGameState().result)finishLocalDuel();
@@ -4951,8 +5025,9 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             if (sessionGameFinalized) return;
             sessionTracker.observeLocalResult(text);
             sessionTracker.observeLocalChat(text, {
-                mode: currentGamemode, sessionKey: `${activeMatchServerId || 'game'}:${gameStartTime}`,
+                mode: currentGamemode, sessionKey: activeSessionGameKey,
                 ownTeam: metadata.team,
+                variant: metadata.variant,
                 detectKnownKillMessageForStats,
                 ...identity
             });
@@ -4975,7 +5050,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         function finalizeSessionGame(immediate = false, confirmed = immediate) {
             if (sessionGameFinalized) return;
             if (!immediate && activeSessionGameEvents.some(event =>
-                event.type === 'victory' || event.type === 'defeat')) {
+                event.type === 'victory' || event.type === 'defeat' || event.type === 'draw')) {
                 immediate = true;
                 confirmed = true;
             }
@@ -5068,9 +5143,10 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         // marks an undenicked nick, whose name must not be looked up as an IGN;
         // `stale` marks a rank book entry old enough to refresh.
         function resolveRankedPlayer(name) {
-            const denicked = getAutoDenickResult(name)?.realName || findKnownDenickByNick(name)?.realName || null;
+            const identity = getAutoDenickResult(name) || findKnownDenickByNick(name);
+            const denicked = identity?.realName || null;
             const realName = denicked || name;
-            const profile = globalCache.get(playerLookupKey(realName))?.data;
+            const profile = getCachedPlayerProfile(globalCache, realName, identity?.realUuid)?.data;
             if (profile?.player && !profile.isNicked && !profile.lookupFailed) {
                 return { realName, display: rankedDisplayForPlayer(profile.player, realName), nicked: false, stale: false };
             }
@@ -5689,6 +5765,8 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 const actorTeam = resolveBedwarsTeamName(name);
                 if (!ownTeam || !actorTeam || ownTeam === actorTeam) return;
             }
+            const realName = getAutoDenickResult(name)?.realName || findKnownDenickByNick(name)?.realIGN;
+            const displayName = isValidPlayerName(realName) ? realName : name;
             const confirmed = tier === 'confirmed';
             const verdict = confirmed ? cheat : `Possibly ${cheat}`;
             console.log(`[AC] ${cheat.toUpperCase()} ${confirmed ? 'CONFIRMED' : 'POSSIBLE'}: ${name} - ${evidence.map(item => item.reason).join(' | ')}`);
@@ -5710,7 +5788,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             ]);
             sendChat(client, chatController.line([
                 chatController.text('[AC] ', 'red', { bold: true }),
-                chatController.text(name, 'white', { hoverEvent: details }),
+                chatController.text(displayName, 'white', { hoverEvent: details }),
                 chatController.text(' » ', 'dark_gray'),
                 chatController.text(verdict, confirmed ? 'red' : 'yellow', { bold: confirmed, hoverEvent: details })
             ]));
@@ -5905,12 +5983,22 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             }
         });
         hypixelClient.write = (name, data) => {
-            if (quickBuy.allowOutbound(name, data)) return quickBuyTransport(name, data, 'relay-or-proxy-feature');
+            if (quickBuy.allowOutbound(name, data)) {
+                watchdogReport?.observeUpstream(name, data);
+                return quickBuyTransport(name, data, 'relay-or-proxy-feature');
+            }
         };
 
         watchdogReport = require('./src/menu/watchdogReport').createWatchdogReport({
             menuMonitor,
             sendCommand: sendHypixelCommand,
+            getTeamPlayers: team => {
+                if (!gameActive || currentGamemode !== 'BEDWARS') return [];
+                const names = new Set([...gameRoster, ...Array.from(currentGameTeams.values(), entry => entry.name)]);
+                return Array.from(names).filter(name => isValidPlayerName(name) && !isOwnPlayerName(name)
+                    && !isDenickAliasDuplicate(name)
+                    && (resolveBedwarsTeamName(name) || currentGameTeams.get(nickKey(name))?.team) === team);
+            },
             sendUpstream: (name, data) => {
                 if (hypixelClient.state === mc.states.PLAY) quickBuyTransport(name, data, 'watchdog-report');
                 if (name === 'close_window') {
@@ -7354,6 +7442,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 const result = {
                     nick: observed.name,
                     realName: best.displayName || best.name,
+                    realUuid: best.realUuid,
                     source: 'stats',
                     finals: best.finals,
                     beds: best.beds,
@@ -7373,6 +7462,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 appendDenickHistory({
                     nick: observed.name,
                     realIGN: result.realName,
+                    realUuid: result.realUuid,
                     method: 'stats',
                     stats: {
                         finals: result.observedFinals ?? result.finals ?? observed.finals,
@@ -7814,6 +7904,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             const serverId = pregameLobbyIdForScoreboard(scoreboardText);
             if (serverId) activeMatchServerId = serverId;
             if (serverId && activeSessionGameMetadata) activeSessionGameMetadata.serverId = serverId;
+            if (serverId && !sessionGameFinalized) sessionTracker.noteServerId(serverId);
         }
 
         function notePrivateSessionGame(scoreboardText = getCurrentScoreboardText()) {
@@ -7897,12 +7988,18 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         // failed re-check changes nothing, since isKnownNickedPlayer holds the
         // nick until real player data arrives. Auto-denick still owns turning
         // the nick into a real IGN.
+        function pendingDenickForPlayer(name) {
+            const pending = denickHistory.findPendingDenickByNick(name);
+            if (pending) denickIdentityMigration?.request(name);
+            return pending;
+        }
+
         async function getStatsProfileForRosterPlayer(name, options = {}) {
             const denickResult = options.denickResult !== undefined
                 ? options.denickResult
                 : getAutoDenickResult(name);
-            if (denickResult?.realName) {
-                return makeFallbackPlayerProfile(name, { status: '§cNicked Account' });
+            if (denickResult?.realName || pendingDenickForPlayer(name)) {
+                return makeFallbackPlayerProfile(name, { isNicked: true, status: '§cNicked Account' });
             }
             if (isKnownNickedPlayer(name, null, denickResult)) {
                 const key = nickKey(name);
@@ -7954,6 +8051,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
 
         function enterBedwarsPregame(lobbyId = null) {
             if (bedwarsPregameActive) return false;
+            partyDenickAnnouncements = new Set();
             stopLookingFor('you joined a game lobby');
             if (gameActive && gameStartTime && !sessionGameFinalized
                 && Date.now() - gameStartTime < 30000) finalizeSessionGame(true, false);
@@ -8159,7 +8257,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         // re-ran the lookup and any miss re-rendered the row as a failure.
         // Only a lookup that returns real player data clears the marker.
         function isKnownNickedPlayer(name, data, denickResult = null, previousRow = undefined) {
-            if (denickResult?.realName) return false;
+            if (denickResult?.realName) return Boolean(data?.isNicked);
             if (hasRealPlayerLookupData(data)) return false;
             // The last row we rendered is the third witness, next to the live
             // answer and the detected-nick set. It matters for a nick whose
@@ -8361,7 +8459,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                     if (cachedRow && cachedRow.mode === currentGamemode) {
                         const desiredRealName = showDenickedRealIgn ? (denickResult?.realName || '') : '';
                         if (denickResult?.realName && cachedRow.realName !== desiredRealName) {
-                            const realCachedProfile = globalCache.get(nickKey(denickResult.realName));
+                            const realCachedProfile = getCachedPlayerProfile(globalCache, denickResult.realName, denickResult.realUuid);
                             if (realCachedProfile?.data) {
                                 return {
                                     ...rememberOverlayPlayer(name, {
@@ -8395,7 +8493,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                     }
 
                     const lookupName = denickResult?.realName || name;
-                    const cachedProfile = globalCache.get(nickKey(lookupName));
+                    const cachedProfile = getCachedPlayerProfile(globalCache, lookupName, denickResult?.realUuid);
                     if (cachedProfile?.data) {
                         return {
                             ...rememberOverlayPlayer(name, {
@@ -8579,7 +8677,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
 
         async function resolveKnownPregameDenickForDodge(name, profile) {
             if (profile?.pregameKnownDenick) {
-                announceKnownPregameDenickToParty(name, profile.pregameRealName);
+                announceKnownPregameDenickToParty(name, profile.pregameRealName, { profile, knownDenick: profile.pregameKnownDenick });
                 return { knownDenick: profile.pregameKnownDenick, dodgeProfile: profile };
             }
             if (!profile?.data?.isNicked) {
@@ -8593,8 +8691,6 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             const realName = String(knownDenick?.realName || knownDenick?.realIGN || '').trim();
             if (!realName) return { knownDenick: null, dodgeProfile: profile };
 
-            announceKnownPregameDenickToParty(name, realName);
-
             // The nickname cannot appear in /p list, but its real IGN can.
             // Let Auto Dodge perform the same guard too; this early return also
             // avoids an unnecessary profile request for a current teammate.
@@ -8602,10 +8698,19 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 return { knownDenick, dodgeProfile: profile };
             }
 
-            const realProfile = await getPlayerData(realName, {
-                includeErrors: true,
-                preferCache: true
-            });
+            const announcements = partyDenickAnnouncements;
+            let realProfile;
+            try {
+                realProfile = await getPlayerData(realName, {
+                    realUuid: knownDenick.realUuid,
+                    includeErrors: true,
+                    preferCache: true
+                });
+            } finally {
+                if (partyDenickAnnouncements === announcements) {
+                    announceKnownPregameDenickToParty(name, realName, { profile: realProfile, knownDenick });
+                }
+            }
             if (realProfile?.error || !realProfile?.data?.player) {
                 return { knownDenick, dodgeProfile: profile };
             }
@@ -8624,8 +8729,9 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
 
         const lookupPregameIdentity = createPregameIdentityLookup({
             lookupNick: name => getPlayerDataWithNickDetection(name, { preferCache: true }),
-            lookupReal: name => getPlayerData(name, { includeErrors: true, preferCache: true }),
+            lookupReal: (name, known) => getPlayerData(name, { includeErrors: true, preferCache: true, realUuid: known.realUuid }),
             getKnownDenick: findKnownDenickByNick,
+            getPendingDenick: pendingDenickForPlayer,
             getRosterUuid: name => {
                 const key = nickKey(name);
                 for (const [visibleName, info] of lobbyPlayers) {
@@ -9375,7 +9481,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             const denickResult = getAutoDenickResult(name);
             let displayProfile = profile;
             if (denickResult?.realName) {
-                const realProfile = await getPlayerData(denickResult.realName, { includeErrors: true });
+                const realProfile = await getPlayerData(denickResult.realName, { includeErrors: true, realUuid: denickResult.realUuid });
                 if (realProfile?.data?.player && !realProfile.error) {
                     displayProfile = realProfile;
                     rememberPlayerActiveCosmetics(name, realProfile.data, 'denick_overlay');
@@ -9717,6 +9823,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 serverId: activeMatchServerId || pregameLobbyIdForScoreboard(getCurrentScoreboardText()) || null,
                 myTeam,
                 gameStartTime: gameStartTime || Date.now(),
+                sessionGameKey: activeSessionGameKey,
                 lobbyPlayers: Array.from(lobbyPlayers.entries()).map(([name, player]) => [name, serializePlayerInfo(player)]),
                 scoreboardTeams: Array.from(scoreboardTeamRegistry.entries()).map(([name, teamInfo]) => [name, serializeTeamInfo(teamInfo)]),
                 scoreboardAliases: Array.from(scoreboardTeamAliases.entries()),
@@ -9773,6 +9880,9 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 || null;
             myTeam = snapshot.myTeam || null;
             gameStartTime = snapshot.gameStartTime || Date.now();
+            activeSessionGameKey = snapshot.sessionGameKey || sessionTracker.getResumableGame?.({
+                mode: snapshot.mode, serverId: activeMatchServerId, startedAt: gameStartTime
+            })?.key || `${activeMatchServerId || 'game'}:${gameStartTime}`;
             generatorSidebarElapsedMs = null;
             generatorClockFallbackStartAt = null;
             renewStatsLookupRecovery();
@@ -9847,6 +9957,16 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             });
 
             if (gameRoster.size === 0) return false;
+
+            if (!activeSessionGameMetadata.privateGame && !inferGameResult({ mode: currentGamemode,
+                events: activeSessionGameEvents, ownTeam: activeSessionGameMetadata.team })?.result) {
+                sessionGameFinalized = false;
+                sessionTracker.onGameStart({ mode: currentGamemode, resume: true,
+                    sessionKey: activeSessionGameKey, serverId: activeMatchServerId, startedAt: gameStartTime,
+                    observedFromStart: false, ownTeam: resolveOwnBedwarsTeam(),
+                    standardBedwars: currentGamemode === 'BEDWARS' && isStandardBedwarsVariant(activeSessionGameMetadata.variant),
+                    variant: activeSessionGameMetadata.variant, ...localSessionIdentity() });
+            }
 
             if (currentGamemode === 'BEDWARS' && !activeSessionGameMetadata?.privateGame && bedwarsStatsDebug.status().enabled) {
                 const metadata = buildSessionGameMetadata('BEDWARS');
@@ -10012,14 +10132,19 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             teamDebug.mark('game_activate', { mode, gameSessionId, gameActive, activeMatchServerId });
             if (!isSupportedTabStatsMode(mode)) return;
             stopLookingFor('you joined a game');
+            if (gameActive && observedStart && !presentAtGameStart && activeSessionGameMetadata?.disconnected) {
+                resetMatchState({ keepMode: true });
+            }
             const startingNewGame = !gameActive;
+            const resumedSessionGame = startingNewGame && !observedStart && !bedwarsPregameActive
+                ? sessionTracker.getResumableGame?.({ mode, serverId: pregameLobbyIdForScoreboard(getCurrentScoreboardText()) }) : null;
             if (startingNewGame) queueTimeTracker.gameStart(mode);
             const localObservedFromStart = observedStart || (mode === 'BEDWARS' && bedwarsPregameActive);
             const localQueue = mode === 'BEDWARS' ? bedwarsPregameLocalQueue : null;
             const localStandardBedwars = Boolean(localQueue && !bedwarsPregameLocalUnsupported
                 && /^(Solos|Doubles|Threes|Fours|4v4)$/i.test(localQueue.label));
 
-            // The map exists only on the pregame sidebar. Capture it before
+            // Carry the pregame map and mode into this game's metadata before
             // leaveBedwarsPregame deliberately clears all lobby-scoped state.
             const pregameMap = mode === 'BEDWARS' && bedwarsPregameActive
                 ? bedwarsPregameMap
@@ -10046,20 +10171,27 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 autoDenickNickChecks.clear();
                 autoDenickStats.clear();
                 gameActive = true;
-                presentAtGameStart = true;
+                presentAtGameStart = resumedSessionGame ? false : true;
                 // Re-stamp from the sidebar in front of us — the previous game's
                 // id must never survive into this one's snapshots.
                 activeMatchServerId = pregameLobbyIdForScoreboard(getCurrentScoreboardText()) || null;
-                gameStartTime = Date.now();
+                gameStartTime = resumedSessionGame?.startedAt || Date.now();
+                activeSessionGameKey = resumedSessionGame?.key || `${activeMatchServerId || 'game'}:${gameStartTime}`;
                 generatorSidebarElapsedMs = null;
                 generatorClockFallbackStartAt = null;
                 renewStatsLookupRecovery();
                 gameSessionId += 1;
-                startSessionGameEventCapture(mode, { map: pregameMap });
+                denickMigrationNotice.notify(client);
+                startSessionGameEventCapture(mode, {
+                    map: pregameMap,
+                    ...(resumedSessionGame ? { disconnected: true } : {}),
+                    ...(localQueue || resumedSessionGame?.variant ? { variant: localQueue?.label || resumedSessionGame.variant } : {})
+                });
                 if (startingNewGame) sessionTracker.onGameStart({
-                    mode, sessionKey: `${activeMatchServerId || 'game'}:${gameStartTime}`,
+                    mode, sessionKey: activeSessionGameKey, serverId: activeMatchServerId,
+                    resume: Boolean(resumedSessionGame), startedAt: gameStartTime,
                     ownTeam: resolveOwnBedwarsTeam(), observedFromStart: localObservedFromStart,
-                    standardBedwars: localStandardBedwars,
+                    standardBedwars: resumedSessionGame?.standardBedwars || localStandardBedwars,
                     variant:localQueue?.label||buildSessionGameMetadata(mode).variant,
                     ...localSessionIdentity()
                 });
@@ -10078,8 +10210,9 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 if (mode === 'BEDWARS') markRecentBedwarsSession(gameSessionId);
             } else if (!gameStartTime) {
                 gameStartTime = Date.now();
+                activeSessionGameKey ||= `${activeMatchServerId || 'game'}:${gameStartTime}`;
             }
-            if(!sessionGameFinalized&&!startingNewGame&&observedStart)sessionTracker.onGameStart({mode,sessionKey:`${activeMatchServerId||'game'}:${gameStartTime}`,
+            if(!sessionGameFinalized&&!startingNewGame&&observedStart)sessionTracker.onGameStart({mode,sessionKey:activeSessionGameKey,serverId:activeMatchServerId,
                 ownTeam:resolveOwnBedwarsTeam(),observedFromStart:true,standardBedwars:localStandardBedwars,
                 variant:localQueue?.label||buildSessionGameMetadata(mode).variant,
                 ...localSessionIdentity()});
@@ -10112,6 +10245,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         }
 
         function resetMatchState({ keepMode = false, clearPlayers = false, clearSnapshot = false } = {}) {
+            partyDenickAnnouncements = new Set();
             nicknameSharing.reset(null);
             queuePartyCoordinationUpdate();
             queueTimeTracker.leave();
@@ -10167,6 +10301,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             // The snapshot above already carries it; keeping it live would let
             // the finished game's id stamp the next one.
             activeMatchServerId = null;
+            activeSessionGameKey = null;
             autoDodger.cancel('match reset', { announce: false });
             if (bedwarsPregameActive) partyArrivalTracker.onPregameLeave('match_reset');
             partyArrivalCheck.stop();
@@ -10520,6 +10655,19 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 rememberCurrentGamePlayerName(name);
                 rememberCurrentGameTeam(name);
             });
+
+            // Saved opponents can be shared even without pregame chat.
+            // Wait for our own team so a late team packet cannot reveal a teammate.
+            if (gameActive && currentGamemode === 'BEDWARS' && denickPartyAnnounceEnabled
+                && partyTracker.isInParty() && clientBedwarsTeamName()) {
+                gameRoster.forEach(name => {
+                    if (shouldSuppressDenickAnnouncement(name)) return;
+                    const known = getAutoDenickResult(name) || findKnownDenickByNick(name);
+                    // Fresh in-game matches keep their existing stats-rich announcement.
+                    if (known?.at >= gameStartTime && known.source !== 'history' && known.source !== 'manual') return;
+                    if (known?.realName) announceKnownPregameDenickToParty(name, known.realName);
+                });
+            }
 
             scheduleBedwarsClientTeamSync();
             scheduleCurrentMatchSnapshot('roster_seed');
@@ -11384,7 +11532,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             let displayProfile = profile;
             const denickResult = getAutoDenickResult(name);
             if (denickResult?.realName) {
-                const realProfile = await getPlayerData(denickResult.realName, { includeErrors: true });
+                const realProfile = await getPlayerData(denickResult.realName, { includeErrors: true, realUuid: denickResult.realUuid });
                 if (realProfile?.data?.player && !realProfile.error) displayProfile = realProfile;
             }
             rememberOverlayPlayer(name, displayProfile, {
@@ -11475,7 +11623,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             let displayProfile = profile;
             const denickResult = getAutoDenickResult(name);
             if (denickResult?.realName) {
-                const realProfile = await getPlayerData(denickResult.realName, { includeErrors: true });
+                const realProfile = await getPlayerData(denickResult.realName, { includeErrors: true, realUuid: denickResult.realUuid });
                 if (realProfile?.data?.player && !realProfile.error) displayProfile = realProfile;
             }
             rememberOverlayPlayer(name, displayProfile, {
@@ -11993,7 +12141,8 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 const denick = getAutoDenickResult(name);
                 // A resolution arriving during the lookup invalidates an old
                 // nickname's primary preview just as it does its final row.
-                if (denick?.realName && nickKey(ready.data.player.displayname) !== nickKey(denick.realName)) return;
+                if (denick?.realName && !ready.data.isNicked && !ready.data.lookupFailed
+                    && nickKey(ready.data.player.displayname) !== nickKey(denick.realName)) return;
                 const text = buildTabStatsDisplay(name, ready, lobbyPlayers.get(name) || info, mode, { denickResult: denick });
                 if (text !== lastDisplay) {
                     writeTabDisplayName(uuid, text);
@@ -12014,7 +12163,10 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             const denickResult = getAutoDenickResult(name);
             let displayProfile = profile;
             if (denickResult?.realName) {
+                const cached = getCachedPlayerProfile(globalCache, denickResult.realName, denickResult.realUuid);
+                renderReadyProfile(cached?.data ? { data: cached.data, fromCache: true } : profile);
                 const realProfile = await getPlayerData(denickResult.realName, {
+                    realUuid: denickResult.realUuid,
                     includeErrors: true, apiPriority: 'game', onPrimaryProfile: renderReadyProfile
                 });
                 if (realProfile?.data?.player && !realProfile.error) {
@@ -12054,12 +12206,13 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             const denickResult = getAutoDenickResult(name);
             const denickRealName = denickResult?.realName || '';
             const remembered = tabStatsProfileCache.get(name);
-            if (remembered?.profile && remembered.mode === currentGamemode && remembered.denickRealName === denickRealName) {
+            if (remembered?.profile && remembered.mode === currentGamemode && remembered.denickRealName === denickRealName
+                && (!denickResult?.realUuid || normalizeUuidText(remembered.profile.data?.player?.uuid) === denickResult.realUuid)) {
                 return { profile: remembered.profile, denickResult };
             }
 
             const lookupName = denickRealName || name;
-            const cached = globalCache.get(nickKey(lookupName));
+            const cached = getCachedPlayerProfile(globalCache, lookupName, denickResult?.realUuid);
             if (!cached?.data) return null;
             const profile = { data: cached.data, fromCache: true };
             tabStatsProfileCache.set(name, {
@@ -12080,6 +12233,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 const denickResult = getAutoDenickResult(name);
                 const unsubscribe = observePendingPlayerProfile(denickResult?.realName || name, profile => {
                     if (!profile?.data?.player) return;
+                    if (denickResult?.realUuid && normalizeUuidText(profile.data.player.uuid) !== denickResult.realUuid) return;
                     if (denickResult?.realName && nickKey(profile.data.player.displayname) !== nickKey(denickResult.realName)) return;
                     cached = { profile, denickResult };
                 });
@@ -12210,8 +12364,27 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
             const retryTimer = autoDenickRetryTimers.get(nickKey(name));
             if (retryTimer) clearTimeout(retryTimer);
             autoDenickRetryTimers.delete(nickKey(name));
-            denickTracker.applySavedMappingChange(name, next);
+            const previousVersion = denickTracker.mappingVersion(name);
+            denickTracker.applySavedMappingChange(name, next, { suppressAuto: reason === 'remove' });
+            if (previous?.realUuid !== next?.realUuid || previous?.realName !== next?.realName) {
+                tabStatsProfileCache.delete(name);
+                overlayPlayerStats.delete(nickKey(name));
+            }
+            if (reason === 'identity' && next && (previous?.realName === next.realName
+                || (previous?.realUuid && previous.realUuid === next.realUuid))) {
+                // Attaching a UUID or refreshing this account's name must not
+                // invalidate Undo for the same saved party match. Explicit
+                // corrections still fail the original snapshot/version guard.
+                for (const entry of teammateNickUndo.values()) {
+                    if (nickKey(entry.nick) === nickKey(nick) && entry.version === previousVersion
+                        && entry.saved === JSON.stringify(previous)) {
+                        entry.saved = JSON.stringify(next);
+                        entry.version = denickTracker.mappingVersion(name);
+                    }
+                }
+            }
             if (next?.realName) rememberCurrentGameDenickNames(name, next.realName);
+            if (reason === 'identity' && next?.realUuid) refreshPartyReviewAfterSharedNickname();
             denickDisplayNames.refreshSavedMappings();
             refreshScoreboardTeamDisplay();
             if (isTabStatsActiveInGame()) refreshTabStatsImmediately();
@@ -12571,6 +12744,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                                     source: 'player_info'
                                 });
                                 const teamAssignment = findScoreboardTeamForPlayer(p.name);
+                                pendingDenickForPlayer(p.name);
                                 if (teamAssignment) {
                                     applyPlayersToScoreboardTeam(
                                         teamAssignment.baseTeamName,
@@ -12789,7 +12963,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                     : null;
                 if (banner) {
                     appendSessionGameEvent(banner);
-                    if (banner.type === 'victory' || (banner.type === 'defeat' && banner.cause !== 'game_over')) {
+                    if (banner.type === 'victory' || banner.type === 'draw' || (banner.type === 'defeat' && banner.cause !== 'game_over')) {
                         finalizeSessionGame(true);
                         saveCurrentMatchSnapshot('game_result');
                     }
@@ -13661,6 +13835,10 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
                 handleScanModeCommand(client, ['/scanmode', 'off']);
             }
             else if (cmd === '/denick') {
+                if (String(args[1] || '').toLowerCase() === 'notice') {
+                    await denickMigrationNotice.command(client, args[2]);
+                    return;
+                }
                 if (String(args[1] || '').toLowerCase() === 'test') {
                     await handleAutoDenickTestCommand(args);
                     return;
@@ -14154,7 +14332,7 @@ const {
     auroraPingDeduper
 });
 
-const { getPlayerData, observePendingPlayerProfile, cancelPendingRetries: cancelPendingStatsRetries } = createStatsFetch({
+const { getPlayerData, observePendingPlayerProfile, cancelPendingRetries: cancelPendingStatsRetries, resolveSavedIdentity } = createStatsFetch({
     globalCache,
     cacheDuration: CACHE_DURATION,
     getHypixelKey: () => keys.hypixel,
@@ -14174,6 +14352,7 @@ const { getPlayerData, observePendingPlayerProfile, cancelPendingRetries: cancel
         return () => !proxyStopping && !state.apiKillSwitchEnabled && activeUser === owner;
     },
     observeHypixelPlayerData: (uuid, player) => {
+        denickHistory.observeAccountProfile(uuid, player);
         try {
             if (player?.displayname) rankBook.record(player.displayname, rankedDisplayForPlayer(player));
         } catch (error) {
@@ -14182,6 +14361,13 @@ const { getPlayerData, observePendingPlayerProfile, cancelPendingRetries: cancel
         return activeUser?.observeOwnHypixelPlayerData?.(uuid, player);
     }
 });
+
+denickIdentityMigration = createDenickIdentityMigration({
+    history: denickHistory,
+    resolveIdentity: resolveSavedIdentity,
+    canRequest: () => !proxyStopping && !state.apiKillSwitchEnabled
+});
+denickIdentityMigration.resume();
 
 // The ping data shapers (makePingData, parseAuroraPingResponse,
 // classifyAuroraPingError, localDateKey, parseAuroraDayMs, validPingNumber,
@@ -15470,6 +15656,7 @@ console.log([
 // Install after startup ownership is complete. One deadline is supplied by Main.
 installServiceShutdown({
     async quiesce() {
+        denickIdentityMigration.close();
         cancelPendingStatsRetries();
         hypixelApiClient.close?.();
         proxyStopping = true;

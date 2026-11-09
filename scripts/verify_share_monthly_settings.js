@@ -20,7 +20,7 @@ module.exports = async function ({ page, output, profile }) {
     assert.strictEqual(await page.$eval(id, el => el.checked), true, 'existing users retain monthly FKDR by default');
     assert.strictEqual(await page.$eval(id, el => document.getElementById(el.getAttribute('aria-labelledby')).textContent), 'Monthly FKDR', 'the toggle has its visible accessible label');
     assert((await page.$eval('.share-option-row:has(#share-tags-monthly-fkdr)', el => el.textContent)).includes('May slightly delay sharing.'));
-    await page.locator('.fury-binary-choice:has(#share-tags-monthly-fkdr) .fury-binary-off').click();
+    await page.locator('#share-tags-monthly-fkdr').click();
     await settle(); await verify(false);
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.waitForFunction('typeof furyDesign !== "undefined" && state?.viewedAccount');

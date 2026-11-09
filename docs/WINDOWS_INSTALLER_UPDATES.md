@@ -32,7 +32,12 @@ percentages; there is no update polling loop or history/state refresh hook.
 `windowsUpdaterAdapter.js` lazily loads the pinned electron-updater 6.8.12 NSIS
 implementation with its public custom-provider API. The provider returns only
 Fury's validated metadata. Automatic download, install-on-quit, prereleases,
-downgrades, web installers and differential downloads are disabled. The standard
+downgrades and web installers are disabled. Differential downloads reuse the
+previous installer's bytes and fetch changed ranges using the two versions'
+fixed installer blockmap URLs. R2 requests use single ranges, not multipart
+ranges. Missing maps, an unavailable old installer or failed reconstruction
+fall back to the full installer; final size and SHA-512 verification still apply.
+The standard
 per-user updater cache is separate from accounts and settings. Clicking Download
 after a later launch revalidates and reuses a valid cached installer; it does not
 automatically start a download during startup. Cache handling belongs to the
@@ -68,6 +73,24 @@ absolute FURY_DATA_DIR override. They do not clear logins, preferences or histor
 Microsoft can independently require renewed authorization. Restarting disconnects
 Minecraft; reopening Fury does not reconnect the Minecraft client automatically.
 
+Windows NSIS and ZIP now share an archived `resources/app.asar` application
+payload, reducing the individual files the installer extracts and removes. Mac
+packaging remains unchanged. Electron's bundled Node mode reads service and
+worker code directly from the archive; the PowerShell storage guard alone stays
+outside it in `app.asar.unpacked`. Preservation still runs from the new embedded
+runtime before old-version removal. Package verification checks both archive
+contents and unpacked files, including source parity and private-file exclusions.
+
+Before handoff, Main atomically records only the old and intended versions in
+`launcher_data/windows-update-attempt.json`. On the next eligible launch it
+compares that intent with the actual running version, clears a completed attempt
+and explains an update that did not apply. This never automatically downloads or
+installs anything. Shutdown that never invokes its handoff is not reported as a
+successful installation. Adapter errors are retained as sanitized diagnostic
+codes, and synchronous installer errors propagate. NSIS launches the executable
+just installed directly instead of a potentially stale shortcut; Windows update
+launches explicitly show/focus the completed replacement window.
+
 ## Presentation
 
 The existing button shows availability, download progress, retry and restart
@@ -91,6 +114,15 @@ No extra user distribution is introduced, and build commands never publish.
 metadata through the reviewed release workflow. Existing users must manually
 install their first updater-capable version. Source changes alone activate no
 online update and do not choose or bump a release version.
+
+New Windows builds must also carry `Fury-Setup-<version>-win-x64.exe.blockmap`.
+PREPARE binds this supporting file's bytes and SHA-256 to the approval token and
+checksum list; PUBLISH checks immutability, uploads it and verifies its public
+size before advancing latest.json. It is not another distribution slot. The
+schema-1 installer metadata remains compatible with existing clients. Historical
+releases without blockmaps retain full-download fallback. Existing full-download
+clients still download the first compact release in full; later updates can use
+differential downloads. The amount saved depends on the actual release changes.
 
 ## Verification
 

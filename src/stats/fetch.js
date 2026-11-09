@@ -10,6 +10,8 @@ const axios = require('axios');
 const { BoundedTtlMap } = require('../util/bounded_ttl_map.js');
 const { InFlightDeduper } = require('../util/in_flight_deduper.js');
 const { createMojangLookup } = require('./mojangLookup');
+const { realAccountUuid } = require('../denick/identity');
+const { getCachedPlayerProfile, getCachedAccountUuid } = require('./profileCache');
 
 const LOOKUP_RETRY_DELAYS_MS = [1000, 3000];
 const LOOKUP_FAILURE_COOLDOWN_MS = 30000;
@@ -200,7 +202,10 @@ function createStatsFetch({
         const preferCache = options.preferCache !== undefined ? Boolean(options.preferCache) : true;
         const urchinOverride = options.urchinOverride || null;
         const lowerName = name.toLowerCase();
-        const cached = globalCache.get(lowerName);
+        // UUID lookups cannot poison the username cache if an IGN was reused.
+        // Both use the same bounded cache and account-switch invalidation.
+        const savedUuid = realAccountUuid(options.realUuid);
+        const cached = getCachedPlayerProfile(globalCache, name, savedUuid);
         if (preferCache && !forceRefresh && cached && (now() - cached.timestamp < cacheDuration)) {
             if (urchinOverride) {
                 cached.data.urchin = mergeUrchinOverride(cached.data.urchin, urchinOverride);
@@ -229,7 +234,7 @@ function createStatsFetch({
         const lookupSignal = retryController.signal;
         const scopeSignal = getRetrySignal();
         if (scopeSignal && !scopeIds.has(scopeSignal)) scopeIds.set(scopeSignal, ++nextScopeId);
-        const dedupeKey = `${lowerName}|${keyAtStart}|${scopeSignal ? scopeIds.get(scopeSignal) : 0}`;
+        const dedupeKey = `${savedUuid || lowerName}|${keyAtStart}|${scopeSignal ? scopeIds.get(scopeSignal) : 0}`;
         let progress = pendingProfiles.get(dedupeKey);
         if (!progress) {
             progress = { name: lowerName, key: keyAtStart, signal: lookupSignal,
@@ -252,7 +257,7 @@ function createStatsFetch({
             const canRetry = () => contextIsCurrent() && getHypixelKey() === keyAtStart;
             let provider = 'mojang';
             try {
-                const uuid = await resolvePlayerUuid(name, signal, canRetry, recoverySignal);
+                const uuid = savedUuid || await resolvePlayerUuid(name, signal, canRetry, recoverySignal);
                 if (!uuid) {
                     const miss = { error: true, errorType: 'player_not_found', message: 'Player was not found.' };
                     return miss;
@@ -279,13 +284,18 @@ function createStatsFetch({
                     const miss = { error: true, errorType: 'hypixel_player_missing', message: 'Player has no Hypixel profile data.' };
                     return miss;
                 }
+                if (savedUuid && realAccountUuid(hRes.data.player.uuid) !== savedUuid) {
+                    return { error: true, errorType: 'lookup_failed', message: 'Player lookup returned a different account.' };
+                }
 
                 // The host returns true only for the local account. We retain
                 // its private Slumber readings in the reminders, but strip
                 // other players' minion and quest progress before caching.
                 let isOwnPlayer = false;
                 try {
-                    isOwnPlayer = Boolean(observeHypixelPlayerData(uuid, hRes.data.player));
+                    if (!signal.aborted && !scopeSignal?.aborted && canRetry()) {
+                        isOwnPlayer = Boolean(observeHypixelPlayerData(uuid, hRes.data.player));
+                    }
                 } catch (error) {
                     // A reminder observer must never affect a stats lookup.
                 }
@@ -308,7 +318,8 @@ function createStatsFetch({
                 };
                 recentFailures.delete(dedupeKey);
                 if (!signal.aborted && !scopeSignal?.aborted && getHypixelKey() === keyAtStart) {
-                    globalCache.set(lowerName, { data, timestamp: now() });
+                    const entry = { data, timestamp: now() };
+                    globalCache.set(savedUuid ? `uuid:${savedUuid}` : lowerName, entry);
                 }
                 return { data, fromCache: false };
             } catch (e) {
@@ -339,7 +350,8 @@ function createStatsFetch({
                 urchin: mergeUrchinOverride(profile.data.urchin, urchinOverride)
             };
             if (!lookupSignal.aborted && !scopeSignal?.aborted && getHypixelKey() === keyAtStart) {
-                globalCache.set(lowerName, { data, timestamp: now() });
+                const entry = { data, timestamp: now() };
+                globalCache.set(savedUuid ? `uuid:${savedUuid}` : lowerName, entry);
             }
             return includePlayerStatus({ ...profile, data }, includeStatus);
         }
@@ -347,7 +359,13 @@ function createStatsFetch({
         return includePlayerStatus(profile, includeStatus);
     }
 
-    return { getPlayerData, cancelPendingRetries, observePendingPlayerProfile };
+    async function resolveSavedIdentity(name, { signal, attempt = 1 }) {
+        const cached = getCachedAccountUuid(globalCache, name) || uuidCache.get(name.toLowerCase())?.uuid;
+        const uuid = cached || await mojangLookup.resolve(name, { signal, canRetry: () => !signal.aborted,
+            singleAttempt: true, endpointIndex: attempt === 2 ? 1 : 0 });
+        return { realUuid: uuid, realIGN: name };
+    }
+    return { getPlayerData, cancelPendingRetries, observePendingPlayerProfile, resolveSavedIdentity };
 }
 
 module.exports = { createStatsFetch };

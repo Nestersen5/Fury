@@ -21,7 +21,7 @@ module.exports = async function ({ page, output, profile }) {
     await open();
     assert.strictEqual(await page.$eval(id, el => el.checked), true, 'team summaries are the built-in default');
     assert.strictEqual(await page.$eval(id, el => el.getAttribute('aria-label')), 'Use team summaries');
-    assert.deepStrictEqual(await page.$$eval('.fury-share-method-selector .fury-binary-off,.fury-share-method-selector .fury-binary-on', nodes => nodes.map(el => el.textContent)), ['Individual players', 'Team summaries']);
+    assert.deepStrictEqual(await page.$$eval('.fury-share-method-selector .fury-binary-off,.fury-share-method-selector .fury-binary-on', nodes => nodes.map(el => el.textContent)), ['Players', 'Teams']);
     assert.strictEqual(await page.$eval('#share-tags-monthly-fkdr', el => Boolean(el.closest('#share-individual-options'))), true);
     assert.strictEqual(await page.$eval('#share-tags-fancy', el => Boolean(el.closest('#share-individual-options'))), true);
     await page.locator('.fury-binary-choice:has(#share-tags-team-summary) .fury-binary-off').click();
@@ -37,7 +37,7 @@ module.exports = async function ({ page, output, profile }) {
     assert.strictEqual(await page.$$eval('#party-chat-preview-lines .party-message.is-recolored', nodes => nodes.length), 3);
     assert.ok(await page.$$eval('#party-chat-preview-lines .party-message span', nodes => nodes.some(node => node.textContent === 'Red team' && getComputedStyle(node).color === 'rgb(255, 85, 85)')), 'preview colors the complete team name');
     assert.ok(await page.$$eval('#party-chat-preview-lines .party-message', nodes => nodes.every(node => [...node.querySelectorAll('span')].slice(1).every(span => getComputedStyle(span).color === 'rgb(255, 255, 255)'))), 'everything after the team name stays white');
-    await page.locator('.fury-binary-choice:has(#share-tags-color-local) .fury-binary-off').click();
+    await page.locator('#share-tags-color-local').click();
     await settle();
     assert.strictEqual(await preview(), summaryText, 'colors never alter the message wording');
     assert.strictEqual(await page.$$eval('#party-chat-preview-lines .party-message.is-recolored', nodes => nodes.length), 0);

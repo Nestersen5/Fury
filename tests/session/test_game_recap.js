@@ -461,12 +461,12 @@ function makeRecap(overrides = {}) {
     assert(plain.lines[1].includes('VICTORY   11m 06s   Solos'));
     assert(plain.lines[2].includes('Finals/Beds: 3/1   Kills/Deaths: 7/'));
     assert(!plain.text().includes('Session:') && !plain.text().includes('GAMES GOAL'));
-    assert(plain.colored().includes('<gray>Finals/Beds: <green>3<dark_gray>/<yellow>1') && plain.colored().includes('<gray>Kills/Deaths: <green>7<dark_gray>/<red>'),
-        'Scoreboard keeps the selected semantic colors');
+    assert(plain.colored().includes('<gold>Finals/Beds: <green>3<dark_gray>/<green>1') && plain.colored().includes('<gold>Kills/Deaths: <green>7<dark_gray>/<red>'),
+        'Bed Wars uses gold labels, green finals/beds/kills and red deaths');
     const { chatTextWidth, scoreboardRecapLines } = require('../../src/stats/recapScoreboard');
     const headerLines = scoreboardRecapLines({ game: 'Bedwars', fields: ['header'] });
-    assert(headerLines[0].includes('\u00a78------ \u00a7c\u00a7lBED \u00a7f\u00a7lWARS RECAP\u00a78 ------'),
-        'Bedwars title is bold light red and white with dark gray rules');
+    assert(headerLines[0].includes('\u00a78------ \u00a7e\u00a7lBED WARS RECAP\u00a78 ------'),
+        'Bedwars title is bold yellow with dark gray rules');
     assert(headerLines[1].trimStart().startsWith('\u00a78'), 'Bottom rule is dark gray');
     for (const map of ['Airshow', '§cAirshow\nDoubles', 'W'.repeat(80), null, undefined, '', '  ']) {
         const mapped = fakeClient();
@@ -811,7 +811,7 @@ function makeRecap(overrides = {}) {
         ['5m 0s', 'c'], ['9m 59s', 'c'], ['10m 0s', '4'], ['25m 0s', '4'],
         ['25m 1s', '5'], ['1h 0m', '5']]) {
         const lines = scoreboardRecapLines({ game: 'Bedwars', averageGameTime: duration, fields: [] });
-        assert(lines.some(line => line.includes('\u00a77SESSION \u00a77AVG TIME \u00a7' + color + duration)),
+        assert(lines.some(line => line.includes('\u00a76SESSION \u00a76AVG TIME \u00a7' + color + duration)),
             'Average time color at ' + duration);
     }
 }
@@ -827,7 +827,7 @@ function makeRecap(overrides = {}) {
         [undefined, 4, 2, '?', '2.00']
     ]) {
         const lines = scoreboardRecapLines({ game: 'Bedwars', fields, session: { finals, beds, games } });
-        assert(lines.some(line => line.includes(`Avg. finals/beds: §a${expectedFinals}§8/§a${expectedBeds}`)));
+        assert(lines.some(line => line.includes(`§6Avg. finals/beds: §2${expectedFinals}§8/§2${expectedBeds}`)));
         assert(lines.every(line => chatTextWidth(line) <= 320), 'Averages wrap within Minecraft chat width');
     }
     for (const game of ['SkyWars', 'Duels']) {
@@ -871,8 +871,8 @@ function makeRecap(overrides = {}) {
             'Session totals toggle independently');
         for (const count of [value, 0, undefined]) {
             const lines = scoreboardRecapLines({ game: 'Bedwars', fields: [field], session: { [key]: count } });
-            assert(lines.some(line => line.includes(`${label} §f${count === undefined ? '?' : count}`)),
-                'Session totals, including zero and unknown, preserve white formatting');
+            assert(lines.some(line => line.includes(`§6${label} §a${count === undefined ? '?' : count}`)),
+                'Session totals use gold labels and green values, including zero and unknown');
         }
     }
     const local = fakeClient();
@@ -896,7 +896,7 @@ function makeRecap(overrides = {}) {
         renderGameRecapActual(client, recap, { fields });
         assert.equal(client.text().trim(), `${expected} STARS`, 'Enabled stars render even when no XP was gained');
         assert(client.colored().includes(`<aqua>${expected}`), 'Star gain is aqua');
-        assert(client.colored().includes('<gray>STARS'), 'Stars label is light grey');
+        assert(client.colored().includes('<gold>STARS'), 'Stars label uses the Bed Wars gold palette');
     }
     for (const [experience, expected] of [[100, '+0.02'], [undefined, '?']]) {
         const client = fakeClient();
@@ -910,8 +910,8 @@ function makeRecap(overrides = {}) {
     assert(!disabled.text().includes('STARS'), 'Disabled stars remain hidden');
     const { scoreboardRecapLines } = require('../../src/stats/recapScoreboard');
     assert(scoreboardRecapLines({ game: 'Bedwars', fields,
-        stats: [{ label: 'Stars', value: '+0.02', color: '§6' }] })[0].includes('§b+0.02 §7STARS'),
-    'Shared preview formatting uses aqua values and a light grey label');
+        stats: [{ label: 'Stars', value: '+0.02', color: '§6' }] })[0].includes('§b+0.02 §6STARS'),
+    'Shared preview formatting keeps aqua star gains with a gold label');
 }
 
 {

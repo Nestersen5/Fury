@@ -35,7 +35,7 @@ async function run(apiAvailable) {
         } });
     const trackerOptions = { store, now: () => stamp,
         getIdentity: () => ({ uuid, name: 'Tester' }), isApiAvailable: () => apiAvailable,
-        minGameDurationMs: 0, gameEndDelayMs: 0,
+        minGameDurationMs: 0, gameEndDelayMs: 0, apiSettleMs: 0,
         fetchOwnStats: async () => { fetches++; return { uuid, displayname: 'Tester', stats: {
             Bedwars: { wins_bedwars: wins, kills_bedwars: kills, games_played_bedwars: wins }
         } }; },

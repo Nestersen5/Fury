@@ -34,6 +34,7 @@ function createHealthServer(deps) {
         getServerConfigs,
         getLastScanSummary,
         getSessionHistory = () => null,
+        getDenickMigrationStatus = () => null,
         removeSession = null,
         removeDenickMapping = null,
         appendDenickHistory = null,
@@ -143,6 +144,8 @@ function createHealthServer(deps) {
                     health: port
                 },
                 lastScan: getLastScanSummary(),
+                ...(String(req.query.includeDenicks || '') === '1'
+                    ? { denickMigration: getDenickMigrationStatus() } : {}),
                 // Session snapshots are intentionally left out of the normal
                 // health poll. The launcher asks for this compact projection
                 // only while its Session History page is open.

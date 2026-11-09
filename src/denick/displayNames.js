@@ -76,8 +76,8 @@ function createDenickDisplayNames({
     //   'world' - the GameProfile name (nametag + tab row + team/score keys)
     //   'chat'  - visible chat text only
     //   'skin'  - the real Mojang account to pull a skin from. This one must
-    //             never answer with a custom alias: a skin is looked up by
-    //             name, and a nickname you invented is not an account.
+    //             never answer with a custom alias: a nickname you invented
+    //             is not an account.
     resolveRealName = () => null,
     // (name) -> true when that name is ALREADY visible in the tab list.
     // Renaming onto a name that is genuinely present would put two entries
@@ -197,9 +197,10 @@ function createDenickDisplayNames({
         const uuid = profileUuid(profile);
         if (!uuid || skinRequests.has(uuid)) return;
         if (!profileKey) return;
+        const originalNick = frozenRenameForRenderedName(profile?.name)?.nick || profile?.name;
 
         const request = Promise.resolve()
-            .then(() => skinRequests.get(uuid) === request ? resolveSkinProperties(real) : null)
+            .then(() => skinRequests.get(uuid) === request ? resolveSkinProperties(real, originalNick) : null)
             .then((textures) => {
                 if (skinRequests.get(uuid) !== request) return;
                 if (!skinReplacementEnabled() || !Array.isArray(textures) || textures.length === 0) return;

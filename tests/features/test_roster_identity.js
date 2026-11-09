@@ -29,7 +29,7 @@ function fixture() {
     let requests = 0, pregame = null, known = null, detected = false, settledAt = null;
     let beforeResponse = () => {};
     const context = {
-        isRosterProfileMismatch, makeFallbackPlayerProfile,
+        isRosterProfileMismatch, makeFallbackPlayerProfile, pendingDenickForPlayer: () => null,
         lobbyPlayers: new Map([['RealEye', info]]), getAutoDenickResult: () => known,
         isKnownNickedPlayer: () => detected, nickKey: name => name.toLowerCase(),
         settledNickVerifiedAt: { get: () => settledAt, set: (_, at) => { settledAt = at; } }, SETTLED_NICK_RECHECK_MS: 60000,
@@ -89,7 +89,8 @@ function fixture() {
     assert((await f.context.getStatsProfileForRosterPlayer('RealEye')).data.isNicked, 'Tab evidence arriving during lookup is checked at completion');
 
     f = fixture(); f.known({ realName: 'FacebookMessages' });
-    await f.context.getStatsProfileForRosterPlayer('RealEye');
+    assert((await f.context.getStatsProfileForRosterPlayer('RealEye')).data.isNicked,
+        'A known denick without loaded real-account stats must retain a nick placeholder');
     assert.equal(f.requests(), 0, 'Saved identities keep precedence over nickname lookups');
     f.context.reapplyCachedTabStatsForPlayer('RealEye');
     assert.equal(f.rendered[0], account, 'Saved-account stats intentionally have a different UUID from the nick');

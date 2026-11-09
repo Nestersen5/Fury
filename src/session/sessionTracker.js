@@ -21,11 +21,15 @@ const {
     captureSessionSnapshot,
     diffSessionSnapshots,
     snapshotRegressed,
-    deltaIsEmpty
+    deltaIsEmpty,
+    gamePresent,
+    SNAPSHOT_GAMES
 } = require('./sessionSnapshot.js');
 const { resolveGameResult, isOwnTeamElimination } = require('./gameResult.js');
-const { createGame, observe, observeResult, localModes, FIELDS } = require('./localStats');
-const { singleApiResult, apiCompletedGames, apiCountsCoverObservations, observedSessionDelta } = require('./observedStats');
+const { createGame, observe, observeResult, localModes, FIELDS, updateGameVariant, normalizeLocal, invalidate, updateIdentity } = require('./localStats');
+const { singleApiResult, apiCompletedGames, apiCountsCoverObservations, observedSessionDelta, reconciliationForSnapshot, reconciliationBaseline, weakResult } = require('./observedStats');
+const { createTrailingStats } = require('./trailingStats');
+const { MODE_DEFINITIONS } = require('./modeDefinitions');
 
 const MODE_TO_GAME = {
     BEDWARS: 'Bedwars',
@@ -74,6 +78,7 @@ function createSessionTracker({
     gameEndDelayMs = DEFAULT_GAME_END_DELAY_MS,
     minRefreshIntervalMs = DEFAULT_MIN_REFRESH_INTERVAL_MS,
     minGameDurationMs = DEFAULT_MIN_GAME_DURATION_MS,
+    apiSettleMs = 30000,
     verificationRetryDelaysMs = DEFAULT_VERIFICATION_RETRY_DELAYS_MS,
     isEnabled = () => true,
     isApiAvailable = () => true,
@@ -94,12 +99,187 @@ function createSessionTracker({
     const endTimers = new Set();
     let boundaryTimer = null;
     let verificationTimer = null;
+    let verificationBatch = null;
+    let reconciliationQueue = null;
     let inFlight = null;
     let snapshotGeneration = 0, inFlightGeneration = null;
     let lastRefreshAt = 0;
     let detached = false;
     const observedEnds = new Set();
     let quiescing = false, quiescence;
+    const trailing = createTrailingStats({ store, now, getIdentity, isEnabled });
+    const settleMs = Math.max(0,Number(apiSettleMs)||0);
+    function sameModeReading(a,b,mode) {
+        const key=gameForMode(mode);
+        if (!a || !b || a.uuid!==b.uuid || !gamePresent(a,key) || !gamePresent(b,key)) return false;
+        const left=reconciliationBaseline(a).stats[key],right=reconciliationBaseline(b).stats[key];
+        const fields=new Set([...Object.keys(left),...Object.keys(right)]);
+        return [...fields].every(field=>(left[field]||0)===(right[field]||0));
+    }
+    function modeBaseline(session,mode,fallback) {
+        return session?.apiBoundaries?.[mode] || session?.games.find(game=>game.mode===mode
+            && game.verificationSettled===false && game.verificationBaseline)?.verificationBaseline
+            || (session?.reconciliationBaseline?.priorGameKeys?.length && gamePresent(session.reconciliationBaseline,gameForMode(mode))
+                ? session.reconciliationBaseline : null) || fallback;
+    }
+    function acceptBoundary(sessionId,mode,snapshot) {
+        const owner=store.findSession(sessionId);
+        const boundary=scopedSnapshot(owner,snapshot,mode);
+        store.updateApiBoundary(sessionId,mode,boundary);
+        if (activeSessionId!==sessionId) return;
+        boundarySnapshot=boundary;
+        // An unfinished game cannot be in this API update. It may safely use
+        // the now-settled previous window without losing its local counters.
+        if (pendingGame?.mode===mode && !pendingGame.observed.endObserved) {
+            pendingGame.baseSnapshot=boundary; saveLiveGame();
+        }
+        const session=store.findSession(sessionId),current=session?.localTracking?.current;
+        if (session?.trackingSource==='local' && current?.mode===mode && !current.endObserved) {
+            const local=normalizeLocal(session.localTracking);local.current.apiBaseline=boundary;
+            store.updateLocalTracking(sessionId,local);
+        }
+    }
+    function attachLocalSession(sessionId) {
+        const session=store.findSession(sessionId),uuid=String(getIdentity?.()?.uuid||'').replace(/-/g,'').toLowerCase();
+        if (!session || session.endedAt || session.trackingSource!=='local' || session.uuid!==uuid) return null;
+        activeSessionId=sessionId;boundarySnapshot=session.latest||null;detached=false;
+        return session;
+    }
+    function scopedSnapshot(session,snapshot,mode=null) {
+        const current=session.trackingSource==='local'?session.localTracking?.current
+            :activeSessionId===session.id?pendingGame?.observed:null;
+        const completed=current?.endObserved;
+        const past={...session,liveGame:null};
+        if (session.trackingSource==='local') past.localTracking={...session.localTracking,current:completed?current:null};
+        const prefix=observedSessionDelta(past,null)?.modes||[];
+        const uncaptured=[...observedEnds].filter(context=>context.sessionId===session.id && !context.recordId).length;
+        const initial=session.reconciliationBaseline||session.baseline;
+        const prior=[...session.games,...[...observedEnds].filter(context=>context.sessionId===session.id && !context.recordId)]
+            .filter(game=>(!mode || game.mode===mode) && game.observation && !session.apiBaselines?.[game.mode]
+                && !gamePresent(initial,gameForMode(game.mode)));
+        // A first readable profile does not prove that earlier games have
+        // published. Keep those games inside the window; never add their
+        // observed totals again as an assumed already-published prefix.
+        if (prior.length) return {...reconciliationBaseline(snapshot),sequence:0,prefix:[],
+            priorGameKeys:prior.map(game=>game.observation.key),
+            ...(current&&!current.endObserved?{gameKey:current.key,gameMode:current.mode}:{})};
+        return { ...reconciliationBaseline(snapshot),sequence:(session.gameSequence||0)+(completed?1:0)+uncaptured,prefix,
+            ...(current&&!current.endObserved?{gameKey:current.key,gameMode:current.mode}:{}) };
+    }
+    async function captureLocalBaseline(sessionId,gameKey) {
+        const session=attachLocalSession(sessionId);
+        if (!session || !isEnabled() || !isApiAvailable()) return null;
+        const current=session.localTracking?.current;
+        if (gameKey && (!current || current.key!==gameKey || current.endObserved)) return null;
+        if (!current && now()-lastRefreshAt<minRefreshIntervalMs) return null;
+        const saved=current?modeBaseline(session,current.mode,current.apiBaseline):null;
+        if (saved && gamePresent(saved,gameForMode(current.mode))) {
+            if (!current.apiBaseline) {
+                const local=normalizeLocal(session.localTracking);local.current.apiBaseline=saved;
+                store.updateLocalTracking(sessionId,local);
+            }
+            return null;
+        }
+        const generation=snapshotGeneration,snapshot=await takeSnapshot();
+        const latest=store.findSession(sessionId);
+        if (!snapshot || generation!==snapshotGeneration || latest?.endedAt || latest?.uuid!==snapshot.uuid) return null;
+        const scoped=scopedSnapshot(latest,snapshot,current?.mode);
+        if (!SNAPSHOT_GAMES.some(game=>gamePresent(latest.baseline,game))) store.initializeBaseline(sessionId,scoped);
+        else if (!snapshotRegressed(latest.baseline,snapshot)) store.updateLatest(sessionId,snapshot);
+        boundarySnapshot=latest.latest||boundarySnapshot;lastRefreshAt=now();
+        const game=latest.localTracking?.current;
+        if (game && game.key===gameKey && !game.endObserved && gamePresent(snapshot,gameForMode(game.mode))) {
+            store.updateApiBoundary(sessionId,game.mode,scoped);
+            const local=normalizeLocal(latest.localTracking);local.current.apiBaseline=scoped;
+            store.updateLocalTracking(sessionId,local);
+        }
+        return snapshot;
+    }
+    function initializeRunningBaseline(session,snapshot,game=pendingGame) {
+        const scoped=scopedSnapshot(session,snapshot,game?.mode);
+        if (!SNAPSHOT_GAMES.some(key=>gamePresent(session.baseline,key))) store.initializeBaseline(session.id,scoped);
+        if (game && game===pendingGame && !game.observed.endObserved
+            && !gamePresent(game.baseSnapshot,gameForMode(game.mode)) && gamePresent(snapshot,gameForMode(game.mode))) {
+            game.baseSnapshot=scoped;store.updateApiBoundary(session.id,game.mode,scoped);saveLiveGame();
+        }
+    }
+    async function captureApiBaseline() {
+        const game=pendingGame,session=getActiveSession();
+        if (!session || !game || game.observed.endObserved || !isApiAvailable()
+            || gamePresent(game.baseSnapshot,gameForMode(game.mode))) return null;
+        const generation=snapshotGeneration,snapshot=await takeSnapshot();
+        if (!snapshot || generation!==snapshotGeneration || getActiveSession()!==session || snapshot.uuid!==session.uuid) return null;
+        initializeRunningBaseline(session,snapshot,game);
+        return snapshot;
+    }
+    function queueLocalGame(sessionId,record) {
+        const session=store.findSession(sessionId);
+        if (!session || !record?.observation || record.metadata?.privateGame) return record;
+        const base=record.observation.apiBaseline;
+        if (!base || base.uuid!==session.uuid || base.at>record.at || !gamePresent(base,gameForMode(record.mode))) return record;
+        const updated=store.updateGame(sessionId,record.id,{verificationStatus:'pending',verificationSettled:false,
+            observation:{...record.observation,apiBaseline:null},
+            verificationBaseline:base,verificationRecoveryUntil:record.at+currentResumeWindowMs(),nextVerificationAt:now()+gameEndDelayMs});
+        schedulePendingVerification();return updated;
+    }
+    function saveLiveGame() {
+        if (activeSessionId && pendingGame) {
+            pendingGame.baseSnapshot ||= boundarySnapshot || store.findSession(activeSessionId)?.baseline;
+            store.updateLiveGame(activeSessionId, pendingGame);
+        }
+    }
+    function resolveCombinedResults(session, mode, checkpoint) {
+        const initial=session.reconciliationBaseline||session.baseline;
+        const base=gamePresent(initial,gameForMode(mode))?initial:session.apiBaselines?.[mode];
+        if (!base) return;
+        const prefix=base.prefix?.find(entry=>entry.mode===mode)||{};
+        const games=session.games.filter(game=>game.mode===mode && game.sequence>(base.sequence||0)
+            && game.sequence<=checkpoint.throughSequence);
+        // Missing/pruned details must not be allocated to the retained games.
+        if (games.length!==checkpoint.values.games-(prefix.games||0)) return;
+        const unresolved=games.filter(game=>weakResult(game) || (!game.result && game.observation?.endObserved));
+        if (!unresolved.length) return;
+        const wins=checkpoint.values.wins-(prefix.wins||0)-games.filter(game=>game.result==='win' && !unresolved.includes(game)).length;
+        const losses=checkpoint.values.losses-(prefix.losses||0)-games.filter(game=>game.result==='loss' && !unresolved.includes(game)).length;
+        const result=wins===unresolved.length && losses===0?'win':losses===unresolved.length && wins===0?'loss':null;
+        if (!result) return;
+        for (const game of unresolved) store.updateGame(session.id,game.id,{result,resultSource:'api'});
+    }
+    function reconcileSession(sessionId, snapshot) {
+        if (reconciliationQueue) {
+            const prior=reconciliationQueue.get(sessionId);
+            if (!prior || prior.at<=snapshot.at) reconciliationQueue.set(sessionId,snapshot);
+            return;
+        }
+        const session = store.findSession(sessionId);
+        if (!session) return;
+        const blocked = [...observedEnds].map(context => context.mode);
+        if (pendingGame?.observed?.endObserved) blocked.push(pendingGame.mode);
+        for (const other of store.getSessions(session.uuid)) if (other.id !== session.id && other.startedAt >= session.startedAt) {
+            blocked.push(...other.games.map(game => game.mode));
+            if (other.liveGame) blocked.push(other.liveGame.mode);
+        }
+        const totals = reconciliationForSnapshot(session, snapshot, blocked);
+        if (!totals) return;
+        for (const [mode,checkpoint] of Object.entries(totals)) {
+            const previous=session.apiTotals?.[mode],candidate=previous?.candidate;
+            const stable=previous?.throughSequence===checkpoint.throughSequence && sameModeReading(candidate?.snapshot,snapshot,mode);
+            const at=stable?candidate.at:now();
+            checkpoint.candidate={at,snapshot:reconciliationBaseline(snapshot)};
+            checkpoint.settled=checkpoint.coversObservations && (settleMs===0 || (stable && now()-at>=settleMs));
+        }
+        store.updateApiTotals(sessionId, totals);
+        for (const [mode,checkpoint] of Object.entries(totals)) if (checkpoint.settled) {
+            resolveCombinedResults(session,mode,checkpoint);
+            for (const game of [...session.games]) if (game.mode===mode && game.sequence<=checkpoint.throughSequence
+                && game.verificationSettled===false) {
+                store.updateGame(sessionId,game.id,{verificationSettled:true,verificationBaseline:null,
+                    verificationCandidate:null,nextVerificationAt:0,
+                    verificationStatus:game.verificationStatus==='verified'?'verified':'unverified'});
+            }
+            acceptBoundary(sessionId,mode,snapshot);
+        }
+    }
 
     const retryDelays = (Array.isArray(verificationRetryDelaysMs) ? verificationRetryDelaysMs : [])
         .map(value => Math.max(0, Number(value) || 0));
@@ -137,6 +317,7 @@ function createSessionTracker({
         if (detached || pendingGame || !activeSessionId) return;
         const session = store.findSession(activeSessionId);
         if (!session || session.endedAt) return;
+        if (session.trackingSource==='local') return; // Its observer owns inactivity.
         const dueAt = (Number(session.lastSeen) || now()) + currentResumeWindowMs();
         boundaryTimer = setTimeoutImpl(() => {
             boundaryTimer = null;
@@ -185,9 +366,12 @@ function createSessionTracker({
     // rather than reporting nonsense negatives.
     async function ensureSession() {
         const generation = snapshotGeneration;
+        const account = getIdentity?.();
+        const uuid = String(account?.uuid || '').replace(/-/g, '').toLowerCase();
         if (activeSessionId) {
             const active = store.findSession(activeSessionId);
-            if (active && !active.endedAt && (pendingGame || now() - active.lastSeen < currentResumeWindowMs())) {
+            if (active && !active.endedAt && (!uuid || active.uuid === uuid)
+                && (pendingGame || now() - active.lastSeen < currentResumeWindowMs())) {
                 return activeSessionId;
             }
             if (active && !active.endedAt) store.endSession(activeSessionId, { endedAt: active.lastSeen });
@@ -195,37 +379,46 @@ function createSessionTracker({
             boundarySnapshot = null;
         }
 
-        let snapshot = await takeSnapshot();
-        if (generation !== snapshotGeneration || !isApiAvailable()) return null;
-        if (!snapshot) {
-            const account = getIdentity?.();
-            const uuid = String(account?.uuid || '').replace(/-/g, '').toLowerCase();
-            if (!/^[a-f0-9]{32}$/.test(uuid) || !account?.name) return null;
-            // An unavailable baseline cannot stop local observation. Empty
-            // presence flags prevent later lifetime stats becoming a delta.
-            snapshot = captureSessionSnapshot({ uuid, displayname: account.name, stats: {} }, { now });
-        }
-
-        store.closeExpiredSessions(currentResumeWindowMs(), snapshot.uuid);
-        let resumable = store.findResumableSession(snapshot.uuid, currentResumeWindowMs());
-        if (resumable?.trackingSource === 'local') { store.endSession(resumable.id); resumable = null; }
-        if (resumable) {
-            activeSessionId = resumable.id;
-            if (snapshotRegressed(resumable.baseline, snapshot)) {
-                logger.warn?.('[Session] Baseline regressed — starting a fresh baseline.');
-                store.rebaseline(activeSessionId, snapshot);
-            } else {
-                store.updateLatest(activeSessionId, snapshot);
+        const open = snapshot => {
+            store.closeExpiredSessions(currentResumeWindowMs(), snapshot.uuid);
+            let session = store.findResumableSession(snapshot.uuid, currentResumeWindowMs());
+            if (session?.trackingSource === 'local') { store.endSession(session.id); session = null; }
+            if (!session) {
+                store.closeStaleSessions(snapshot.uuid);
+                session = store.startSession(snapshot);
             }
-        } else {
-            // Nothing resumable: close anything still open for this account so
-            // abandoned sessions get a real end time and drop their snapshots
-            // instead of lingering in the history list.
-            store.closeStaleSessions(snapshot.uuid);
-            activeSessionId = store.startSession(snapshot).id;
+            activeSessionId = session.id;
+            boundarySnapshot = session.latest || snapshot;
+            return session.id;
+        };
+        // Save local progress while the first API request is still loading.
+        // Empty presence flags cannot turn a later lifetime total into gains.
+        const seed = /^[a-f0-9]{32}$/.test(uuid) && account?.name
+            ? captureSessionSnapshot({ uuid, displayname: account.name, stats: {} }, { now }) : null;
+        let sessionId = seed ? open(seed) : null;
+        if (sessionId && !isApiAvailable()) {
+            scheduleBoundaryClose();return sessionId;
         }
-
-        boundarySnapshot = store.findSession(activeSessionId)?.latest || snapshot;
+        const snapshot = await takeSnapshot();
+        if (generation !== snapshotGeneration || !isApiAvailable()) return null;
+        if (!sessionId) {
+            if (!snapshot) return null;
+            sessionId = open(snapshot);
+        }
+        const session = store.findSession(sessionId);
+        if (!session || session.endedAt || activeSessionId !== sessionId
+            || (snapshot && snapshot.uuid !== session.uuid)) return null;
+        if (snapshot) {
+            if (!SNAPSHOT_GAMES.some(game => gamePresent(session.baseline,game)) && seed) {
+                store.initializeBaseline(sessionId, scopedSnapshot(session,snapshot));
+                if (pendingGame && !pendingGame.observed?.endObserved
+                    && !SNAPSHOT_GAMES.some(game => gamePresent(pendingGame.baseSnapshot,game))) pendingGame.baseSnapshot = snapshot;
+            } else if (snapshotRegressed(session.baseline, snapshot)) {
+                logger.warn?.('[Session] Baseline regressed — starting a fresh baseline.');
+                store.rebaseline(sessionId, snapshot);
+            } else store.updateLatest(sessionId, snapshot);
+        }
+        boundarySnapshot = session.latest || snapshot || seed;
         lastRefreshAt = now();
         scheduleBoundaryClose();
         return activeSessionId;
@@ -257,12 +450,15 @@ function createSessionTracker({
         if (!snapshot || generation !== snapshotGeneration || !isApiAvailable()) return getSessionDelta();
 
         const session = store.findSession(sessionId);
+        if (session && snapshot.uuid===session.uuid) initializeRunningBaseline(session,snapshot);
         if (session && snapshotRegressed(session.baseline, snapshot)) {
             logger.warn?.(`[Session] Snapshot regressed during ${reason} — re-baselining.`);
             store.rebaseline(sessionId, snapshot);
-            boundarySnapshot = snapshot;
+            boundarySnapshot = store.findSession(sessionId)?.latest || boundarySnapshot;
         } else {
             store.updateLatest(sessionId, snapshot);
+            await processPendingVerifications({ suppliedSnapshot:snapshot });
+            reconcileSession(sessionId, snapshot);
         }
         lastRefreshAt = now();
         return getSessionDelta();
@@ -273,6 +469,7 @@ function createSessionTracker({
     // Hosts that cannot identify a pregame can keep using onGameStart as the
     // fallback, which calls the same idempotent ensureSession path.
     function onQueueStart({ mode } = {}) {
+        trailing.clear();
         if (!isEnabled() || !gameForMode(mode)) return null;
         clearBoundaryTimer();
         detached = false;
@@ -301,18 +498,27 @@ function createSessionTracker({
         if (record.resultSource === 'api' || (record.result && record.resultSource !== 'manual')) {
             return { result: record.result, source: record.resultSource };
         }
-        return store.updateGame(session.id, record.id, { result, resultSource: 'manual' });
+        const updated = store.updateGame(session.id, record.id, { result, resultSource: 'manual' });
+        // A confirmed result replaces the paused copy of this same game;
+        // otherwise its old unknown result masks the saved win/loss in totals.
+        if (updated && session.liveGame?.recordId === updated.id) store.updateLiveGame(session.id, null);
+        return updated;
     }
 
     function onGameStart(options = {}) {
         const { mode, sessionKey } = options;
         if (!isEnabled()) return;
+        trailing.clear();
         if (pendingGame && sessionKey && pendingGame.sessionKey === sessionKey) {
             const observed = pendingGame.observed;
+            updateGameVariant(observed, options.variant);
+            updateIdentity(observed, options);
             if (observed && !observed.observedFromStart && options.observedFromStart
                 && now() - observed.startedAt <= 5000 && FIELDS.every(key => observed.counts[key].value === 0)) {
-                pendingGame.observed = createGame({ ...options, key: sessionKey, startedAt: observed.startedAt, ownName: getIdentity?.()?.name });
+                pendingGame.observed = createGame({ ...options, variant: observed.variant, serverId: observed.serverId,
+                    key: sessionKey, startedAt: observed.startedAt, ownName: getIdentity?.()?.name });
             }
+            saveLiveGame();
             return pendingGame.sessionPromise;
         }
         currentGameExcluded = false;
@@ -320,26 +526,76 @@ function createSessionTracker({
         clearBoundaryTimer();
         detached = false;
         const startedAt = now();
+        const hadSession=Boolean(activeSessionId);
         const sessionPromise = ensureSession().catch((error) => {
             logger.error?.('[Session] Automatic session start failed:', error?.message || error);
             return null;
         });
-        pendingGame = { mode: mode || null, startedAt, sessionPromise, sessionKey, baseSnapshot: boundarySnapshot,
-            observed: createGame({ ...options, key: sessionKey || startedAt, startedAt, ownName: getIdentity?.()?.name }) };
-        return sessionPromise;
+        let restored = null;
+        if (options.resume) {
+            const uuid = String(getIdentity?.()?.uuid || '').replace(/-/g, '').toLowerCase();
+            const session = activeSessionId ? store.findSession(activeSessionId) : store.findResumableSession(uuid, currentResumeWindowMs());
+            const same = game => game && game.mode === mode && !game.endObserved
+                && (game.key === String(sessionKey) || (Number(options.startedAt) > 0 && game.startedAt === Number(options.startedAt)));
+            const live = session?.liveGame;
+            const prior = [...(session?.games || [])].reverse().find(game => same(game.observation) && !game.result);
+            if (same(live?.observed) && (!live.recordId || !session.games.find(game => game.id === live.recordId)?.result)) restored = live;
+            else if (prior) restored = { observed: prior.observation, startedAt: prior.observation.startedAt,
+                recordId: prior.id, baseSnapshot: prior.verificationBaseline };
+            if (restored) {
+                restored = { ...restored, observed: normalizeLocal({ current: restored.observed }).current };
+                invalidate(restored.observed, ['finals','beds','bedsLost','finalDeaths','kills','deaths'], 8);
+                restored.observed.leftAt = 0;
+                updateIdentity(restored.observed, options);
+                for (const context of observedEnds) if (context.observation?.key === restored.observed.key) observedEnds.delete(context);
+                lastEndedSessionKey = null;
+            }
+        }
+        if (!restored) {
+            const uuid = String(getIdentity?.()?.uuid || '').replace(/-/g, '').toLowerCase();
+            const previous = activeSessionId ? store.findSession(activeSessionId) : store.findResumableSession(uuid, currentResumeWindowMs());
+            if (previous?.liveGame && previous.liveGame.observed.key !== String(sessionKey)
+                && ![...observedEnds].some(context => context.observation?.key === previous.liveGame.observed.key)) store.settleLiveGame(previous.id);
+        }
+        pendingGame = { mode: mode || null, startedAt: restored?.startedAt || startedAt, sessionPromise, sessionKey,
+            baseSnapshot: restored?.baseSnapshot || modeBaseline(store.findSession(activeSessionId),mode,boundarySnapshot), recordId: restored?.recordId || null,
+            observed: restored?.observed || createGame({ ...options, key: sessionKey || startedAt,
+                startedAt: Number(options.startedAt) || startedAt, ownName: getIdentity?.()?.name }) };
+        const starting = pendingGame;
+        saveLiveGame();
+        return sessionPromise.then(async sessionId => { if (pendingGame === starting) {
+            const session=store.findSession(activeSessionId);
+            pendingGame.baseSnapshot=modeBaseline(session,mode,pendingGame.baseSnapshot);
+            if (!session?.apiBoundaries?.[mode] && gamePresent(pendingGame.baseSnapshot,gameForMode(mode))) store.updateApiBoundary(activeSessionId,mode,pendingGame.baseSnapshot);
+            saveLiveGame();
+            if (hadSession) await captureApiBaseline();
+        } return sessionId; });
     }
 
     function observeLocalChat(text, context = {}) {
         if (!isEnabled() || currentGameExcluded || !pendingGame?.observed) return false;
-        return observe(pendingGame.observed, text, { ...context, at: now() });
+        const modeChanged = updateGameVariant(pendingGame.observed, context.variant);
+        const changed = observe(pendingGame.observed, text, { ...context, at: now() }) || modeChanged;
+        if (changed || context.identityKnown === false) saveLiveGame();
+        return changed;
+    }
+
+    function noteServerId(serverId) {
+        if (!isEnabled() || currentGameExcluded || !pendingGame?.observed) return false;
+        if (!updateIdentity(pendingGame.observed, { serverId })) return false;
+        saveLiveGame(); return true;
     }
 
     function observeLocalResult(text) {
         if (!isEnabled() || currentGameExcluded || !pendingGame?.observed) return false;
-        return observeResult(pendingGame.observed, text, { at: now() });
+        const changed = observeResult(pendingGame.observed, text, { at: now() });
+        if (changed) saveLiveGame();
+        return changed;
     }
 
     function excludeCurrentGame() {
+        trailing.clear();
+        if (activeSessionId) store.updateLiveGame(activeSessionId, null);
         currentGameExcluded = true;
         pendingGame = null;
         // Keep the last public boundary: private Bed Wars does not contribute
@@ -375,7 +631,7 @@ function createSessionTracker({
         const attempts = immediate ? 0 : 1;
         const stamp = now();
         const outcome = resolveGameResult(null, context);
-        return store.appendGame(sessionId, {
+        const patch = {
             at: context.endedAt || stamp,
             mode: context.mode || null,
             durationMs: context.durationMs || 0,
@@ -387,13 +643,28 @@ function createSessionTracker({
             metadata: context.metadata || null,
             events: context.events || [],
             localModes: context.localModes || null,
+            observation: context.observation || null,
             delta: null,
             verificationStatus: immediate || retryDelays.length ? 'pending' : 'unverified',
             verificationAttempts: attempts,
+            verificationSettled: false,
+            verificationRecoveryUntil: stamp + currentResumeWindowMs(),
             lastVerificationAt: immediate ? 0 : stamp,
             nextVerificationAt: immediate ? stamp + gameEndDelayMs : retryDelays.length ? stamp + verificationDelay(attempts) : 0,
             verificationBaseline: immediate || retryDelays.length ? baseSnapshot : null
-        });
+        };
+        const updated = (context.recordId && store.updateGame(sessionId, context.recordId, patch)) || store.appendGame(sessionId, patch);
+        const session = store.findSession(sessionId);
+        if (updated.resultSource === 'manual' && updated.result && session.liveGame?.observed.key === context.observation?.key) {
+            store.updateLiveGame(sessionId, null);
+        } else if (context.observation && !context.observation.endObserved && !pendingGame
+            && (!session.liveGame || session.liveGame.observed.key === context.observation.key)
+            && !session.games.some(game => game.at > context.endedAt)) {
+            store.updateLiveGame(sessionId, { mode: context.mode, observed: context.observation,
+                baseSnapshot, recordId: updated.id });
+        } else if (session?.liveGame?.recordId === updated.id) store.updateLiveGame(sessionId, null);
+        trailing.arm(sessionId, updated);
+        return updated;
     }
 
     function clearVerificationTimer() {
@@ -402,9 +673,10 @@ function createSessionTracker({
         verificationTimer = null;
     }
 
-    function pendingForAccount() {
+    function pendingForAccount(includeRecovery = false) {
         const uuid = String(getIdentity?.()?.uuid || '').replace(/-/g, '').toLowerCase();
-        return store.getPendingGames().filter(entry => !uuid || entry.session.uuid === uuid);
+        return store.getPendingGames({includeRecovery}).filter(entry => (!uuid || entry.session.uuid === uuid) && entry.game.id !== pendingGame?.recordId
+            && !(entry.session.trackingSource==='local' && entry.session.localTracking?.current?.key===entry.game.observation?.key));
     }
 
     function schedulePendingVerification(minWaitMs = 0) {
@@ -431,30 +703,50 @@ function createSessionTracker({
             verificationAttempts: attempts,
             lastVerificationAt: now(),
             nextVerificationAt: exhausted ? 0 : now() + verificationDelay(attempts),
-            verificationBaseline: exhausted ? null : game.verificationBaseline
+            verificationBaseline: game.verificationBaseline,
+            verificationSettled: false
         });
     }
 
     function apiWindowMatchesGame(session, game, base, snapshot, delta) {
-        const result = singleApiResult(delta, game.mode);
+        if (base.at>game.at || (base.sequence>=game.sequence && base.gameKey!==game.observation?.key)) return false;
+        const result = singleApiResult(delta, game.mode, game.result==='draw' && game.observation?.endObserved);
+        if (result==='draw') {
+            const definition=MODE_DEFINITIONS.find(entry=>entry.mode===game.mode);
+            if (!Number.isFinite(base.stats?.[definition.key]?.[definition.fields.games])) return false;
+        }
         const sibling = session.games.some(other => other.id !== game.id && other.mode === game.mode
-            && other.at > base.at && other.at <= snapshot.at
-            && (other.durationMs >= 1000 || ['win', 'loss'].includes(other.result)));
+            && other.sequence>(base.sequence||0) && (other.at >= base.at || base.priorGameKeys?.includes(other.observation?.key)) && other.at <= snapshot.at
+            && (other.durationMs >= 1000 || ['win', 'loss', 'draw'].includes(other.result)));
         const awaitingCapture = [...observedEnds].some(other => other.mode === game.mode
             && other.endedAt > base.at && other.endedAt <= snapshot.at);
-        const anotherMatch = pendingGame?.mode === game.mode && pendingGame.startedAt >= (game.endedAt || game.at);
-        return Boolean(result && !sibling && !awaitingCapture && !anotherMatch && apiCountsCoverObservations(delta, game)
-            && (!game.result || game.resultSource === 'manual' || result === game.result));
+        const anotherMatch = pendingGame?.mode === game.mode && pendingGame.observed?.endObserved
+            && pendingGame.startedAt >= (game.endedAt || game.at);
+        const localEnd=session.localTracking?.current;
+        const anotherLocal=localEnd?.mode===game.mode && localEnd.endObserved && localEnd.key!==game.observation?.key;
+        const anotherSession=store.getSessions(session.uuid).some(other=>other.id!==session.id
+            && (other.games.some(record=>record.mode===game.mode && record.at>base.at && record.at<=snapshot.at)
+                || (other.liveGame?.mode===game.mode && other.liveGame.observed?.endObserved)
+                || (other.localTracking?.current?.mode===game.mode && other.localTracking.current.endObserved)));
+        const weakGameOver = (!game.resultSource || game.resultSource === 'title') && game.result === 'loss'
+            && game.events?.some(event => event.type === 'defeat' && event.cause === 'game_over')
+            && !game.events.some(event => event.type === 'victory' || (event.type === 'defeat' && event.cause !== 'game_over')
+                || isOwnTeamElimination(event, game.mode, game.metadata?.team));
+        return Boolean(result && !sibling && !awaitingCapture && !anotherMatch && !anotherLocal && !anotherSession && apiCountsCoverObservations(delta, game)
+            && (!game.result || game.resultSource === 'manual' || weakGameOver || result === game.result));
     }
 
-    async function verifyPendingEntry({ session, game }) {
+    async function verifyPendingEntry({ session, game }, suppliedSnapshot) {
         const generation = snapshotGeneration;
-        const snapshot = await takeSnapshot();
+        const snapshot = suppliedSnapshot === undefined ? await takeSnapshot() : suppliedSnapshot;
         if (generation !== snapshotGeneration || !isApiAvailable()) return null;
+        const connected = String(getIdentity?.()?.uuid || '').replace(/-/g, '').toLowerCase();
+        if (connected && session.uuid !== connected) return null;
         // Timer and manual retries may share the same fetch. Only the first
         // continuation may consume this pending record and notify chat.
         const current = store.findSession(session.id)?.games.find(entry => entry.id === game.id);
-        if (!current || current.verificationStatus !== 'pending'
+        if (pendingGame?.recordId === game.id || !current || (current.verificationStatus !== 'pending'
+            && !(current.verificationSettled===false && current.verificationBaseline && current.verificationRecoveryUntil>now()))
             || current.verificationAttempts !== game.verificationAttempts) return null;
         if (!snapshot) {
             failPendingVerification(session.id, game);
@@ -500,25 +792,44 @@ function createSessionTracker({
                 && other.at > base.at && other.at <= snapshot.at && ['win', 'loss'].includes(other.result)).length;
             if (!pendingGame && !session.endedAt && completed > 1 && completed >= observedCount) {
                 store.updateLatest(session.id, snapshot);
-                if (activeSessionId === session.id) boundarySnapshot = snapshot;
             }
+            reconcileSession(session.id, snapshot);
             failPendingVerification(session.id, game);
             return null;
         }
 
         if (!session.endedAt) store.updateLatest(session.id, snapshot);
-        if (activeSessionId === session.id) boundarySnapshot = snapshot;
-        const outcome = resolveGameResult(deriveResult(delta, game.mode), game);
+        const outcome = resolveGameResult(singleApiResult(delta,game.mode,game.result==='draw' && game.observation?.endObserved), game);
+        const candidate=game.verificationCandidate;
+        const stable=sameModeReading(candidate?.snapshot,snapshot,game.mode);
+        if (getIdentity && game.observation && settleMs>0 && (!stable || now()-candidate.at<settleMs)) {
+            const at=stable?candidate.at:now();
+            const attempts=game.verificationAttempts+1,exhausted=attempts>retryDelays.length;
+            const record=store.updateGame(session.id,game.id,{
+                result:outcome.result,resultSource:outcome.source,
+                verificationStatus:exhausted?'unverified':'pending',verificationSettled:false,
+                verificationAttempts:attempts,lastVerificationAt:now(),nextVerificationAt:exhausted?0:at+settleMs,
+                verificationCandidate:{ at,snapshot:reconciliationBaseline(snapshot) }
+            });
+            if (session.liveGame?.recordId===record.id) store.updateLiveGame(session.id,null);
+            reconcileSession(session.id,snapshot);
+            return null;
+        }
         const record = store.updateGame(session.id, game.id, {
             delta: { stats: delta.stats, achievements: delta.achievements },
             result: outcome.result,
             resultSource: outcome.source,
             verificationStatus: 'verified',
+            verificationSettled: true,
+            verificationCandidate: null,
             verificationAttempts: game.verificationAttempts + 1,
             lastVerificationAt: now(),
             nextVerificationAt: 0,
             verificationBaseline: null
         });
+        if (session.liveGame?.recordId === record.id) store.updateLiveGame(session.id, null);
+        acceptBoundary(session.id,game.mode,snapshot);
+        reconcileSession(session.id, snapshot);
         const context = {
             mode: game.mode,
             roster: game.roster,
@@ -537,20 +848,40 @@ function createSessionTracker({
         return record;
     }
 
-    async function processPendingVerifications({ force = false } = {}) {
+    async function processPendingVerifications({ force = false, suppliedSnapshot } = {}) {
         if (!isApiAvailable()) return null;
         if (!isEnabled()) {
             schedulePendingVerification(30000);
             return null;
         }
-        const next = pendingForAccount().find(entry => force || entry.game.nextVerificationAt <= now());
-        if (!next) {
+        if (verificationBatch) return verificationBatch;
+        const selected=pendingForAccount().filter(entry=>force || entry.game.nextVerificationAt<=now());
+        const due=(selected.length || suppliedSnapshot || force) ? pendingForAccount(true).filter(entry=>
+            entry.game.verificationStatus!=='pending' || selected.some(item=>item.game.id===entry.game.id && item.session.id===entry.session.id)) : [];
+        if (!due.length) {
             schedulePendingVerification();
             return null;
         }
-        const result = await verifyPendingEntry(next);
-        schedulePendingVerification();
-        return result;
+        const generation = snapshotGeneration;
+        verificationBatch = (async () => {
+            const snapshot = suppliedSnapshot===undefined ? await takeSnapshot() : suppliedSnapshot;
+            if (generation !== snapshotGeneration || !isApiAvailable()) return null;
+            let first = null;
+            reconciliationQueue=new Map();
+            try {
+                for (const entry of due) {
+                    if (generation !== snapshotGeneration) break;
+                    const result = await verifyPendingEntry(entry, snapshot);
+                    first ||= result;
+                }
+            } finally {
+                const queue=reconciliationQueue;reconciliationQueue=null;
+                if (generation===snapshotGeneration) for (const [id,reading] of queue) reconcileSession(id,reading);
+            }
+            return first;
+        })();
+        try { return await verificationBatch; }
+        finally { verificationBatch = null; schedulePendingVerification(); }
     }
 
     function resumePendingRetries() {
@@ -567,18 +898,29 @@ function createSessionTracker({
         detached = false;
         scheduleBoundaryClose();
         schedulePendingVerification();
+        return captureApiBaseline();
     }
 
     // The actual end-of-game capture, run after `gameEndDelayMs`.
     async function captureGameEnd(context) {
         const generation = snapshotGeneration;
-        const sessionId = await context.sessionPromise || await ensureSession();
-        if (!sessionId || generation !== snapshotGeneration || !isApiAvailable() || !observedEnds.has(context)) return null;
+        const sessionId = context.sessionId || await context.sessionPromise || await ensureSession();
+        if (!sessionId || generation !== snapshotGeneration || !observedEnds.has(context)) return null;
 
         const session = store.findSession(sessionId);
         const base = context.baseSnapshot || boundarySnapshot || session?.latest || session?.baseline;
+        if (!isApiAvailable()) {
+            observedEnds.delete(context);
+            const saved=appendPendingGame(sessionId,context,base,true);
+            scheduleBoundaryClose();return saved;
+        }
         const snapshot = await takeSnapshot();
-        if (generation !== snapshotGeneration || !isApiAvailable() || !observedEnds.has(context)) return null;
+        if (generation !== snapshotGeneration || !observedEnds.has(context)) return null;
+        if (!isApiAvailable()) {
+            observedEnds.delete(context);
+            const saved=appendPendingGame(sessionId,context,base,true);
+            scheduleBoundaryClose();return saved;
+        }
         observedEnds.delete(context);
         if (!snapshot) {
             const pending = appendPendingGame(sessionId, context, base);
@@ -590,7 +932,7 @@ function createSessionTracker({
         if (session && snapshotRegressed(session.baseline, snapshot)) {
             logger.warn?.('[Session] Snapshot regressed at game end — re-baselining.');
             store.rebaseline(sessionId, snapshot);
-            boundarySnapshot = snapshot;
+            boundarySnapshot = store.findSession(sessionId)?.latest || boundarySnapshot;
             if (context.localModes?.length) {
                 const pending = appendPendingGame(sessionId, context, base);
                 schedulePendingVerification();
@@ -605,6 +947,12 @@ function createSessionTracker({
         // Session-wide movement can be useful even when it cannot safely be
         // attributed to this one game (for example, kills published first).
         if (session && gameDelta && !deltaIsEmpty(gameDelta, game)) store.updateLatest(sessionId, snapshot);
+        if (getIdentity && context.observation) {
+            const saved=appendPendingGame(sessionId,context,base,true);
+            const verified=await verifyPendingEntry({session:store.findSession(sessionId),game:saved},snapshot);
+            schedulePendingVerification();scheduleBoundaryClose();
+            return verified || store.findSession(sessionId)?.games.find(game=>game.id===saved.id);
+        }
         if (!gameDelta || deltaIsEmpty(gameDelta, game)
             || !apiWindowMatchesGame(session, { ...context, result: resolveGameResult(null, context).result }, base, snapshot, gameDelta)) {
             const pending = appendPendingGame(sessionId, context, base);
@@ -618,7 +966,7 @@ function createSessionTracker({
         boundarySnapshot = snapshot;
 
         const outcome = resolveGameResult(deriveResult(gameDelta, context.mode), context);
-        const record = store.appendGame(sessionId, {
+        const patch = {
             at: context.endedAt || now(),
             mode: context.mode || null,
             // 0 means "unknown" downstream — the card omits the duration
@@ -632,11 +980,17 @@ function createSessionTracker({
             metadata: context.metadata || null,
             events: context.events || [],
             localModes: context.localModes || null,
+            observation: context.observation || null,
             delta: { stats: gameDelta.stats, achievements: gameDelta.achievements },
             verificationStatus: 'verified',
             verificationAttempts: 1,
             lastVerificationAt: now()
-        });
+        };
+        const record = (context.recordId && store.updateGame(sessionId, context.recordId, patch)) || store.appendGame(sessionId, patch);
+        if (context.manualResult && session.liveGame?.observed.key === context.observation?.key) store.updateLiveGame(sessionId, null);
+        acceptBoundary(sessionId,context.mode,snapshot);
+        trailing.arm(sessionId, record);
+        reconcileSession(sessionId, snapshot);
 
         const recap = recapFor(sessionId, record, gameDelta, context);
         emitRecap(recap);
@@ -703,16 +1057,17 @@ function createSessionTracker({
             baseSnapshot: pendingGame?.baseSnapshot || boundarySnapshot,
             endedAt: now()
         };
+        context.recordId = pendingGame?.recordId || null;
         let observed = pendingGame?.observed || null;
         if (observed?.result && !observed.resultConflict) {
-            context.events = [...events, { type: observed.result === 'win' ? 'victory' : 'defeat',
+            context.events = [...events, { type: observed.result === 'win' ? 'victory' : observed.result==='draw'?'draw':'defeat',
                 at: observed.endedAt || now(), ...(observed.resultFromGameOver ? { cause: 'game_over' } : {}) }];
         }
         const outcome = resolveGameResult(null, context);
-        if (['win', 'loss'].includes(outcome.result)) {
+        if (['win', 'loss', 'draw'].includes(outcome.result)) {
             observed ||= createGame({ mode: context.mode, key: sessionKey,
                 startedAt: now() - (measured || 0), ownName: getIdentity?.()?.name, observedFromStart: false });
-            observeResult(observed, outcome.result === 'win' ? 'VICTORY!' : 'DEFEAT!', { at: now() });
+            observeResult(observed, outcome.result === 'win' ? 'VICTORY!' : outcome.result==='draw'?'DRAW!':'DEFEAT!', { at: now() });
             // The end result is known even if we joined too late to cover all
             // combat stats. Unobserved counters keep their unavailable flags.
             observed.counts.games = { value: 1, available: true };
@@ -723,10 +1078,21 @@ function createSessionTracker({
         // snapshot is delayed or overlaps another game. A later cumulative
         // API delta cannot be split safely between matches, but these local
         // counters already belong to this game's observed instance.
-        if (observed && gameForMode(context.mode) && FIELDS.some(field => observed.counts[field]?.available)) {
+        updateGameVariant(observed, metadata?.variant);
+        updateIdentity(observed, { ownTeam: metadata?.team, serverId: metadata?.serverId });
+        if (observed && !observed.endObserved) observed.leftAt = now();
+        context.observation = observed;
+        if (observed && !observed.variant.unknown) {
+            context.metadata = { ...metadata, variant: observed.variant.label };
+        }
+        if (observed?.serverId) context.metadata = { ...context.metadata, serverId: observed.serverId };
+        if (observed && gameForMode(context.mode)
+            && FIELDS.some(field => observed.counts[field]?.available || observed.counts[field]?.value > 0)) {
             context.localModes = localModes({ totals: { [context.mode]: observed.counts } });
         }
         pendingGame = null;
+        if (activeSessionId) store.updateLiveGame(activeSessionId, observed && !observed.endObserved
+            ? { mode: context.mode, observed, baseSnapshot: context.baseSnapshot, recordId: context.recordId } : null);
         context.sessionId = activeSessionId;
         observedEnds.add(context);
 
@@ -767,10 +1133,12 @@ function createSessionTracker({
     // Close the current session and immediately open a new one from a fresh
     // snapshot (/session reset).
     async function reset() {
+        trailing.clear();
         const generation = snapshotGeneration;
         await Promise.all([...observedEnds].map(context => context.sessionPromise));
         if (generation !== snapshotGeneration) return null;
         preserveObservedEnds();
+        trailing.clear();
         clearEndTimers();
         snapshotGeneration++;
         observedEnds.clear();
@@ -795,7 +1163,9 @@ function createSessionTracker({
     }
 
     function end() {
+        trailing.clear();
         preserveObservedEnds();
+        trailing.clear();
         snapshotGeneration++;
         observedEnds.clear();
         clearBoundaryTimer();
@@ -835,7 +1205,11 @@ function createSessionTracker({
     }
 
     function detach() {
+        trailing.clear();
+        if (pendingGame?.observed && !pendingGame.observed.endObserved) pendingGame.observed.leftAt ||= now();
+        saveLiveGame();
         preserveObservedEnds();
+        trailing.clear();
         snapshotGeneration++;
         observedEnds.clear();
         clearEndTimers();
@@ -867,11 +1241,16 @@ function createSessionTracker({
         onQueueStart,
         confirmPreviousGameResult,
         onGameStart,
+        noteServerId,
         observeLocalChat,
+        observeTrailingChat: trailing.accept,
         observeLocalResult,
         excludeCurrentGame,
         onGameEnd,
         captureGameEnd,
+        attachLocalSession,
+        captureLocalBaseline,
+        queueLocalGame,
         processPendingVerifications,
         resumePendingRetries,
         refreshSettings,

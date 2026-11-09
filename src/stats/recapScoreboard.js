@@ -45,6 +45,7 @@ function averageTimeColor(duration) {
 function scoreboardRecapLines({ game, result, duration = '', averageGameTime = '', averageGameTimeEnabled = true,
     variant = '', map = '', stats = [], gamesGoal = 0, games, session = null, fields } = {}) {
     const selected = new Set(normalizeRecapFields(fields));
+    const labelColor = game === 'Bedwars' ? '§6' : '§7';
     const title = { Bedwars: 'BED WARS', SkyWars: 'SKYWARS', Duels: 'DUELS' }[game] || 'GAME';
     const badge = result === 'win' ? '§aVICTORY' : result === 'loss' ? '§cDEFEAT' : '§fGAME OVER';
     const mode = stripAnsi(String(variant || '')).replace(/[\r\n]/g, ' ').slice(0, 24);
@@ -52,7 +53,7 @@ function scoreboardRecapLines({ game, result, duration = '', averageGameTime = '
     let mapName = selected.has('map') && game === 'Bedwars' && typeof map === 'string'
         ? stripAnsi(map).replace(/[\x00-\x20\x7f]+/g, ' ').trim().slice(0, 80) : '';
     if (mapName) {
-        const prefix = (details ? '   ' : '') + '§7Map: ';
+        const prefix = (details ? '   ' : '') + labelColor + 'Map: ';
         const available = CHAT_WIDTH - chatTextWidth(details + prefix);
         if (chatTextWidth(mapName) > available) {
             while (mapName && chatTextWidth(mapName + '...') > available) mapName = mapName.slice(0, -1);
@@ -74,7 +75,7 @@ function scoreboardRecapLines({ game, result, duration = '', averageGameTime = '
         if (row && row !== prefix) rows.push(row);
         return rows;
     };
-    const recapTitle = game === 'Bedwars' ? '§c§lBED §f§lWARS RECAP' : `§6${title} RECAP`;
+    const recapTitle = game === 'Bedwars' ? '§e§lBED WARS RECAP' : `§6${title} RECAP`;
     const header = `§8------ ${recapTitle}§8 ------`;
     const visibleStats = stats.filter(stat => selected.has(stat.field || stat.label.toLowerCase()));
     const kills = visibleStats.find(stat => stat.label.toLowerCase() === 'kills');
@@ -84,16 +85,17 @@ function scoreboardRecapLines({ game, result, duration = '', averageGameTime = '
     const statParts = visibleStats.flatMap(stat => {
         if (finals && beds) {
             if (stat === beds) return [];
-            if (stat === finals) return [`§7Finals/Beds: §a${stripAnsi(String(finals.value))}§8/§e${stripAnsi(String(beds.value))}`];
+            if (stat === finals) return [`${labelColor}Finals/Beds: §a${stripAnsi(String(finals.value))}§8/${game === 'Bedwars' ? '§a' : '§e'}${stripAnsi(String(beds.value))}`];
         }
         if (kills && deaths) {
             if (stat === deaths) return [];
-            if (stat === kills) return [`§7Kills/Deaths: §a${stripAnsi(String(kills.value))}§8/§c${stripAnsi(String(deaths.value))}`];
+            if (stat === kills) return [`${labelColor}Kills/Deaths: §a${stripAnsi(String(kills.value))}§8/§c${stripAnsi(String(deaths.value))}`];
         }
         if (stat.field === 'stars' || stat.label.toLowerCase() === 'stars') {
-            return [`§b${stripAnsi(String(stat.value))} §7STARS`];
+            return [`§b${stripAnsi(String(stat.value))} ${labelColor}STARS`];
         }
-        return [`${stat.color}${stripAnsi(String(stat.value))} ${stat.label.toUpperCase()}`];
+        const color = game === 'Bedwars' && (stat === finals || stat === beds || stat === kills) ? '§a' : stat.color;
+        return [`${color}${stripAnsi(String(stat.value))} ${game === 'Bedwars' ? labelColor : ''}${stat.label.toUpperCase()}`];
     });
     const lines = [selected.has('header') && header, details,
         ...wrap(statParts)];
@@ -106,9 +108,9 @@ function scoreboardRecapLines({ game, result, duration = '', averageGameTime = '
             if (selected.has('session_losses')) results.push(`§c${count(session.losses)}L`);
             if (results.length) summary.push(results.join(' §7/ '));
             if (selected.has('session_ratio') && game === 'Bedwars') {
-                summary.push(`§7FKDR ${Number.isFinite(session.fkdr) ? getFkdrColor(session.fkdr) + formatRatio(session.fkdr) : '§f?'}`);
+                summary.push(`${labelColor}FKDR ${Number.isFinite(session.fkdr) ? getFkdrColor(session.fkdr) + formatRatio(session.fkdr) : '§f?'}`);
             }
-            if (selected.has('session_games')) summary.push(`§7PLAYED §f${count(session.games)}`);
+            if (selected.has('session_games')) summary.push(`${labelColor}PLAYED §f${count(session.games)}`);
             if (game === 'Bedwars') {
                 for (const average of [false, true]) {
                     const keys = ['finals', 'beds'].filter(key =>
@@ -117,28 +119,28 @@ function scoreboardRecapLines({ game, result, duration = '', averageGameTime = '
                     const label = average ? `Avg. ${keys.join('/')}`
                         : keys.map(key => key[0].toUpperCase() + key.slice(1)).join('/');
                     const values = keys.map(key => {
-                        if (!average) return `§f${count(session[key])}`;
+                        if (!average) return `§a${count(session[key])}`;
                         const known = Number.isFinite(session[key]) && session[key] >= 0
                             && Number.isFinite(session.games) && session.games >= 0;
                         const value = known ? (session.games > 0 ? session[key] / session.games : 0).toFixed(2) : '?';
-                        return `§a${value}`;
+                        return `§2${value}`;
                     });
-                    summary.push(`§7${label}: ${values.join('§8/')}`);
+                    summary.push(`${labelColor}${label}: ${values.join('§8/')}`);
                 }
             }
         }
-        if (averageGameTimeEnabled && averageGameTime) summary.push(`§7AVG TIME ${averageTimeColor(averageGameTime)}${averageGameTime}`);
+        if (averageGameTimeEnabled && averageGameTime) summary.push(`${labelColor}AVG TIME ${averageTimeColor(averageGameTime)}${averageGameTime}`);
     }
     const hasSession = summary.length > 0;
-    if (hasSession) summary[0] = '§7SESSION ' + summary[0];
+    if (hasSession) summary[0] = labelColor + 'SESSION ' + summary[0];
     const target = Math.floor(Number(gamesGoal));
     if (selected.has('goals') && Number.isFinite(target) && target > 0) {
         const known = Number.isFinite(games) && games >= 0;
         const filled = known ? Math.min(10, Math.floor(games / target * 10)) : 0;
         const color = known && games >= target ? '§a' : '§e';
         summary.push(hasSession
-            ? `§7GAMES ${color}${count(games)}/${formatInt(target)}`
-            : `§7GAMES GOAL ${color}${count(games)}/${formatInt(target)} §7[§a${'|'.repeat(filled)}§8${'-'.repeat(10 - filled)}§7]`);
+            ? `${labelColor}GAMES ${color}${count(games)}/${formatInt(target)}`
+            : `${labelColor}GAMES GOAL ${color}${count(games)}/${formatInt(target)} §7[§a${'|'.repeat(filled)}§8${'-'.repeat(10 - filled)}§7]`);
     }
     if (summary.length) {
         if (hasSession && statParts.length) lines.push('§r');

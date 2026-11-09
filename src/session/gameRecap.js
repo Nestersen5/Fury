@@ -7,7 +7,9 @@ const { isOwnTeamElimination } = require('./gameResult');
 function isCompletedGameRecap(recap) {
     const record = recap?.record;
     if (!record || record.metadata?.privateGame || !(record.durationMs >= 1000)
-        || !['win', 'loss'].includes(record.result)) return false;
+        || !['win', 'loss', 'draw'].includes(record.result)) return false;
+    if (record.result==='draw') return record.observation?.endObserved===true && record.observation.result==='draw'
+        && record.localModes?.some(mode=>mode.mode===record.mode && mode.games===1);
     let wins, losses;
     if (record.verificationStatus === 'local' || (recap.delta?.local && record.localModes?.length)) {
         const mode = record.localModes?.find(entry => entry.mode === record.mode);

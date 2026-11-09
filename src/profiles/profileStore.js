@@ -388,8 +388,6 @@ function builtInProfiles() {
         create('normal-sweaty', 'Normal Sweaty (Recommended)', 'A bit more chill than Super Sweaty; good for regular playing and winning.', ['competitive', 'everyday'], {
             autoDodgeEnabled: true,
             autoDodgeMinStars: 700,
-            enderDustReminderEnabled: true,
-            shareTagsAuto: true,
             shareTagsIncludeThreats: false,
             tabStatsBedwarsFields: ['name', 'stars', 'fkdr', 'tags', 'ws'],
             nametagOverlayEnabled: true,
@@ -401,7 +399,6 @@ function builtInProfiles() {
             nametagOthersSuffix: 'ping',
             nametagOthersSuffixFallback: 'fkdr',
             lobbyChatStatsTriggerEnabled: false,
-            denickPartyAnnounceEnabled: true,
             denickRealIgnNametags: true,
             denickRealSkin: true,
             denickRealIgnChat: true,

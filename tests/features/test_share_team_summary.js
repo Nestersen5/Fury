@@ -56,6 +56,18 @@ assert.ok(long.line.length + 4 <= MAX_PC_LENGTH && long.line.includes('2 cheater
 assert.strictEqual(extractText(long.component), long.line);
 assert.strictEqual(long.component.color, 'white');
 
+const statRows = [
+    { name: 'StarsOnly', team: 'RED', isThreat: true, starThreat: true, fkdrThreat: false, stars: 1200, fkdr: 6.7 },
+    { name: 'FkdrOnly', team: 'BLUE', isThreat: true, starThreat: false, fkdrThreat: true, stars: 1200, fkdr: 6.7 },
+    { name: 'BothStats', team: 'GREEN', isThreat: true, starThreat: true, fkdrThreat: true, stars: 1200, fkdr: 6.7 }
+];
+const statLines = ['Red team has 1200 stars', 'Blue team has 7 FKDR', 'Green team has 7 FKDR'];
+assert.deepStrictEqual(buildTeamSummaryEntries(statRows).map(entry => entry.line), statLines);
+const mixedStats = buildTeamSummaryEntries(statRows.map(row => ({ ...row, team: 'RED' })), include, true)[0];
+assert.strictEqual(mixedStats.line, 'Red team has 1200 stars, 7 FKDR, 7 FKDR');
+assert.strictEqual(extractText(mixedStats.component), mixedStats.line);
+assert.strictEqual(buildTeamSummaryEntries([{ ...statRows[0], team: null }])[0].line, '[UNKNOWN] [1200✫] StarsOnly');
+
 function harness(extra = {}) {
     const { clock } = fixture(), filename = require.resolve('../../src/overlay/shareTags'), module = { exports: {} };
     vm.runInNewContext(fs.readFileSync(filename, 'utf8'), { require: createRequire(filename), module, exports: module.exports, console, setTimeout: clock.setTimeout }, { filename });
@@ -73,6 +85,17 @@ function harness(extra = {}) {
 }
 
 (async () => {
+    const stats = harness({ lastScanResults: { at: Date.now(), gameMode: 'BEDWARS', results: statRows } });
+    const statStream = stats.b.createStream({}, { gameMode: 'BEDWARS' });
+    statRows.forEach(statStream.onRow);
+    const statsDone = statStream.end();
+    await stats.clock.until(2000); await statsDone;
+    assert.deepStrictEqual(stats.messages.map(row => row.message), statLines.map(line => `/pc ${line}`));
+    const statsManual = stats.b.broadcast({});
+    await stats.clock.until(4000); await statsManual;
+    assert.deepStrictEqual(stats.messages.slice(3).map(row => row.message), statLines.map(line => `/pc ${line}`));
+    assert.ok(stats.echoes.every(entry => extractText(entry.component) === entry.line));
+
     const h = harness();
     const stream = h.b.createStream({}, { gameMode: 'BEDWARS' });
     rows.forEach(stream.onRow);

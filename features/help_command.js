@@ -141,8 +141,8 @@ const HELP_SECTIONS = [
             {
                 label: '/wdr',
                 command: '/wdr ',
-                description: 'Report one player for cheating without opening the confirmation menu.',
-                variations: ['/wdr <player>', '/wdr status', '/wdr cancel']
+                description: 'Report a player or a Bed Wars team for cheating without opening the confirmation menu.',
+                variations: ['/wdr <player>', '/wdr <team>', '/wdr status', '/wdr cancel']
             },
             {
                 label: '/scan',
@@ -252,7 +252,7 @@ const HELP_SECTIONS = [
                 label: '/denick',
                 command: '/denick ',
                 description: 'Manual, automatic party, stat, and exact-match denick lookup. Party choices appear after a BedWars game starts.',
-                variations: ['/denick self', '/denick party', '/denick party test', '/denick party confirm', '/denick party choose <#>', '/denick add <nick> <realIGN>', '/denick finals <#> beds <#>', '/denick test finals <#> beds <#>', '/denick test messages', '/denick test clear', '/denick test reset', '/denick finalkill <name> beddestroy <name>'],
+                variations: ['/denick self', '/denick party', '/denick party test', '/denick party confirm', '/denick party choose <#>', '/denick add <nick> <realIGN>', '/denick notice on|off', '/denick finals <#> beds <#>', '/denick test finals <#> beds <#>', '/denick test messages', '/denick test clear', '/denick test reset', '/denick finalkill <name> beddestroy <name>'],
                 startup: 'Nick mappings and party denick'
             },
             {

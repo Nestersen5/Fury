@@ -20,6 +20,9 @@ async function main() {
     if (result.error) throw result.error;
     if (result.status !== 0) throw new Error(`Windows packaging failed (${result.status}).`);
   }
+  if (!fs.existsSync(path.join(outputDirectory, `Fury-Setup-${require('../package.json').version}-win-x64.exe.blockmap`))) {
+    throw new Error('Windows differential-download blockmap is missing.');
+  }
   // NSIS finishes adding its helper before ZIP reads this same application.
   if (!fs.existsSync(path.join(stage, 'resources', 'app-update.yml'))) {
     throw new Error('Windows updater configuration is missing from the NSIS payload.');

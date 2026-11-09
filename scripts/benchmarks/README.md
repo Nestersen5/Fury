@@ -371,3 +371,22 @@ check; ongoing trial cancellation also responds to SIGINT.
 `--resume --live` continues a stopped checkpoint after verifying source hashes
 and the key-file timestamp, retains all prior outcomes and quiet time, and
 excludes every previously requested identity from the remaining player pool.
+
+**Windows installer updates**
+
+The native updater harness uses a random installation identity, synthetic data
+and a loopback feed. It records download/verification, old-process exit and
+restart-to-ready times, plus actual response bytes and HTTP ranges:
+
+```powershell
+node scripts/verify_windows_installer_updates.js <win-unpacked> --output=<report-directory> --production-visibility --repetitions=3
+```
+
+Use `--loose --frozen-input --include=<saved-installer.nsh>` with a saved
+pre-change payload, `--missing-blockmap` for full-download fallback, or
+`--transition-from=<saved-source-directory>` for the first loose-to-archive
+upgrade. Saved sources must include launcher.js, the updater adapter/service,
+the storage bootstrap and the installer include. A snapshot must come from the
+accepted working tree, not an older Git HEAD. Do not run native writer/process
+tests concurrently with timed trials. See `docs/WINDOWS_UPDATE_PERFORMANCE.md`
+for the measured workload and limits.

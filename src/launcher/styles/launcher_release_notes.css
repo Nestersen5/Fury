@@ -1,0 +1,63 @@
+/* Release notes and discovery share category colors, not the player's accent. */
+html.fury-redesign { --release-new:#f3c64e;--release-improved:#77adff;--release-fixed:#5ed29a; }
+html.fury-redesign:is([data-theme="light"],[data-theme="frost"]) { --release-new:#906400;--release-improved:#285ebb;--release-fixed:#18754c; }
+.fury-change-section.features,.fury-change-icon.features { --release-color:var(--release-new); }
+.fury-change-section.improvements,.fury-change-icon.improvements { --release-color:var(--release-improved); }
+.fury-change-section.fixes,.fury-change-icon.fixes { --release-color:var(--release-fixed); }
+#fury-design-a .fury-release-dialog.fury-release-browser { width:min(900px,calc(100vw - 48px));height:min(700px,calc(100dvh - 48px));padding:0!important;overflow:hidden;border-radius:18px!important; }
+#fury-design-a .fury-release-browser[open] { display:grid;grid-template-columns:208px minmax(0,1fr); }
+.fury-release-browser .fury-release-versions { display:flex;flex-direction:column;min-height:0;padding:22px 12px;background:var(--fury-inset);border-right:1px solid var(--fury-border); }
+#fury-design-a .fury-release-versions h2 { margin:0 0 14px;padding:0 12px;font-size:18px; }
+.fury-release-version-list { overflow:auto;min-height:0;display:grid;align-content:start;gap:4px; }
+#fury-design-a .fury-release-version { display:flex;align-items:center;gap:10px;width:100%;height:44px;padding:0 12px;border:0;border-radius:10px;background:transparent;color:var(--fury-muted);font-size:15px;font-weight:600;text-align:left; }
+#fury-design-a .fury-release-version:is(:hover,[aria-current="true"]) { background:color-mix(in srgb,var(--fury-text) 7%,transparent);color:var(--fury-text); }
+html.fury-redesign .fury-release-version:focus-visible { outline-offset:-2px!important; }
+.fury-release-main { display:flex;flex-direction:column;min-height:0;min-width:0; }
+.fury-release-browser .fury-release-head { padding:22px 18px 4px 30px; }
+#fury-design-a .fury-release-browser .fury-release-head h2 { font-size:26px!important; }
+#fury-design-a .fury-release-head>button { display:grid;place-items:center;flex:none;width:34px;min-height:34px;padding:0;border:0;border-radius:9px;background:transparent;color:var(--fury-muted);font-size:24px;line-height:1; }
+.fury-release-browser .fury-release-content { flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:0 30px 24px;margin:0; }
+.fury-release-browser .fury-release-actions { padding:14px 24px;border-top:1px solid var(--fury-border); }
+.fury-release-browser .fury-release-status:not(:empty) { padding:0 24px; }
+.fury-release-main>[hidden] { display:none!important; }
+.fury-change-icon { display:inline-grid;place-items:center;flex:none;width:28px;height:28px;border-radius:9px;background:color-mix(in srgb,var(--release-color) 12%,transparent);color:var(--release-color); }
+.fury-change-icon svg { width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round; }
+html.fury-redesign .fury-release-content .fury-change-section { border:0;padding:0;margin:24px 0 0; }
+html.fury-redesign .fury-release-content .fury-change-section:first-child { margin-top:18px; }
+html.fury-redesign .fury-change-section h3 { display:flex;align-items:center;gap:12px;margin:0 0 6px;font-size:16px; }
+.fury-change-count { color:var(--fury-muted);font-weight:400; }
+html.fury-redesign .fury-change-section ul { list-style:none;padding:0;margin:0; }
+html.fury-redesign .fury-change-section li { display:grid;grid-template-columns:8px minmax(0,1fr) auto;align-items:start;gap:0 16px;padding:12px 0;margin:0;border-top:1px solid var(--fury-border); }
+html.fury-redesign .fury-change-section li:first-child { border:0; }
+.fury-change-section li>i { width:7px;height:7px;margin-top:9px;border-radius:50%;background:var(--release-color); }
+html.fury-redesign .fury-change-section li>p { margin:0;font-size:16px;line-height:1.55;color:var(--fury-text);overflow-wrap:anywhere; }
+#fury-design-a .fury-release-link { display:inline-flex;align-items:center;align-self:start;gap:4px;min-height:32px;padding:0 8px;border:0;border-radius:8px;background:transparent;color:var(--fury-muted);font-size:14px;font-weight:500;text-align:left;white-space:nowrap; }
+#fury-design-a .fury-release-link:hover { background:color-mix(in srgb,var(--fury-text) 6%,transparent);color:var(--fury-text); }
+.fury-change-section li>.fury-release-link { margin-top:-3px; }
+.fury-release-dot { display:block;flex:none;width:6px;height:6px;border-radius:50%;background:var(--release-new); }
+.fury-release-dot[hidden] { display:none!important; }
+.fury-release-version>.fury-release-dot,.ds-category>.fury-release-dot { margin-left:auto; }
+.fury-release-reopen,.ds-main-settings { position:relative; }
+.fury-release-reopen>.fury-release-dot,.ds-main-settings>.fury-release-dot { position:absolute;top:8px;right:8px; }
+#fury-design-a .da-update-notice.fury-release-card { display:block;padding:20px 22px 22px;border:1px solid var(--fury-border);border-radius:20px;background:var(--fury-panel); }
+.fury-release-card-head { display:flex;align-items:center;gap:12px;margin-bottom:16px; }
+.fury-release-card-head>strong { flex:1;min-width:0;font-size:17px;font-weight:600; }
+#fury-design-a .fury-release-card-close { width:32px;min-height:32px;padding:0;border:0;background:transparent;color:var(--fury-muted);font-size:24px; }
+.fury-release-highlights { display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px; }
+.fury-release-highlight { display:flex;flex-direction:column;gap:14px;padding:16px 16px 12px;border:1px solid var(--fury-border);border-radius:16px;background:var(--fury-inset);min-width:0; }
+#fury-design-a .fury-release-highlight>p { flex:1;margin:0;font-size:15.5px;line-height:1.5;color:var(--fury-text); }
+#fury-design-a .fury-release-highlight .fury-release-link { margin-left:-8px;color:var(--release-new); }
+#fury-design-a .da-update-notice.fury-release-card .fury-release-link { min-height:32px!important; }
+#fury-design-a .da-update-notice.fury-release-card .fury-release-card-close { min-height:32px!important;font-size:24px!important; }
+#fury-design-a .da-update-notice.fury-release-card .fury-release-highlight .fury-release-link { color:var(--release-new)!important; }
+#fury-design-a .fury-release-tag-label { display:flex;align-items:center;flex-wrap:wrap;gap:6px 9px; }
+#fury-design-a .fury-release-tag-label>.fury-setting-release-tag { margin-left:0; }
+#fury-design-a .fury-overlay-row:has(#lobby-spam-enabled) { grid-template-columns:minmax(0,1fr) auto!important; }
+#fury-design-a .fury-setting-release-tag { display:inline-flex;align-items:center;justify-content:center;min-width:0;height:20px;min-height:20px;margin-left:9px;padding:0 8px;vertical-align:middle;border:0;border-radius:10px;font-size:12px;font-weight:600;line-height:20px;white-space:nowrap;color:var(--release-new);background:color-mix(in srgb,var(--release-new) 12%,transparent); }
+#fury-design-a .fury-setting-release-tag.updated { color:var(--release-improved);background:color-mix(in srgb,var(--release-improved) 12%,transparent); }
+#fury-design-a .fury-release-target { outline:0!important;box-shadow:inset 0 0 0 2px var(--fury-gold)!important;border-radius:12px!important; }
+html.fury-redesign .fury-update-preview .fury-change-section li { grid-template-columns:7px minmax(0,1fr);gap:12px;padding:10px 0; }
+html.fury-redesign .fury-update-preview .fury-change-section li>p { font-size:15px; }
+@media(max-width:1100px) { .fury-release-highlights { grid-template-columns:1fr;gap:8px; }.fury-release-highlight { flex-direction:row;align-items:center;gap:16px;padding:14px 16px; }.fury-release-highlight>p { flex:1; }.fury-release-browser .fury-release-versions { padding-inline:10px; }#fury-design-a .fury-release-browser[open] { grid-template-columns:180px minmax(0,1fr); }.fury-release-browser .fury-release-head { padding-left:24px; }.fury-release-browser .fury-release-content { padding-inline:24px; } }
+@media(prefers-reduced-motion:reduce) { .fury-release-browser *, .fury-release-card * { transition:none!important; } }
+html[data-motion="reduced"] :is(.fury-release-browser,.fury-release-card) * { transition:none!important; }

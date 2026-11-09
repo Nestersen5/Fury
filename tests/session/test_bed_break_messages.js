@@ -53,5 +53,6 @@ for (const line of ['Friend: BED DESTRUCTION > Your Bed was destroyed by Tester!
 const unknown = createGame(start);
 observe(unknown, 'BED DESTRUCTION > Your Bed disappeared mysteriously!');
 assert(unknown.bedGone, 'An unknown own-bed announcement still establishes that the bed is gone');
-assert(!('beds' in localModes({ current: unknown })[0]), 'Unknown wording does not invent exact counters');
+assert(localModes({ current: unknown })[0].unavailable.includes('beds'), 'Unknown wording retains internal coverage flags');
+assert.equal(localModes({ current: unknown })[0].beds, 0, 'Only observed bed breaks are displayed');
 console.log('Bed breaks: all shipped cosmetic samples, team aliases, colors, exact actors, duplicates, unknowns and elimination passed.');

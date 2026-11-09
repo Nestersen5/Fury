@@ -110,8 +110,36 @@ function namesFrom(messages) {
     for (const gameMode of ['BEDWARS', 'SKYWARS']) await scanStreamsBeforeCompletion(gameMode);
     await scanStreamsBeforeCompletion('BEDWARS', true);
     await monthlyPreferenceStreams();
+    await starsOnlyShares();
     console.log('test_share_stream.js passed');
 })().catch(err => { console.error(err); process.exit(1); });
+
+async function starsOnlyShares() {
+    for (const fancy of [false, true]) {
+        const { clock } = fixture(), filename = require.resolve('../../src/overlay/shareTags.js'), module = { exports: {} };
+        vm.runInNewContext(fs.readFileSync(filename, 'utf8'), { require: createRequire(filename), module, exports: module.exports, console, setTimeout: clock.setTimeout }, { filename });
+        const row = { ...threat('StarPlayer', 'RED', 6.7), stars: 1200, starThreat: true, fkdrThreat: false };
+        let monthlyFetches = 0;
+        const messages = [], echoes = [], state = baseState({ shareTagsFancy: fancy, shareTagsColorLocal: true,
+            shareTagsMonthlyFkdr: true, lastScanResults: { at: Date.now(), gameMode: 'BEDWARS', results: [row] } });
+        const b = module.exports.createShareTagsBroadcaster({ state, sendChat() {}, getHypixelClient: () => ({}), getLocalUsername: () => 'Self',
+            fetchMonthlySession: async () => { monthlyFetches++; return {}; },
+            registerLocalEcho: (line, component) => echoes.push({ line, component }),
+            sendHypixelCommand: async message => { messages.push(message); return { sent: true }; }
+        });
+        const stream = b.createStream({}, { gameMode: 'BEDWARS' });
+        stream.onRow(row);
+        const done = stream.end();
+        await clock.until(1000); await done;
+        await b.broadcast({});
+        const expected = `/pc [RED] [1200✫] StarPlayer${fancy ? ' ✔' : ''}`;
+        assert.deepStrictEqual(messages, [expected, expected], 'Automatic and manual individual sharing choose the same triggering stat');
+        assert.strictEqual(monthlyFetches, 0, 'Stars-only messages must not request unused monthly FKDR');
+        const { extractText } = require('../../features/minecraft_chat');
+        assert.strictEqual(echoes.length, 2);
+        assert.ok(echoes.every(entry => extractText(entry.component) === expected.slice(4)));
+    }
+}
 
 async function monthlyPreferenceStreams() {
     const { clock } = fixture(), filename = require.resolve('../../src/overlay/shareTags.js'), module = { exports: {} };

@@ -131,6 +131,9 @@
     System::Call 'kernel32::CloseHandle(p $furyUserExeLease)'
     System::Call 'kernel32::CloseHandle(p $furyMachineExeLease)'
     System::Call 'kernel32::CloseHandle(p $furyTargetExeLease)'
+    ; Launch the executable just installed, even if a preserved shortcut still
+    ; points at a previous installation location.
+    StrCpy $launchLink "$INSTDIR\${APP_EXECUTABLE_FILENAME}"
   !macroend
   !macro customCheckAppRunning
     ; The earlier mandatory preservation section checks all legacy locations

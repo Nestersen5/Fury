@@ -147,6 +147,9 @@ async function lifecycle(apiAvailable) {
             const b = tracker.processPendingVerifications({ force: true });
             releaseFetch(); holdFetch = false;
             await Promise.all([a, b]);
+            assert.equal(verifications.length, 0, 'The first API result is still settling');
+            stamp += 30000;
+            await Promise.all([tracker.processPendingVerifications({force:true}),tracker.processPendingVerifications({force:true})]);
             assert.equal(verifications.length, 1, 'Concurrent verification consumes a record once');
             assert.equal(callbacks.length, 1, 'API reconciliation never reprints the observed recap');
         } else {

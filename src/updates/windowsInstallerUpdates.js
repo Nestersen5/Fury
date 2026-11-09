@@ -20,7 +20,7 @@ async function verifyInstaller(file, metadata) {
 }
 function createInstallerUpdates({ installedVersion, getAvailable, detectInstallation, onChange = () => {},
     requestInstall, canInstall = async () => true, read = readManifest, createUpdater = (...args) => require('./windowsUpdaterAdapter').createWindowsUpdater(...args),
-    verify = verifyInstaller, log = () => {} }) {
+    verify = verifyInstaller, attempt, log = () => {} }) {
     let state = { supported: false, status: 'idle', installedVersion, revision: 0 }, initialization, metadata, installation, adapter;
     let stopped = false, operation, generation = 0, downloaded, installOperation;
     const controller = new AbortController();
@@ -34,6 +34,7 @@ function createInstallerUpdates({ installedVersion, getAvailable, detectInstalla
         return initialization ||= (async () => {
             installation = await detectInstallation();
             if (stopped || !installation) return;
+            const previousFailed = await attempt?.pending(installedVersion);
             update({ supported: true });
             const offer = await getAvailable();
             if (stopped || !offer || compareVersions(offer.version, installedVersion) <= 0) return;
@@ -41,7 +42,8 @@ function createInstallerUpdates({ installedVersion, getAvailable, detectInstalla
             try {
                 metadata = validateWindowsUpdate(await read(new URL(releaseUrl(offer.version)), { signal: controller.signal }), offer.version);
                 if (stopped) return;
-                update({ status: 'available', bytes: metadata.bytes, releasedAt: metadata.releasedAt });
+                update({ status: 'available', bytes: metadata.bytes, releasedAt: metadata.releasedAt,
+                    ...(previousFailed ? { message: 'The previous update did not finish. Download it again to retry; a verified download can be reused.' } : {}) });
             } catch {
                 update({ status: 'unavailable', message: 'Download this release from the Fury website.' });
             }
@@ -57,7 +59,7 @@ function createInstallerUpdates({ installedVersion, getAvailable, detectInstalla
             try {
                 adapter?.dispose();
                 adapter = createUpdater(metadata, { directory: installation.directory, log,
-                    onError: () => {}, // The awaited download reports one controlled error.
+                    onError: error => log(`Windows updater reported ${/^[A-Z0-9_]+$/.test(error?.code || '') ? error.code : 'an operation failure'}.`),
                     onProgress(progress) {
                         if (stopped || id !== generation || state.status !== 'downloading') return;
                         const percent = Math.min(99, Math.max(0, Math.floor(Number(progress.percent) || 0)));
@@ -108,7 +110,14 @@ function createInstallerUpdates({ installedVersion, getAvailable, detectInstalla
                 if (stopped) return false;
                 // requestInstall invokes the handoff ONLY in the clean terminal
                 // branch of Fury's existing shutdown owner, while its lock is held.
-                await requestInstall(() => adapter.install());
+                await attempt?.begin(installedVersion, metadata.version);
+                let handedOff = false;
+                await requestInstall(() => { adapter.install(); handedOff = true; });
+                if (!handedOff) {
+                    await attempt?.clear();
+                    update({ status: 'ready', message: 'Fury could not close cleanly. Restart Fury and try the update again.' });
+                    return false;
+                }
                 return true;
             } catch {
                 update({ status: 'ready', message: 'Could not start the update. Check your connection and try again.' });

@@ -303,14 +303,6 @@ html.fury-redesign.fury-settings-roomy .appearance-studio-controls > .fury-sideb
  html.fury-redesign.fury-settings-roomy .appearance-studio-controls > :is(.appearance-theme-card,.appearance-motion-card,.fury-sidebar-options) { grid-column:1;grid-row:auto; }
 }
 
-/* Queue-time preferences use the same copy / toggle columns in both rows. */
-html.fury-redesign.fury-settings-roomy #queue-time-settings { display:grid!important;grid-template-columns:minmax(0,1fr);gap:20px!important; }
-html.fury-redesign.fury-settings-roomy #queue-time-settings .queue-time-row { display:grid;grid-template-columns:minmax(0,1fr) 132px;align-items:center;gap:24px;min-width:0; }
-html.fury-redesign.fury-settings-roomy #queue-time-settings .queue-time-row + .queue-time-row { padding-top:20px;border-top:1px solid var(--fury-border); }
-html.fury-redesign.fury-settings-roomy #queue-time-settings .queue-time-row >div { min-width:0; }
-html.fury-redesign.fury-settings-roomy #queue-time-settings .note { max-width:none; }
-html.fury-redesign.fury-settings-roomy #queue-time-settings .feature-toggle { justify-self:end; }
-
 /* Approved control design: text-led cards, solid selections and soft steppers.
    Existing inputs, labels and events remain the source of state. */
 html.fury-redesign.fury-settings-roomy {
@@ -343,7 +335,6 @@ html.fury-redesign.fury-settings-roomy .settings-subpage :is(.fc-module-icon,.sh
     display:none!important;
 }
 html.fury-redesign.fury-settings-roomy .settings-subpage .feature-card .note { max-width:none; }
-html.fury-redesign.fury-settings-roomy #queue-time-settings .queue-time-row + .queue-time-row { border-top:0!important; }
 html.fury-redesign.fury-settings-roomy .share-option-row { border-bottom:0!important; }
 
 /* Master controls retain their original checkbox and Off/On click targets. */
@@ -573,8 +564,7 @@ html.fury-redesign.fury-settings-roomy .settings-subpage .fury-overlay-panel {
     display:block!important;padding:8px 24px!important;margin:0!important;border:1px solid var(--fury-soft-edge)!important;
     border-radius:14px!important;background:var(--fury-panel)!important;box-shadow:none!important;
 }
-html.fury-redesign.fury-settings-roomy .fury-overlay-row,
-html.fury-redesign.fury-settings-roomy #queue-time-settings .fury-overlay-row {
+html.fury-redesign.fury-settings-roomy .fury-overlay-row {
     display:grid!important;grid-template-columns:minmax(0,1fr) 132px!important;align-items:center;gap:24px;
     min-height:78px;padding:18px 0!important;border:0!important;background:transparent!important;box-shadow:none!important;
 }
@@ -718,53 +708,12 @@ html.fury-redesign.fury-settings-roomy[data-workspace-page="settings"] .settings
     }
 }
 
-/* Connection settings use the API page's compact accordion cards. */
+/* Connection rows are laid out by Design A; these keep the shared footer actions. */
 html.fury-redesign .fury-connections { display:grid;gap:20px; }
-html.fury-redesign .fury-connection-card,
-html.fury-redesign .fury-connection-alerts,
-html.fury-redesign .fury-connection-footer { margin:0!important;padding:0;border:1px solid var(--fury-border);border-radius:8px;background:var(--fury-inset);min-width:0;overflow:hidden; }
-html.fury-redesign .fury-connection-heading { display:grid;grid-template-columns:48px minmax(0,1fr) auto 16px;gap:12px;align-items:center;padding:20px;min-height:72px;list-style:none;cursor:pointer; }
-.fury-connection-heading::-webkit-details-marker { display:none; }
-html.fury-redesign .fury-connection-heading h3,
-html.fury-redesign .fury-connection-alerts h3 { margin:0;font-size:16px;line-height:24px; }
-html.fury-redesign .fury-connection-heading >span:first-child { color:var(--fury-gold);display:grid;place-items:center;width:28px;height:28px; }
-.fury-connection-heading svg { width:24px;height:24px; }
-html.fury-redesign .fury-connection-heading b { font-size:11px;text-transform:uppercase;font-weight:600; }
-.fury-connection-heading .good { color:var(--good,#68cd90); }
-.fury-connection-heading .bad { color:var(--bad,#f17474); }
-.fury-connection-heading .warn { color:var(--fury-gold); }
-.fury-connection-chevron { color:var(--fury-gold);font-size:22px; }
-.fury-connection-card:not([open]) .fury-connection-chevron { transform:rotate(180deg); }
-html.fury-redesign .fury-connection-body { border-top:1px solid var(--fury-border);padding:20px; }
-html.fury-redesign .fury-connection-fields { display:grid;grid-template-columns:minmax(160px,.65fr) minmax(220px,1.4fr) auto;align-items:center;gap:20px; }
-html.fury-redesign .fury-connection-fields label { display:flex;flex-direction:row;align-items:center;gap:16px;margin:0;min-width:0; }
-html.fury-redesign .fury-connection-fields label >span { flex:none;font-size:13px;white-space:nowrap; }
-html.fury-redesign .fury-connection-fields input { width:100%;min-width:0;height:42px;min-height:42px;margin:0;padding:0 14px;border:1px solid var(--fury-border);border-radius:7px;background:var(--fury-inset); }
 html.fury-redesign .fury-connections button { min-height:42px;padding:0 18px;white-space:nowrap; }
 html.fury-redesign .fury-connections button.primary { background:var(--fury-gold);color:#101315;border-color:var(--fury-gold); }
-html.fury-redesign .fury-connection-address-row { display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin:14px 0 0; }
-html.fury-redesign .fury-connection-address { margin:0;color:var(--fury-muted);font-size:13px; }
-html.fury-redesign .fury-connection-address-row button { min-height:36px;padding:0 12px; }
-html.fury-redesign .fury-connection-address-row button.is-copied { color:var(--good); }
-html.fury-redesign .fury-connection-body >small:not([hidden]) { display:block;color:var(--bad,#f17474);margin-top:10px; }
-html.fury-redesign .fury-connection-alerts { display:grid;grid-template-columns:48px minmax(0,1fr) auto;align-items:center;gap:12px;padding:20px; }
-.fury-connection-alert-icon svg { width:28px;height:28px;fill:none;stroke:var(--fury-gold);stroke-width:1.7;stroke-linejoin:round; }
-html.fury-redesign .fury-connection-alerts p { margin:5px 0 0;color:var(--fury-muted);font-size:13px; }
-html.fury-redesign .fury-connection-footer { display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 20px; }
-.fury-connection-footer >span { color:var(--fury-muted);font-size:13px; }
 .fury-connection-actions { display:flex;gap:12px;flex-wrap:wrap; }
 .fury-connections [hidden] { display:none!important; }
 /* Keep expiry visible when the existing Hypixel card is collapsed. */
 html.fury-redesign #hypixel-key-reminder-summary[data-reminder-alert="true"] { display:block!important;color:var(--fury-gold);white-space:normal; }
 html.fury-redesign #hypixel-key-reminder { flex-direction:column;gap:4px!important; }
-.fury-connection-heading:focus-visible { outline:2px solid var(--fury-gold);outline-offset:-3px; }
-@media(max-width:1200px) {
- html.fury-redesign .fury-connection-fields { grid-template-columns:minmax(100px,.6fr) minmax(180px,1fr) auto;gap:14px;align-items:end; }
- html.fury-redesign .fury-connection-fields label { flex-direction:column;align-items:stretch;gap:8px; }
- html.fury-redesign .fury-connection-footer { flex-wrap:wrap; }
-}
-@media(max-width:800px) {
- html.fury-redesign .fury-connection-fields { grid-template-columns:1fr; }
- html.fury-redesign .fury-connection-alerts { grid-template-columns:28px minmax(0,1fr); }
- .fury-connection-alerts .feature-toggle { grid-column:2; }
-}

@@ -33,17 +33,18 @@ function packagePaths(input) {
     const resources = process.platform === 'darwin'
         ? path.resolve(path.dirname(executable), '..', 'Resources')
         : path.join(path.dirname(executable), 'resources');
-    const appRoot = path.join(resources, 'app');
-    assert(fs.existsSync(path.join(appRoot, 'launcher.js')), 'Packaged launcher is missing');
+    const { applicationRoot, applicationFileExists } = require('./packaged_application');
+    const appRoot = applicationRoot(resources);
+    assert(applicationFileExists(appRoot, 'launcher.js'), 'Packaged launcher is missing');
     for (const privatePath of ['.env', '.env.local', 'statmod_key.txt', 'auth_tokens', 'launcher_data',
         'recordings', 'packet_logs', 'backups', 'tmp', 'friend_aliases.json', 'session_data.json',
         'denicked.json', 'encounter_data.json', 'features_config.json', 'server_config.json',
         'cosmetic_search_cache.json', 'cosmetic_direct_samples.json', 'kill_message_patterns.json',
         'src/cosmetics/effect_library.json']) {
-        assert(!fs.existsSync(path.join(appRoot, privatePath)), `Private runtime data was bundled: ${privatePath}`);
+        assert(!applicationFileExists(appRoot, privatePath), `Private runtime data was bundled: ${privatePath}`);
     }
     for (const asset of ['skinview3d/bundles/skinview3d.bundle.js', 'skinview3d/assets/minecraft.woff2']) {
-        assert(fs.existsSync(path.join(appRoot, 'node_modules', asset)), `Skin preview asset is missing: ${asset}`);
+        assert(applicationFileExists(appRoot, 'node_modules/' + asset), `Skin preview asset is missing: ${asset}`);
     }
     return { executable, resources, appRoot };
 }

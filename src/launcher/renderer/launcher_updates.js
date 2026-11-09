@@ -1,8 +1,8 @@
 'use strict';
-function mount({ document, notifications, invoke, subscribe = () => () => {}, isClosing = () => false }) {
+function mount({ document, notifications, invoke, navigate, subscribe = () => () => {}, isClosing = () => false }) {
     const window = document.defaultView;
     let disposed = false, offer = null, toast = null, loading = false, notesPromise, updater = null;
-    let pinned = false, closeTimer, suppressFocus = false;
+    let pinned = false, closeTimer, suppressFocus = false, dashboardNotice = null;
     const node = (tag, text, css) => {
         const el = document.createElement(tag);
         if (text) el.textContent = text;
@@ -17,20 +17,13 @@ function mount({ document, notifications, invoke, subscribe = () => () => {}, is
     const formatBytes = value => `${(Math.max(0, value || 0) / 1024 / 1024).toFixed(1)} MB`;
     const sections = [['features', 'New features'], ['improvements', 'Improvements'], ['fixes', 'Bug fixes']];
     function fillNotes(target, result) {
-        target.replaceChildren();
-        for (const [key, title] of sections) {
-            if (!result.sections[key]?.length) continue;
-            const section = node('section'), list = node('ul'); section.append(node('h3', title));
-            result.sections[key].forEach(line => list.append(node('li', line)));
-            section.append(list); target.append(section);
-        }
-        if (!result.complete) target.append(node('p', 'The latest release notes are unavailable.', 'note'));
-        if (!target.children.length) target.append(node('p', 'No additional changes to show.', 'note'));
+        presentation.fillNotes(target, result);
     }
-    const notes = () => notesPromise ||= invoke('updates:notes').catch(error => { notesPromise = null; throw error; });
+    const notes = () => notesPromise ||= invoke('updates:notes').finally(() => { notesPromise = null; });
     async function acknowledge(version) {
         if (!await invoke('updates:dismiss', version)) throw Error('Dismissal unavailable');
         toast?.querySelector('.notification-close')?.click(); toast = null;
+        dashboardNotice?.remove(); dashboardNotice = null;
     }
     async function action() {
         if (disposed || isClosing()) return;
@@ -64,9 +57,7 @@ function mount({ document, notifications, invoke, subscribe = () => () => {}, is
         try {
             const result = await notes();
             if (disposed || isClosing() || !result) return;
-            heading.textContent = `What’s new in Fury ${result.version}`;
-            subtitle.textContent = result.fromVersion ? `Changes since your version: ${result.fromVersion}` : 'Release highlights';
-            fillNotes(content, result);
+            presentation.show(result);
             download.hidden = result.kind !== 'available'; download.textContent = `Download ${result.version}`;
             if (automatic()) renderState();
             if (!dialog.open) dialog.showModal();
@@ -92,6 +83,9 @@ function mount({ document, notifications, invoke, subscribe = () => () => {}, is
         if (disposed || isClosing()) return;
         suppressFocus = true; reopen.focus({ preventScroll: true }); suppressFocus = false;
     });
+    const presentation = require('./launcher_release_notes').mount({ document, invoke, navigate,
+        notify: (title, detail) => notifications.show({ title, detail, kind: 'error' }),
+        dialog, head, heading, subtitle, content, footer, dialogStatus, reopen });
     const preview = node('section', null, 'fury-update-preview');
     preview.id = 'fury-update-preview'; preview.hidden = true;
     preview.setAttribute('popover', 'manual'); preview.setAttribute('role', 'dialog');
@@ -206,9 +200,24 @@ function mount({ document, notifications, invoke, subscribe = () => () => {}, is
         updater = value; renderState();
     }
     const unsubscribe = subscribe(acceptState);
-    const show = () => {
+    const show = async () => {
         if (disposed || isClosing() || document.hidden || !offer) return;
         const result = offer; offer = null; document.removeEventListener('visibilitychange', show);
+        const dashboard = document.querySelector('.da-dashboard-notices');
+        if (dashboard) {
+            dashboardNotice?.remove();
+            let data;
+            try { data = await notes(); } catch { data = { ...result, releases: [] }; }
+            if (disposed || isClosing()) return;
+            dashboardNotice = presentation.dashboard(data, openNotes, async event => {
+                const dismiss = event.currentTarget; dismiss.disabled = true;
+                try { await acknowledge(result.version); }
+                catch { notifications.show({ title: 'Could not save your choice', detail: 'Please try again.', kind: 'error' }); }
+                finally { dismiss.disabled = false; }
+            });
+            dashboard.append(dashboardNotice);
+            return;
+        }
         toast = notifications.show({
             title: result.kind === 'welcome' ? `Welcome to Fury ${result.version}` : `Fury ${result.version} is available.`,
             detail: result.fromVersion ? `See what changed since ${result.fromVersion}.` : 'See the release highlights.',
@@ -234,6 +243,8 @@ function mount({ document, notifications, invoke, subscribe = () => () => {}, is
                 if (document.hidden) document.addEventListener('visibilitychange', show); else show();
             }
             acceptState(await invoke('updates:state'));
+            const data = await notes();
+            if (!disposed && !isClosing()) presentation.load(data);
         } catch { /* Offline/startup failures stay silent. */ }
     }, 0);
     function dispose() {
@@ -241,9 +252,10 @@ function mount({ document, notifications, invoke, subscribe = () => () => {}, is
         document.removeEventListener('visibilitychange', show); document.removeEventListener('pointerdown', outside);
         document.removeEventListener('keydown', escape); window.removeEventListener('resize', positionPreview);
         window.removeEventListener('pagehide', dispose);
-        if (dialog.open) dialog.close(); hidePreview(false); dialog.remove(); preview.remove(); reopen.remove();
+        presentation.dispose();
+        if (dialog.open) dialog.close(); hidePreview(false); dashboardNotice?.remove(); dialog.remove(); preview.remove(); reopen.remove();
     }
     window.addEventListener('pagehide', dispose, { once: true });
-    return { dispose };
+    return { dispose, flush: () => presentation.flush() };
 }
 module.exports = { mount };

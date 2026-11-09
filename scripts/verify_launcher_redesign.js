@@ -8,7 +8,7 @@ const puppeteer=require('puppeteer');
 const {cleanEnvironment,unusedPorts,startChild,stopChild,assertRunning,eventually,packagePaths,uiTestArguments}=require('./smoke_packaged_app');
 const root=path.resolve(__dirname,'..');
 const args=process.argv.slice(2),options={};
-for(let i=0;i<args.length;i+=2){assert(['--app','--output','--focus'].includes(args[i])&&args[i+1], 'Usage: node scripts/verify_launcher_redesign.js [--app <Fury.app or executable>] [--output <directory>] [--focus sessions|order]');options[args[i]]=args[i+1];}
+for(let i=0;i<args.length;i+=2){assert(['--app','--output','--focus'].includes(args[i])&&args[i+1], 'Usage: node scripts/verify_launcher_redesign.js [--app <Fury.app or executable>] [--output <directory>] [--focus sessions|order|sliders|version]');options[args[i]]=args[i+1];}
 const packaged=options['--app']?packagePaths(options['--app']):null;
 const output=path.resolve(options['--output']||path.join(root,'output','launcher-redesign-implemented'));
 const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
@@ -34,13 +34,20 @@ const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
     fs.writeFileSync(path.join(profile,'session_data.json'),JSON.stringify({version:3,sessions}));
     const nickFixtures=[{realIGN:'ExamplePlayer',nicks:['ExampleNick'],methods:['skin'],firstSeen:'2026-09-01T12:00:00Z',lastSeen:'2026-09-07T14:30:00Z',events:[{at:'2026-09-07T14:30:00Z',nick:'ExampleNick',method:'skin'}]},{realIGN:'PlayerTwo',nicks:['AnotherNick'],methods:['manual'],firstSeen:'2026-09-01T12:00:00Z',lastSeen:'2026-09-06T14:30:00Z',events:[{at:'2026-09-06T14:30:00Z',nick:'AnotherNick',method:'manual'}]}];
     fs.writeFileSync(path.join(profile,'denicked.json'),JSON.stringify(nickFixtures));
-    const child=startChild(packaged?.executable||require('electron'),[...(packaged ? [] : [root]),...uiTestArguments(),`--remote-debugging-port=${debugPort}`,'--remote-debugging-address=127.0.0.1','--disable-backgrounding-occluded-windows','--disable-renderer-backgrounding',`--proxy-server=${env.HTTPS_PROXY}`],env,'Launcher redesign verification');
+    const child=startChild(packaged?.executable||require('electron'),[...(packaged ? [] : [root]),...(options['--focus']==='seasonal'||options['--focus']?.startsWith('seasonal-masking')||options['--focus']==='seasonal-navigation'?['--inspect=0']:[]),...uiTestArguments(),`--remote-debugging-port=${debugPort}`,'--remote-debugging-address=127.0.0.1','--disable-backgrounding-occluded-windows','--disable-renderer-backgrounding',`--proxy-server=${env.HTTPS_PROXY}`],env,'Launcher redesign verification');
     let browser,page;const errors=[],checks=[],layouts=[];
-    // Locator clicks wait for the moving page/control to settle before pressing.
-    const click=selector=>page.locator(selector).click();
+    // Exercise the visible control after Design A replaces binary labels with
+    // native switches; the Players/Teams selector keeps its two real choices.
+    const click=async selector=>{
+        if (/\.fury-binary-(?:on|off)$/.test(selector)) {
+            const choice=await page.$eval(selector,el=>({visible:el.checkVisibility(),id:el.closest('label').querySelector('input').id,checked:el.closest('label').querySelector('input').checked}));
+            if(!choice.visible){if(choice.checked!==selector.endsWith('.fury-binary-on'))await page.locator('#'+choice.id).click();return;}
+        }
+        await page.locator(selector).click();
+    };
     const record=text=>{checks.push(text);console.log(`PASS ${text}`);};
     try{
-        browser=await eventually(async()=>{assertRunning(child);return puppeteer.connect({browserURL:`http://127.0.0.1:${debugPort}`,defaultViewport:null});},'Connecting launcher');
+        browser=await eventually(async()=>{assertRunning(child);const endpoint=child.output.match(/DevTools listening on (ws:\/\/[^\s]+)/)?.[1];assert(endpoint,'DevTools is not ready');return puppeteer.connect({browserWSEndpoint:endpoint,defaultViewport:null});},'Connecting launcher');
         page=await eventually(async()=>{const p=(await browser.pages()).find(p=>p.url().endsWith('/launcher.html'));assert(p);return p;},'Opening launcher renderer');
         await page.setViewport({width:1440,height:900,deviceScaleFactor:1});
         page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error'&&m.text().includes('[Fury]'))errors.push(m.text());});
@@ -49,6 +56,54 @@ const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
         assert.strictEqual(await page.evaluate('process.platform'),process.platform);
         assert(await page.evaluate('Boolean(windowsDesign && windowsSettingsDesign && document.querySelector(".fc-module") && document.querySelector(".fury-window-controls"))'));
         assert.deepStrictEqual(await page.evaluate('[...document.querySelectorAll("link[rel=stylesheet]")].filter(link=>!link.sheet).map(link=>link.getAttribute("href"))'),[],'A launcher stylesheet did not load');
+        await page.waitForSelector('.ds-brand-version',{visible:true});
+        const releaseVersion=require('../package.json').version;
+        const logoVersion=await page.evaluate(()=>({
+            installedVersion:require('./package.json').version,
+            labels:[...document.querySelectorAll('.ds-brand-version')].map(label=>({
+                text:label.textContent,visible:label.checkVisibility(),title:label.closest('.ds-brand')?.title
+            }))
+        }));
+        assert.strictEqual(logoVersion.installedVersion,releaseVersion,'The running launcher must use the release package version');
+        assert.deepStrictEqual(logoVersion.labels,[{text:`v.${releaseVersion}`,visible:true,title:`Fury v.${releaseVersion}`}],
+            'The version beside the Fury logo and its tooltip must show the installed release version');
+        fs.writeFileSync(path.join(output,'logo-version.json'),JSON.stringify(logoVersion,null,2));
+        record('Visible Fury logo version and tooltip match the installed release '+releaseVersion);
+        if(options['--focus']==='version'){
+            assert.deepStrictEqual(errors,[]);
+            return;
+        }
+        if(options['--focus']==='seasonal-card-audit'){
+            const cards=await page.evaluate(async()=>{
+                const renderer=require('./src/launcher/renderer/launcher_session_card'),crypto=require('node:crypto');
+                const session=state.sessionHistory.sessions[0],fields=state.settings.features.sessionBedwarsFields;
+                const capture=async()=>{
+                    const result=[];
+                    for(const selected of [fields,[...fields.filter(f=>f!=='gamesByMode'),'hideGamesByMode']]){
+                        const card=await renderer.render(session,{fields:selected,avatar:false});
+                        result.push({width:card.canvas.width,height:card.canvas.height,sha256:crypto.createHash('sha256').update(card.canvas.toDataURL()).digest('hex')});
+                    }
+                    return result;
+                };
+                const enabled=await capture();NesterTheme.disposeSeasonal();
+                document.querySelector('link[href="src/launcher/styles/launcher_seasonal.css"]').disabled=true;
+                return{withSeasonal:enabled,withoutSeasonal:await capture()};
+            });
+            assert.deepStrictEqual(cards.withSeasonal,cards.withoutSeasonal,'Seasonal feature must not change session-card output');
+            fs.writeFileSync(path.join(output,'card-compatibility.json'),JSON.stringify(cards,null,2));
+            console.log('PASS Session-card pixels/dimensions are identical with the seasonal feature removed',JSON.stringify(cards));
+            return;
+        }
+        if (options['--focus'] === 'seasonal' || options['--focus'] === 'seasonal-baseline' || options['--focus']?.startsWith('seasonal-masking') || options['--focus'] === 'seasonal-navigation') {
+            await require('./verify_seasonal_themes')({page,output,profile,child,baseline:options['--focus'] === 'seasonal-baseline',masking:options['--focus']?.startsWith('seasonal-masking'),maskingBaseline:options['--focus']==='seasonal-masking-baseline',navigation:options['--focus']==='seasonal-navigation'});
+            assert.deepStrictEqual(errors,[]);
+            return;
+        }
+        if(options['--focus']==='reminder-previews'){
+            await require('./verify_reminder_previews')({page,output,profile});
+            assert.deepStrictEqual(errors,[]);
+            return;
+        }
         if(options['--focus']==='lobby-scoreboard'){
             await require('./verify_lobby_scoreboard_settings')({page,output,profile});
             assert.deepStrictEqual(errors,[]);
@@ -74,6 +129,11 @@ const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
             assert.deepStrictEqual(errors,[]);
             return;
         }
+        if(options['--focus']==='sliders'){
+            await require('./verify_range_sliders')({page,output,profile});
+            assert.deepStrictEqual(errors,[]);
+            return;
+        }
         if(options['--focus']==='key-reminder'){
             await require('./verify_launcher_key_reminder')({page,output,profile});
             assert.deepStrictEqual(errors,[]);
@@ -95,9 +155,19 @@ const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
             assert.deepStrictEqual(errors,[]);
             return;
         }
+        if(options['--focus']==='nicks'){
+            await require('./verify_launcher_nicks')({page,output,profile});
+            assert.deepStrictEqual(errors,[]);
+            return;
+        }
+        if(options['--focus']==='nicks-migration'){
+            await require('./verify_denick_migration_notice')({page,output,profile});
+            assert.deepStrictEqual(errors,[]);
+            return;
+        }
         assert.strictEqual(await page.$eval('.global-search-shortcut',e=>e.textContent),process.platform==='darwin'?'Cmd K':'Ctrl K');
         const modifier=process.platform==='darwin'?'Meta':'Control';
-        await page.focus('#proxy-start');await page.keyboard.down(modifier);await page.keyboard.press('k');await page.keyboard.up(modifier);
+        await page.focus('.da-dashboard-start');await page.keyboard.down(modifier);await page.keyboard.press('k');await page.keyboard.up(modifier);
         assert(await page.evaluate('document.activeElement.id==="global-search-input"'));
         await page.keyboard.press('Escape');
         record('Current shared design, settings styles, window controls and native search shortcut load on '+process.platform+'/'+process.arch);
@@ -105,6 +175,11 @@ const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
         assert.strictEqual(await page.evaluate('state.accountKey'),accounts[0].uuid);
         assert.strictEqual(await page.evaluate('state.reminders.enderDust.enderDust'),280);
         assert.strictEqual(await page.evaluate('state.reminders.gamblerGeorge.claimReady'),true);
+        assert(await page.evaluate(()=>{
+            const host=document.querySelector('.fury-recent-content'),before=host.textContent;
+            furyDesign.clearAccount();designA.update(state);
+            return before.length>0&&host.textContent===before;
+        }), 'The Dashboard restores its summary after the native account owner clears it');
         const select=async name=>{
             await page.evaluate(`if(!document.querySelector('.fury-account-manager').open)furyDesign.openManager()`);
             await page.evaluate(name=>{const row=[...document.querySelectorAll('.fury-account-row')].find(r=>r.querySelector('strong')?.textContent===name);const b=[...row.querySelectorAll('button')].find(b=>b.textContent==='Select');b.click();},name);
@@ -136,22 +211,22 @@ const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
         const png=Buffer.from(image.png.split(',')[1],'base64');assert.strictEqual(png.toString('ascii',1,4),'PNG');assert.strictEqual(png.readUInt32BE(16),image.width);fs.writeFileSync(path.join(output,'session-card.png'),png);
         const dynamic=await page.evaluate(`(async()=>{const render=require('./src/launcher/renderer/launcher_session_card').render,session=state.sessionHistory.sessions[0];const small=await render(session,{fields:['wins'],avatar:false});const all=await render(session,{avatar:false});const large=structuredClone(session);Object.assign(large.modes[0],{wins:123456789,finals:123456789,losses:123456789});const expanded=await render(large,{avatar:false});const overnight=structuredClone(session);overnight.startedAt=new Date("2026-09-07T23:30:00").getTime();overnight.endedAt=new Date("2026-09-08T01:15:00").getTime();overnight.durationMs=105*60000;const overnightCard=await render(overnight,{avatar:false});return {small:small.width,all:all.width,large:expanded.width,smallHeight:small.height,allHeight:all.height,overnight:overnightCard.canvas.getAttribute("aria-label")};})()`);
         assert(dynamic.large>dynamic.all&&dynamic.all>=dynamic.small);assert(dynamic.smallHeight<dynamic.allHeight);assert(dynamic.overnight.includes("Finished: Sep 8, 1:15 AM"));
-        await page.evaluate(`window.originalWriteImage=clipboard.writeImage;clipboard.writeImage=image=>{window.copiedCardSize=image.getSize();};document.querySelector('.fury-card-toolbar button').click();`);
+        await page.evaluate(`window.originalWriteImage=clipboard.writeImage;clipboard.writeImage=image=>{window.copiedCardSize=image.getSize();};document.querySelector('.fury-session-row[open] .fury-card-copy').click();`);
         assert.deepStrictEqual(await page.evaluate('window.copiedCardSize'),{width:image.width,height:image.height});await page.evaluate('clipboard.writeImage=window.originalWriteImage');
         const exports=path.join(profile,'exports');fs.mkdirSync(exports);const cdp=await page.createCDPSession();await cdp.send('Page.setDownloadBehavior',{behavior:'allow',downloadPath:exports});
-        await click('.fury-card-toolbar .fury-gold-outline');await eventually(async()=>assert(fs.readdirSync(exports).some(file=>file.endsWith('.png'))),'Saving generated PNG');
+        await click('.fury-session-row[open] .fury-card-save');await eventually(async()=>assert(fs.readdirSync(exports).some(file=>file.endsWith('.png'))),'Saving generated PNG');
         const downloaded=fs.readFileSync(path.join(exports,fs.readdirSync(exports).find(file=>file.endsWith('.png'))));assert(downloaded.equals(png));
         record('Session PNG uses real stats and timestamps, measures long values, and reaches both copy and download actions');
         if(options['--focus']==='sessions'){await require('./verify_launcher_session_modes')({page,output});assert.deepStrictEqual(errors,[]);record('Session game and team mode selection, responsive cards and exports passed');return;}
         if(options['--focus']==='order'){await require('./verify_launcher_order_overlay')({page,output});assert.deepStrictEqual(errors,[]);record('Pointer and keyboard ordering passed');return;}
 
 
-        await page.evaluate(`openGlobalSearchEntry({page:'settings',category:'display',element:document.getElementById('denick-real-skin')})`);await delay(350);
+        await page.evaluate(`openGlobalSearchEntry({page:'settings',category:'denick',element:document.getElementById('denick-real-skin')})`);await delay(350);
         assert(await page.$eval('#denick-real-skin',e=>e.checkVisibility()));
         const before=await page.evaluate('collectFeatureSettings()');await click(`.fury-binary-choice:has(#denick-real-skin) .${before.features.denickRealSkin ? 'fury-binary-off' : 'fury-binary-on'}`);
         await eventually(async()=>assert.strictEqual(JSON.parse(fs.readFileSync(path.join(profile,'features_config.json'))).denickRealSkin,!before.features.denickRealSkin),'Saving checkbox chip');
         const after=await page.evaluate('collectFeatureSettings()');before.features.denickRealSkin=!before.features.denickRealSkin;assert.deepStrictEqual(after,before);
-        record('Search opens the nested appearance tab and checkbox chips save only their own setting');
+        record('Search opens the owning settings page and switches save only their own setting');
         const change=async(id,value,event='change')=>page.evaluate(({id,value,event})=>{const el=document.getElementById(id);if(el.type==='checkbox')el.checked=value;else el.value=value;el.dispatchEvent(new Event(event,{bubbles:true}));},{id,value,event});
         // Match verify_settings_autosave: the write chain acknowledges IPC,
         // while settingsSaveInFlight becomes false BEFORE refresh finishes.
@@ -247,13 +322,13 @@ const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
             await page.setViewport({width,height:900,deviceScaleFactor:1});
             const centers=await page.evaluate(()=>{
                 const rect=selector=>document.querySelector(selector).getBoundingClientRect();
-                const left=rect('.fury-number-control:has(#auto-dodge-min-fkdr)'),right=rect('.fury-number-control:has(#auto-dodge-min-stars)'),or=rect('.auto-dodge-threshold-or'),delay=rect('.stat-select-shell:has(#auto-dodge-leave-mode)');
-                return {delayY:delay.left>right.right ? Math.abs(delay.top-left.top) : 0,delayHeight:Math.abs(delay.height-left.height),x:Math.abs((or.left+or.right)/2-(left.right+right.left)/2),y:Math.abs((or.top+or.bottom)/2-(left.top+left.bottom)/2)};
+                const left=rect('.fury-number-control:has(#auto-dodge-min-fkdr)'),right=rect('.fury-number-control:has(#auto-dodge-min-stars)'),timing=rect('.stat-select-shell:has(#auto-dodge-leave-mode)');
+                return {height:Math.abs(left.height-right.height),aligned:Math.abs(left.top-right.top)<1&&left.right<=right.left || Math.abs(left.left-right.left)<1&&left.bottom<=right.top,timingVisible:timing.width>0&&timing.height>0};
             });
-            assert(centers.x<1 && centers.y<1 && centers.delayY<1,JSON.stringify({width,...centers}));
+            assert(centers.height<1 && centers.aligned && centers.timingVisible,JSON.stringify({width,...centers}));
         }
         await page.setViewport({width:1440,height:900,deviceScaleFactor:1});
-        record('Auto Dodge OR centered and Leave timing aligned with threshold inputs');
+        record('Auto Dodge limits stay aligned in both column layouts and leave timing stays available');
         const timingTrigger='.stat-select-shell:has(#auto-dodge-leave-mode) .stat-select-trigger';
         const timingMenu='[data-stat-select-for="auto-dodge-leave-mode"]';
         await click(timingTrigger);
@@ -292,7 +367,7 @@ const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
         await eventually(async()=>assert.strictEqual(JSON.parse(fs.readFileSync(path.join(profile,'server_config.json'))).proxyCustomHost,'play.example.com'),'Saving custom host');
         await change('proxy-custom-port',customPort);
         await eventually(async()=>assert.strictEqual(JSON.parse(fs.readFileSync(path.join(profile,'server_config.json'))).proxyCustomPort,customPort),'Saving custom port');
-        await eventually(async()=>assert.strictEqual(await page.$eval('#proxy-custom-port',input=>input.closest('.fury-connection-card').querySelector('.fury-connection-address').textContent),`Minecraft address: localhost:${customPort}`),'Rendering saved custom port');
+        await eventually(async()=>assert.notStrictEqual(await page.$eval('#proxy-custom-port',input=>input.closest('.fury-connection-row').querySelector('[data-network-status]').textContent),'Not configured'),'Rendering saved custom port');
         await eventually(async()=>assert.deepStrictEqual(await page.evaluate(()=>[document.querySelector('[data-join-route="custom"]').hidden,document.getElementById('join-custom-address').value]),[false,`localhost:${customPort}`]),'Showing custom address on dashboard');
         const duplicateCustom=await page.evaluate(()=>ipcRenderer.invoke('network:validate',{...currentNetworkPayload(),proxyCustomPort:Number(ids.proxyDirectPort.value)}));
         assert.strictEqual(duplicateCustom.ports.custom.state,'duplicate');
@@ -330,7 +405,7 @@ const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
         const views=[['dashboard','dashboard'],['overlay','overlay'],['sessions','sessions'],['denicks','nicks'],['reminders','reminders'],['profiles','profiles'],['console','console'],...['launcher','scan','gameplay','sessions','denick','overlay','display','api','network'].map(k=>['settings',`settings-${k}`,k])];
         for(const [width,height] of [[1440,900],[1024,680]]){
             await page.setViewport({width,height,deviceScaleFactor:1});
-            for(const [view,name,category,tab] of [...views,['settings','settings-nametags','display','nametags'],['settings','settings-colors','display','colors']]){
+            for(const [view,name,category,tab] of [...views,['settings','settings-nametags','display','nametags'],['settings','settings-scoreboard','display','scoreboard']]){
                 await page.evaluate(`activatePage('${view}');${category?`activateSettingsSubpage('${category}',false);`:''}${category==='display'?`furyDesign.showIngame('${tab||'tablist'}');`:''}document.querySelector('main').scrollTop=0;`);await delay(100);
                 const layout=await page.evaluate(`(()=>{const active=document.querySelector('.tab-page.active'),main=document.querySelector('main');return{name:'${name}',width:${width},overflow:main.scrollWidth-main.clientWidth,controls:[...active.querySelectorAll('input,select,button')].filter(e=>e.checkVisibility()&&e.getBoundingClientRect().right>innerWidth+2).map(e=>e.id||e.className)}})()`);
                 layouts.push(layout);assert(layout.overflow<=2,JSON.stringify(layout));assert.deepStrictEqual(layout.controls,[],JSON.stringify(layout));
@@ -342,7 +417,7 @@ const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
                 const errors=[];
                 for(const [input,icon] of [['#global-search-input','.global-search-icon']])if(Math.abs(cy(document.querySelector(input))-cy(document.querySelector(icon)))>.5)errors.push(input);
                 for(const b of document.querySelectorAll('.scan-mode-buttons button'))if(Math.abs(cy(b)-cy(b.querySelector('strong')))>.5)errors.push('scan '+b.textContent.trim());
-                for(const e of document.querySelectorAll('.fury-number-control'))if(e.checkVisibility())for(const c of e.children)if(Math.abs(cy(e)-cy(c))>.5)errors.push(c.id||c.tagName);
+                for(const e of document.querySelectorAll('.fury-number-control'))if(e.checkVisibility())for(const c of e.children)if(c.checkVisibility()&&Math.abs(cy(e)-cy(c))>.5)errors.push(c.id||c.tagName);
                 return errors;
             });assert.deepStrictEqual(centers,[]);
             // Navigation now refreshes overlay visibility; let that real response settle
@@ -360,9 +435,10 @@ const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
         }
         record('All main pages and nine settings categories fit 1440×900 and 1024×680; all 16 board rows render in team cards with unclipped names while only the board scrolls');
         await page.setViewport({width:1440,height:900,deviceScaleFactor:1});
-        await page.evaluate("activatePage('dashboard')");await click('#sidebar-toggle');
+        await page.evaluate("activatePage('settings');activateSettingsSubpage('launcher',false)");await click('[data-sidebar-choice="collapsed"]');
         await page.waitForFunction('document.documentElement.dataset.sidebar === "collapsed"');await delay(250);
-        await page.screenshot({path:path.join(output,'sidebar-collapsed.png')});await click('#sidebar-toggle');
+        await page.evaluate("activatePage('dashboard')");await page.screenshot({path:path.join(output,'sidebar-collapsed.png')});
+        await page.evaluate("activatePage('settings');activateSettingsSubpage('launcher',false)");await click('[data-sidebar-choice="expanded"]');await page.evaluate("activatePage('dashboard')");
         await click('#global-search-input');await page.type('#global-search-input','nametag');
         await page.waitForFunction('document.getElementById("global-search-results").checkVisibility() && document.getElementById("global-search-results-content").textContent.toLowerCase().includes("nametag")');
         await page.screenshot({path:path.join(output,'global-search.png')});await page.keyboard.press('Escape');
@@ -371,11 +447,11 @@ const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
         await page.$eval('#global-search-input',e=>{e.focus();e.value='profile';e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));});await delay(100);
         assert.strictEqual(await page.$eval('#global-search-results',e=>e.hidden),true);
         record('Columns drawer stays within both window sizes; sidebar collapse and search popup work with keyboard dismissal');
-        for(const tab of ['nametags','colors']) {await page.evaluate(`activatePage('settings');activateSettingsSubpage('display',false);furyDesign.showIngame('${tab}');document.querySelector('main').scrollTop=0;`);await delay(500);await page.screenshot({path:path.join(output,`settings-${tab}.png`)});assert.strictEqual(await page.evaluate('nametagPreviewIsVisible()'),tab==='nametags');if(tab==='nametags')await page.waitForFunction('nametagSkinViewer?.playerObject.skin.visible === true');}
+        for(const tab of ['nametags','scoreboard']) {await page.evaluate(`activatePage('settings');activateSettingsSubpage('display',false);furyDesign.showIngame('${tab}');document.querySelector('main').scrollTop=0;`);await delay(500);await page.screenshot({path:path.join(output,`settings-${tab}.png`)});assert.strictEqual(await page.evaluate('nametagPreviewIsVisible()'),tab==='nametags');if(tab==='nametags')await page.waitForFunction('nametagSkinViewer?.playerObject.skin.visible === true');}
         assert(await page.evaluate('nametagSkinViewer.renderPaused'));
         await page.evaluate(`activatePage('denicks');activateDenickSubpage('history');`);await delay(250);
         await page.waitForSelector('.fury-nick-row');await page.screenshot({path:path.join(output,'nicks-saved-matches.png')});
-        await click('.fury-nick-row[data-real="PlayerTwo"]');assert(await page.$eval('.fury-nick-detail',e=>e.textContent.includes('PlayerTwo')));
+        await click('.fury-nick-row[data-real="PlayerTwo"]');assert(await page.$eval('.fury-nick-dialog',e=>e.open&&e.textContent.includes('PlayerTwo')));await page.keyboard.press('Escape');
         await page.evaluate(() => {
             clearTimeout(refreshTimer);
             window.__nicksFixture = {fileExists:true,revision:'ui-large-nicks',players:Array.from({length:2000},(_,i)=>({realIGN:`Fixture${String(i).padStart(4,'0')}`,nicks:[`Nick${i}`],methods:['manual'],firstSeen:'2026-01-01',lastSeen:'2026-01-01',events:[{nick:`Nick${i}`,method:'manual',at:'2026-01-01'}]}))};
@@ -384,7 +460,7 @@ const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
         assert(await page.$$eval('.fury-nick-row',rows=>rows.length>0&&rows.length<60),'Large nick history mounts a bounded set of rows');
         await page.focus('.fury-nick-row');await page.keyboard.press('End');
         assert.equal(await page.evaluate('document.activeElement.dataset.index'),'1999','Keyboard navigation reaches unmounted final row');
-        await page.keyboard.press('Enter');assert(await page.$eval('.fury-nick-detail',el=>el.textContent.includes('Fixture1999')));
+        await page.keyboard.press('Enter');assert(await page.$eval('.fury-nick-dialog',el=>el.open&&el.textContent.includes('Fixture1999')));await page.keyboard.press('Escape');
         await page.keyboard.press('Home');assert.equal(await page.evaluate('document.activeElement.dataset.index'),'0');
         await page.evaluate(() => {document.getElementById('denick-search').value='Fixture0123';renderDenickHistory(window.__nicksFixture);});
         assert.equal(await page.$$eval('.fury-nick-row',rows=>rows.length),1,'Search includes offscreen players');
@@ -493,11 +569,11 @@ const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
         await page.evaluate(`activatePage('settings');activateSettingsSubpage('overlay',false);FuryNotifications.dismissAll();window.notificationExample={kind:'success',title:'Clear at game boundaries updated',detail:'Changed Clear at game boundaries.',duration:9000};FuryNotifications.show(window.notificationExample);FuryNotifications.show(window.notificationExample);`);
         await delay(250);
         assert.strictEqual(await page.$$eval('.fury-notification',els=>els.length),1);
-        assert(await page.$eval('.fury-notification',e=>{const r=e.getBoundingClientRect(),copy=e.querySelector('.notification-copy').getBoundingClientRect(),icon=e.querySelector('.notification-icon').getBoundingClientRect(),close=e.querySelector('.notification-close').getBoundingClientRect();return r.height===56&&Math.abs(icon.y+icon.height/2-close.y-close.height/2)<.5&&copy.width>240&&getComputedStyle(e.querySelector('.notification-progress')).display==='none';}));
+        assert(await page.$eval('.fury-notification',e=>{const r=e.getBoundingClientRect(),copy=e.querySelector('.notification-copy').getBoundingClientRect(),icon=e.querySelector('.notification-icon').getBoundingClientRect(),close=e.querySelector('.notification-close').getBoundingClientRect();return r.height>=40&&r.left>=0&&r.right<=innerWidth&&r.bottom<=innerHeight&&Math.abs(icon.y+icon.height/2-close.y-close.height/2)<.5&&copy.width>150&&close.right<=r.right&&getComputedStyle(e.querySelector('.notification-progress')).display==='none';}));
         await page.screenshot({path:path.join(output,'notifications.png')});await click('.notification-close');await delay(300);assert.strictEqual(await page.$('.fury-notification'),null);
         record('Compact notification icon, message and dismiss button align; duplicate feedback coalesces and dismissal works');
-        await page.evaluate(`activatePage('dashboard')`);await click('#proxy-start');
-        await eventually(async()=>{await page.evaluate('refresh()');assert(await page.evaluate('state.services.proxy.running && document.getElementById("proxy-stop").checkVisibility() && !document.getElementById("proxy-start").checkVisibility()'));},'Starting the isolated test proxy');
+        await page.evaluate(`activatePage('dashboard')`);await click('.da-dashboard-start');
+        await eventually(async()=>{await page.evaluate('refresh()');assert(await page.evaluate('state.services.proxy.running && document.querySelector(".da-dashboard-start").dataset.action==="stop" && !document.querySelector(".da-dashboard-start").disabled'));},'Starting the isolated test proxy');
         await eventually(async()=>{await page.evaluate('refresh()');assert.strictEqual(await page.evaluate('state.proxyHealth?.features?.partySplitWarningsEnabled'),false);},'Loading the saved warning preference into a fresh proxy process');
         await change('party-split-warnings-enabled',true);await waitSaved('partySplitWarningsEnabled',true);
         await eventually(async()=>{await page.evaluate('refresh()');assert.strictEqual(await page.evaluate('state.proxyHealth?.features?.partySplitWarningsEnabled'),true);},'Enabling warnings in the running proxy');
@@ -505,10 +581,10 @@ const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
         await eventually(async()=>{await page.evaluate('refresh()');assert.strictEqual(await page.evaluate('state.proxyHealth?.features?.partySplitWarningsEnabled'),false);},'Disabling warnings in the running proxy');
         record('The saved warning preference survives proxy startup and launcher changes reach the running proxy immediately');
         const buttonCenter=async id=>page.$eval(id,e=>{const r=e.getBoundingClientRect(),children=[...e.children].filter(c=>c.checkVisibility()).map(c=>c.getBoundingClientRect());return Math.abs((children[0].left+children.at(-1).right)/2-r.x-r.width/2)<.5&&children.every(c=>Math.abs(c.y+c.height/2-r.y-r.height/2)<.5);});
-        assert(await buttonCenter('#proxy-stop'));
-        await page.screenshot({path:path.join(output,'proxy-running.png')});await click('#proxy-stop');
-        await eventually(async()=>{await page.evaluate('refresh()');assert(await page.evaluate('!state.services.proxy.running && document.getElementById("proxy-start").checkVisibility()'));},'Stopping the isolated test proxy');
-        assert(await buttonCenter('#proxy-start'));
+        assert(await buttonCenter('.da-dashboard-start'));
+        await page.screenshot({path:path.join(output,'proxy-running.png')});await click('.da-dashboard-start');
+        await eventually(async()=>{await page.evaluate('refresh()');assert(await page.evaluate('!state.services.proxy.running && document.querySelector(".da-dashboard-start").dataset.action==="start" && !document.querySelector(".da-dashboard-start").disabled'));},'Stopping the isolated test proxy');
+        assert(await buttonCenter('.da-dashboard-start'));
         record('The single Start/Stop control starts and stops an actual isolated proxy process');
         // Exercise API-free persistence through the real launcher's IPC and
         // canvas renderer, without touching the user's session history.
@@ -555,7 +631,7 @@ const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
             return {text:rendered.canvas.getAttribute('aria-label'),partial:uncertain.canvas.getAttribute('aria-label'),partialPng:uncertain.canvas.toDataURL()};
         },localId);
         assert(filteredLocal.text.includes('Wins: 1')&&!filteredLocal.text.includes('Beds lost:'));
-        assert(filteredLocal.partial.includes('No verified counters available')&&!filteredLocal.partial.includes('Final kills:'));
+        assert(filteredLocal.partial.includes('No stats recorded')&&!filteredLocal.partial.includes('Final kills:'));
         fs.writeFileSync(path.join(output,'local-session-incomplete.png'),Buffer.from(filteredLocal.partialPng.split(',')[1],'base64'));
         await select('SecondAccount');await page.waitForFunction('state.accountKey==="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" && state.sessionHistory.sessions.every(s=>s.name==="SecondAccount")');
         assert(!await page.evaluate(id=>state.sessionHistory.sessions.some(s=>s.id===id),localId));

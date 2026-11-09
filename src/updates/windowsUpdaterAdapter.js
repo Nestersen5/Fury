@@ -12,6 +12,12 @@ function createWindowsUpdater(metadata, { onProgress, onError, directory, log = 
         constructor(options, updater, runtime) { super(runtime); }
         async getLatestVersion() { return info; }
         resolveFiles() { return [{ url: new URL(file.url), info: file }]; }
+        // R2 supports single byte ranges, not multipart range responses.
+        get isUseMultipleRangeRequest() { return false; }
+        getBlockMapFiles(baseUrl, oldVersion) {
+            return [new URL(releaseUrl(oldVersion, `Fury-Setup-${oldVersion}-win-x64.exe.blockmap`)),
+                new URL(releaseUrl(metadata.version, metadata.filename + '.blockmap'))];
+        }
     }
     const updater = new NsisUpdater({ provider: 'custom', updateProvider: FuryProvider });
     updater.autoDownload = false;
@@ -19,11 +25,13 @@ function createWindowsUpdater(metadata, { onProgress, onError, directory, log = 
     updater.allowDowngrade = false;
     updater.allowPrerelease = false;
     updater.disableWebInstaller = true;
-    updater.disableDifferentialDownload = true;
+    updater.disableDifferentialDownload = false;
     updater.installDirectory = directory;
     updater.logger = { info: () => {}, warn: () => {}, error: () => log('Windows update operation failed.') };
+    let installError;
+    const handleError = error => { installError = error; onError(error); };
     updater.on('download-progress', onProgress);
-    updater.on('error', onError);
+    updater.on('error', handleError);
     let token, cancelled = false;
     return {
         async download() {
@@ -36,10 +44,15 @@ function createWindowsUpdater(metadata, { onProgress, onError, directory, log = 
         },
         cancel() { cancelled = true; token?.cancel(); },
         install() {
+            installError = null;
             process.env.FURY_UPDATE_PARENT_PID = String(process.pid);
             updater.quitAndInstall(true, true);
+            if (installError) throw installError;
         },
-        dispose() { token?.cancel(); updater.removeListener('download-progress', onProgress); updater.removeListener('error', onError); }
+        // Cancellation and installer spawning can emit an error after disposal.
+        // Keep the instance-local error sink until that work is collected; an
+        // unhandled EventEmitter error must not crash the closing launcher.
+        dispose() { token?.cancel(); updater.removeListener('download-progress', onProgress); }
     };
 }
 module.exports = { createWindowsUpdater };
