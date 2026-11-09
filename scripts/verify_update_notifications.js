@@ -54,11 +54,14 @@ const server = http.createServer((req, res) => {
     if (req.url === '/available') { held.set(req.url, res); return; }
     if (req.url === '/malformed') { res.end('{broken'); return; }
     if (req.url === '/installer') { res.end(JSON.stringify({ schemaVersion: 1, latestVersion: latest, releasePageUrl: pageUrl })); return; }
-    res.end(JSON.stringify({ schemaVersion: 1, latestVersion: installed, releasePageUrl: pageUrl }));
+    res.end(JSON.stringify({ schemaVersion: 1, latestVersion: req.url === '/welcome-design' ? '1.1.4' : installed, releasePageUrl: pageUrl }));
 });
 server.on('connection', socket => { sockets.add(socket); socket.on('close', () => sockets.delete(socket)); });
 
 async function scenario(mode) {
+    // The discovery fixture exercises the reviewed 1.1.4 settings destinations;
+    // keep that historical upgrade independent of the next release's version.
+    const fixtureVersion = mode === 'welcome-design' ? '1.1.4' : installed;
     const fixturePids = new Set();
     const profile = path.join(temporary, mode), application = path.join(profile, 'fixture-app');
     fs.mkdirSync(application, { recursive: true });
@@ -73,7 +76,7 @@ async function scenario(mode) {
         env.FURY_UPDATE_TEST_MODE = '1';
         env.FURY_UPDATE_TEST_URL = `http://127.0.0.1:${server.address().port}/${mode}`;
     }
-    fs.writeFileSync(path.join(application, 'package.json'), JSON.stringify({ name: 'fury-update-fixture', version: installed, main: 'main.cjs' }));
+    fs.writeFileSync(path.join(application, 'package.json'), JSON.stringify({ name: 'fury-update-fixture', version: fixtureVersion, main: 'main.cjs' }));
     fs.writeFileSync(path.join(application, 'main.cjs'), `
 const fs=require('fs'),{app,ipcMain,shell,session}=require('electron');
 const status={checks:0,settled:0,opens:[],downloads:0,pids:[]};
@@ -117,7 +120,7 @@ require(${JSON.stringify(path.join(root, 'launcher.js'))});
             for (const pid of result.pids) fixturePids.add(pid);
             return result;
         };
-        assert.equal((await status()).installedVersion, installed);
+        assert.equal((await status()).installedVersion, fixtureVersion);
         if (mode === 'installer') {
             await page.waitForSelector('.fury-release-reopen.fury-update-available');
             assert.equal((await status()).installerDownloads, 0, 'Checking does not download');
@@ -215,7 +218,7 @@ require(${JSON.stringify(path.join(root, 'launcher.js'))});
             assert.equal(await page.$('.da-update-notice'), null);
             assert.deepEqual((await status()).opens, []);
         }
-        const final = await status(); assert.equal(final.downloads, 0); assert.equal(final.installedVersion, installed);
+        const final = await status(); assert.equal(final.downloads, 0); assert.equal(final.installedVersion, fixtureVersion);
         assert.deepEqual(errors, []);
         const count = requests.filter(request => request.path === '/' + mode).length;
         assert.equal(count, mode === 'dev-disabled' ? 0 : 1);
