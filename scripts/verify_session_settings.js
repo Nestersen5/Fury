@@ -11,11 +11,11 @@ module.exports=async function verifySessionSettings({page,output,profile}) {
     const storedBefore=await page.evaluate('JSON.stringify(state.sessionHistory.sessions)');
     const chartOption='#session-bedwars-fields label:has(input[value="gamesByMode"])';
     assert(await page.$eval(chartOption,e=>e.querySelector('input').checked),'Existing settings keep the chart enabled');
-    const chartWidth=await page.$eval('.fury-session-preview-section canvas',e=>e.width);
+    const chartHeight=await page.$eval('.fury-session-preview-section canvas',e=>e.height);
     await page.locator(chartOption).click();
     await page.waitForFunction('state.settings.features.sessionBedwarsFields.includes("hideGamesByMode")');
     await page.waitForFunction(()=>{const c=document.querySelector('.fury-session-preview-section canvas');return c&&!c.getAttribute('aria-label').includes('Games by mode');});
-    assert(await page.$eval('.fury-session-preview-section canvas',e=>e.width)<chartWidth,'Chart off reclaims its space');
+    assert(await page.$eval('.fury-session-preview-section canvas',e=>e.height)<chartHeight,'Chart off reclaims its space below the stats');
     await page.evaluate('refresh()');
     assert(!(await page.$eval(chartOption,e=>e.querySelector('input').checked)),'Chart preference survives reload');
     assert(await page.$eval('#session-skywars-fields input[value="gamesByMode"]',e=>e.checked),'Other games keep their own chart preference');

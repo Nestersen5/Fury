@@ -10,6 +10,7 @@ for (const file of [
     'src/launcher/launcher_auth_worker.js',
     'src/launcher/renderer/launcher_updates.js',
     'src/launcher/styles/launcher_theme.css',
+    'src/launcher/styles/launcher_release_notes.css',
     'src/net/cosmeticSearchAddress.js',
     'src/storage/json_writer_worker.js'
 ]) {
@@ -34,6 +35,10 @@ for (const file of ['AGENTS.md', '.agents/skills/fury-release/SKILL.md', 'websit
     assert.equal(classify(file).include, false, `Export must exclude ${file}`);
 }
 const config = require('../../package.json');
+assert.throws(() => assertApplicationComplete(included, {
+    ...config, build: { ...config.build, files: config.build.files.filter(file => file !== 'src/launcher/styles/launcher_release_notes.css') }
+}), /Launcher stylesheet missing from package: src\/launcher\/styles\/launcher_release_notes\.css/,
+'Completeness must reject an omitted stylesheet mounted by a renderer module');
 const projected = publicPackage(config);
 assert.equal(projected.scripts['test:publishing'], undefined);
 assert.equal(projected.scripts['stage:download-site'], undefined);

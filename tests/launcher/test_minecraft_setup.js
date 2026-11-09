@@ -7,7 +7,8 @@ const {registerMinecraftSetup}=require('../../src/launcher/minecraftSetupIpc');
 const entry=(name,ip)=>({name:{type:'string',value:name},ip:{type:'string',value:ip},icon:{type:'string',value:'preserve-icon'},acceptTextures:{type:'byte',value:1}});
 const root=entries=>({type:'compound',name:'',value:{servers:{type:'list',value:{type:'compound',value:entries}},other:{type:'string',value:'preserve-root-tag'}}});
 async function fixture(t,options={}){
- const dir=await fs.mkdtemp(path.join(os.tmpdir(),'fury-minecraft-setup-'));t.after(async()=>{assert.ok(path.basename(dir).startsWith('fury-minecraft-setup-'));await fs.rm(dir,{recursive:true,force:true});});
+ // macOS /var is an alias for /private/var; compare canonical fixture paths.
+ const dir=await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(),'fury-minecraft-setup-')));t.after(async()=>{assert.ok(path.basename(dir).startsWith('fury-minecraft-setup-'));await fs.rm(dir,{recursive:true,force:true});});
  const game=path.join(dir,'.minecraft'),data=path.join(dir,'fury');await fs.mkdir(game);
  const original=root([entry('Hypixel','mc.hypixel.net'),entry('Fury Design Lab','my-own-server.example'),entry('Another server','example.test')]);
  const raw=nbt.writeUncompressed(original);await fs.writeFile(path.join(game,'servers.dat'),raw);

@@ -69,6 +69,7 @@
       "src/launcher/styles/launcher_design_a.css",
       "src/launcher/styles/launcher_design_a_pages.css",
       "src/launcher/styles/launcher_seasonal.css",
+      "src/launcher/styles/launcher_release_notes.css",
       "assets/**/*",
       "src/**/*.js",
       "src/updates/releaseNotes.json",

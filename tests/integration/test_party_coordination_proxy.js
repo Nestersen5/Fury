@@ -66,6 +66,14 @@ require(${JSON.stringify(require.resolve('axios'))}).defaults.adapter = async ()
     upstream.on('error', error => errors.push(error.message));
     upstream.on('login', connection => {
         serverClient = connection; connection.on('error', error => errors.push(error.message));
+        // Reply to the real connect-time request. Unsolicited rows could race
+        // its reset of a provisional list on faster/slower native runners.
+        connection.on('chat', packet => {
+            if (!/^\/(?:p|party) list$/i.test(packet.message)) return;
+            for (const text of ['Party Leader: Alice', 'Party Members: Bob']) {
+                connection.write('chat', { message: JSON.stringify({ text }), position: 0 });
+            }
+        });
         connection.write('login', { entityId: 1, gameMode: 0, dimension: 0, difficulty: 1,
             maxPlayers: 8, levelType: 'default', reducedDebugInfo: false });
         connection.write('position', { x: 0, y: 80, z: 0, yaw: 0, pitch: 0, flags: 0 });
@@ -85,7 +93,6 @@ require(${JSON.stringify(require.resolve('axios'))}).defaults.adapter = async ()
         await eventually(async () => { assertRunning(child); assert(positioned); }, 'Connecting player');
         player.write('chat', { message: '/denick self' });
         await eventually(async () => assert(messages.some(text => text.includes('Not checked yet.'))), 'Diagnostic before any own tab observation');
-        chat('Party Leader: Alice'); chat('Party Members: Bob');
         await eventually(async () => { assertRunning(child); assert(publications.length); }, 'Confirming roster and relay authentication');
         serverClient.write('scoreboard_objective', { name: 'bedwars', action: 0, displayText: 'BED WARS', type: 'integer' });
         serverClient.write('scoreboard_display_objective', { position: 1, name: 'bedwars' });

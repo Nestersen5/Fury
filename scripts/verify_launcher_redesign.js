@@ -55,6 +55,7 @@ const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
         await page.waitForFunction('Boolean(typeof furyDesign !== "undefined" && furyDesign && state?.viewedAccount)');
         assert.strictEqual(await page.evaluate('process.platform'),process.platform);
         assert(await page.evaluate('Boolean(windowsDesign && windowsSettingsDesign && document.querySelector(".fc-module") && document.querySelector(".fury-window-controls"))'));
+        await page.waitForFunction(()=>[...document.querySelectorAll('link[rel=stylesheet]')].some(link=>link.getAttribute('href')==='src/launcher/styles/launcher_release_notes.css'&&link.sheet));
         assert.deepStrictEqual(await page.evaluate('[...document.querySelectorAll("link[rel=stylesheet]")].filter(link=>!link.sheet).map(link=>link.getAttribute("href"))'),[],'A launcher stylesheet did not load');
         await page.waitForSelector('.ds-brand-version',{visible:true});
         const releaseVersion=require('../package.json').version;

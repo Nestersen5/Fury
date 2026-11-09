@@ -138,10 +138,10 @@ function scan(files) {
     return findings;
 }
 
-function assertApplicationComplete(included) {
+function assertApplicationComplete(included, config = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'))) {
     const exported = new Set(included.map(entry => typeof entry === 'string' ? entry : entry.file));
-    const config = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
     const packaged = runtimeFiles(root, config);
+    const packagedSet = new Set(packaged);
     const required = new Set([...packaged, '.gitattributes',
         'launcher.js', 'launcher.html', 'proxy.js', 'cosmetic_search_api.js']);
     const localFile = (from, specifier) => {
@@ -154,6 +154,12 @@ function assertApplicationComplete(included) {
     };
     for (const file of packaged.filter(name => /\.(js|html)$/.test(name))) {
         const source = fs.readFileSync(path.join(root, file), 'utf8');
+        // Renderer modules mount styles after HTML loads; these are just as
+        // necessary in the packaged app as the initial HTML stylesheet links.
+        for (const match of source.matchAll(/\bhref\s*=\s*(['"])(src\/launcher\/styles\/[^'"]+\.css)\1/g)) {
+            required.add(match[2]);
+            assert(packagedSet.has(match[2]), `Launcher stylesheet missing from package: ${match[2]}`);
+        }
         for (const match of source.matchAll(/\brequire\(\s*(['"])(\.{1,2}\/[^'"]+)\1\s*\)/g)) {
             required.add(localFile(file, match[2]));
         }
