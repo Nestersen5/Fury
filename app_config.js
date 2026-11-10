@@ -1,4 +1,6 @@
 const fs = require('fs');
+const { randomUUID } = require('crypto');
+const { writeFileAtomicSync, writeFilesAtomicSync } = require('./src/storage/atomic_file');
 const { dataPath } = require('./src/storage/runtimePaths.js');
 const {
     DEFAULT_LOBBY_SCOREBOARD_STYLE,
@@ -42,7 +44,7 @@ function normalizeTabStatsModeSetting(value, fallback = 'auto') {
 
 // Release baseline: the settings used by the built-in Normal Sweaty
 // (Recommended) profile. Runtime config files may override these per user.
-const DEFAULT_CHAT_PREFIX_ACCENT_HEX = '#a66bea';
+const DEFAULT_CHAT_PREFIX_ACCENT_HEX = '#0022cc';
 
 function normalizeChatPrefixAccentHex(value, fallback = DEFAULT_CHAT_PREFIX_ACCENT_HEX) {
     const clean = String(value || '').trim().toLowerCase();
@@ -253,8 +255,26 @@ function readJson(file, fallback) {
     }
 }
 
+let stagedProfileWrites = null;
 function writeJson(file, data) {
-    fs.writeFileSync(file, JSON.stringify(data, null, 2), 'utf8');
+    const json = JSON.stringify(data, null, 2);
+    if (stagedProfileWrites) stagedProfileWrites.set(file, json);
+    else writeFileAtomicSync(file, json);
+}
+
+// Share normalization and publication between launcher and in-game profiles.
+// No live settings change until all files have been normalized and published.
+function saveProfileSettings(settings) {
+    if (stagedProfileWrites) throw new Error('A profile save is already being prepared.');
+    const writes = new Map();
+    stagedProfileWrites = writes;
+    try {
+        // Fence older launcher forms even when a profile is applied in game.
+        saveFeatureSettings({ ...settings.features, _profileRevision: randomUUID() });
+        if (settings.scan) saveScanSettings(settings.scan);
+        if (settings.chatTriggers) saveChatTriggerSettings(settings.chatTriggers);
+    } finally { stagedProfileWrites = null; }
+    writeFilesAtomicSync([...writes].map(([filePath, data]) => ({ filePath, data })));
 }
 
 function formatKeyTimestamp(date = new Date()) {
@@ -502,6 +522,7 @@ function saveFeatureSettings(features) {
         ...normalizeUrchinRequestSettings(next),
         ...normalizeHypixelRequestSettings(next),
         nickRoll: require('./src/nick/settings').normalizeSettings(next.nickRoll),
+        _profileRevision: typeof next._profileRevision === 'string' ? next._profileRevision : '',
         dailyReward: require('./src/rewards/settings').normalizeSettings(next.dailyReward),
         chatPrefixAccentHex: normalizeChatPrefixAccentHex(
             next.chatPrefixAccentHex,
@@ -826,6 +847,7 @@ module.exports = {
     saveScanSettings,
     loadFeatureSettings,
     saveFeatureSettings,
+    saveProfileSettings,
     loadChatTriggerSettings,
     saveChatTriggerSettings,
     loadServerSettings,

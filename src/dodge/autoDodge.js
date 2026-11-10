@@ -187,7 +187,7 @@ function createAutoDodger(deps) {
     }
 
     function refreshPendingDodge() {
-        if (!pendingDodge || getLeaveMode() === 'instant') return;
+        if (!pendingDodge || pendingDodge.queued || getLeaveMode() === 'instant') return;
         const plan = pendingDodge;
         clearTimeout(plan.timer);
         schedulePlan(plan);
@@ -210,33 +210,52 @@ function createAutoDodger(deps) {
     }
 
     function canExecuteDodge(plan) {
+        if (pendingDodge !== plan || plan.controller.signal.aborted) return false;
         if (plan.sessionId !== getPregameSessionId() || !isPregameActive() || isGameActive()) return false;
         // Party updates and denick results can arrive during the delay. A
         // scheduled match is not authority to leave over a current teammate.
         if (!isEnabled() || !isPartyRosterUsable()
             || isPartyTarget(plan.player, getKnownDenick(plan.player) || plan.knownDenick)) return false;
-        return true;
+        return Boolean(getDodgeReason(plan.data, getKnownDenick(plan.player) || plan.knownDenick));
+    }
+
+    function revalidate() {
+        if (pendingDodge && !pendingDodge.dispatched && !canExecuteDodge(pendingDodge)) {
+            cancel('settings changed', { announce: false });
+        }
     }
 
     function executeDodge(plan) {
-        if (pendingDodge !== plan) return;
-        pendingDodge = null;
-        if (!canExecuteDodge(plan)) return;
+        if (pendingDodge !== plan || plan.queued) return;
+        const complete = () => { if (pendingDodge === plan) pendingDodge = null; };
+        if (!canExecuteDodge(plan)) { complete(); return; }
+        plan.queued = true;
         sendChat(`§b§lDodge §8» §cLeaving lobby §7— §f${plan.player} §7matched auto-dodge (${plan.reason}§7).`);
         try {
             // The shared command lane may add a pacing delay. Keep the same
             // guard on dispatch so a party update in that gap also wins.
-            sendLeaveCommand(() => canExecuteDodge(plan));
+            const result = sendLeaveCommand(() => {
+                if (!canExecuteDodge(plan)) { complete(); return false; }
+                plan.dispatched = true;
+                return true;
+            }, { signal: plan.controller.signal });
+            if (result && typeof result.then === 'function') result.then(complete, error => {
+                complete();
+                sendChat(`§b§lDodge §8» §cFailed to send leave command: §f${error.message || 'unknown error'}`);
+            });
+            else complete();
         } catch (error) {
+            complete();
             sendChat(`§b§lDodge §8» §cFailed to send leave command: §f${error.message || 'unknown error'}`);
         }
     }
 
     function cancel(reason, { announce = true } = {}) {
-        if (!pendingDodge) return false;
+        if (!pendingDodge || pendingDodge.dispatched) return false;
         clearTimeout(pendingDodge.timer);
         const cancelled = pendingDodge;
         pendingDodge = null;
+        cancelled.controller.abort();
         if (announce) {
             sendChat(`§b§lDodge §8» §7Cancelled dodge of §f${cancelled.player}§7${reason ? ` §8(${reason})` : ''}.`);
         }
@@ -272,7 +291,11 @@ function createAutoDodger(deps) {
         const plan = {
             player: name,
             knownDenick,
+            data: profile.data,
             reason,
+            controller: new AbortController(),
+            queued: false,
+            dispatched: false,
             sessionId: getPregameSessionId(),
             timer: null,
             dueAt: null
@@ -468,6 +491,7 @@ function createAutoDodger(deps) {
     }
 
     function settingsLine() {
+        revalidate();
         sendController();
     }
 
@@ -494,7 +518,7 @@ function createAutoDodger(deps) {
                 return;
             }
             applyConfig({ leaveMode: mode });
-            if (pendingDodge) {
+            if (pendingDodge && !pendingDodge.queued) {
                 clearTimeout(pendingDodge.timer);
                 schedulePlan(pendingDodge);
             }
@@ -593,6 +617,7 @@ function createAutoDodger(deps) {
         noteScoreboard,
         noteChat,
         onGameStart,
+        revalidate,
         handleCommand,
         getDebugState
     };

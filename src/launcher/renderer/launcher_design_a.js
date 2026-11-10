@@ -4,7 +4,7 @@ const {version}=require('../../../package.json');
 
 // Presentation only. Existing production controls, data, IPC and save listeners
 // retain ownership; the transferable patch contains this module and its CSS.
-function mount({document,navigate,settingsPage,getState,showIngame,startProxy,stopProxy,checkDust,invoke}) {
+function mount({document,navigate,settingsPage,getState,showIngame,startProxy,stopProxy,checkDust,invoke,settingsIcon}) {
  const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
  const root=document.documentElement;
  if(!root.dataset.workspacePage)root.dataset.workspacePage=document.querySelector('.tab-page.active')?.dataset.page||'dashboard';
@@ -134,7 +134,7 @@ function mount({document,navigate,settingsPage,getState,showIngame,startProxy,st
  // Remove repeated category headers only; status, errors and validation remain.
  const labels={scan:'Scanning',sessions:'Sessions',overlay:'Chat',network:'Connection'};
  for(const [key,label]of Object.entries(labels)){const heading=page(key).querySelector('.fury-category-heading h2');if(heading)heading.textContent=label;}
- const pages=require('./launcher_design_a_pages').mount({document,navigate,getState,startProxy,stopProxy,checkDust,invoke});
+ const pages=require('./launcher_design_a_pages').mount({document,navigate,getState,startProxy,stopProxy,checkDust,invoke,settingsIcon});
  const categoryFromPage={anticheat:'anticheat',reminders:'reminders',profiles:'profiles',nickroll:'denick',console:'network'};
  function selectCategory(key){
   lastCategory=key;

@@ -97,7 +97,7 @@ const HELP_SECTIONS = [
                 aliases: ['/profiles', '/preset', '/presets'],
                 command: '/profile',
                 description: 'Browse built-in playstyle setups or save and swap your own.',
-                variations: ['/profile list', '/profile competitive', '/profile save friends', '/profile diff competitive', '/profile bind friends bw']
+                variations: ['/profile list', '/profile normal-sweaty', '/profile save friends', '/profile diff normal-sweaty', '/profile bind friends bw']
             },
             {
                 label: '/urchin',

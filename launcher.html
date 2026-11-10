@@ -3526,8 +3526,8 @@
                                         <section class="fury-seasonal-panel settings-search-item" id="seasonal-themes" aria-labelledby="seasonal-themes-title">
                                             <div class="fury-seasonal-heading"><h3 id="seasonal-themes-title">Seasonal themes</h3></div>
                                             <div class="fury-seasonal-list" role="group" aria-label="Seasonal theme">
-                                                <label class="fury-seasonal-row"><input type="radio" name="fury-seasonal-theme" value="none" checked><span class="fury-seasonal-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="m6 18 12-12"/></svg></span><span class="fury-seasonal-copy"><strong>None</strong><small>No seasonal effects.</small></span><span class="fury-seasonal-selected" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg></span></label>
-                                                <label class="fury-seasonal-row fury-seasonal-winter"><input type="radio" name="fury-seasonal-theme" value="christmas"><img class="fury-seasonal-art" src="assets/launcher-themes/christmas-panorama.png" alt="" loading="lazy" decoding="async"><span class="fury-seasonal-preview-snow" aria-hidden="true"><i style="--x:15%;--y:22%">❄</i><i style="--x:33%;--y:60%">❄</i><i style="--x:53%;--y:18%">❄</i><i style="--x:69%;--y:69%">❄</i><i style="--x:84%;--y:30%">❄</i></span><span class="fury-seasonal-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 2v20M3.3 7l17.4 10M3.3 17 20.7 7M9 4l3 3 3-3M9 20l3-3 3 3M4 10l4-1-1-4M17 19l-1-4 4-1M4 14l4 1-1 4M17 5l-1 4 4 1"/></svg></span><span class="fury-seasonal-copy"><strong>Christmas</strong><small>Soft snow and winter lights.</small></span><span class="fury-seasonal-selected" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg></span></label>
+                                                <label class="fury-seasonal-row"><input type="radio" name="fury-seasonal-theme" value="none"><span class="fury-seasonal-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="m6 18 12-12"/></svg></span><span class="fury-seasonal-copy"><strong>None</strong><small>No seasonal effects.</small></span><span class="fury-seasonal-selected" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg></span></label>
+                                                <label class="fury-seasonal-row fury-seasonal-winter"><input type="radio" name="fury-seasonal-theme" value="christmas" checked><img class="fury-seasonal-art" src="assets/launcher-themes/christmas-panorama.png" alt="" loading="lazy" decoding="async"><span class="fury-seasonal-preview-snow" aria-hidden="true"><i style="--x:15%;--y:22%">❄</i><i style="--x:33%;--y:60%">❄</i><i style="--x:53%;--y:18%">❄</i><i style="--x:69%;--y:69%">❄</i><i style="--x:84%;--y:30%">❄</i></span><span class="fury-seasonal-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 2v20M3.3 7l17.4 10M3.3 17 20.7 7M9 4l3 3 3-3M9 20l3-3 3 3M4 10l4-1-1-4M17 19l-1-4 4-1M4 14l4 1-1 4M17 5l-1 4 4 1"/></svg></span><span class="fury-seasonal-copy"><strong>Christmas</strong><small>Soft snow and winter lights.</small></span><span class="fury-seasonal-selected" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></svg></span></label>
                                             </div>
                                             <section class="fury-seasonal-options" id="seasonal-options" hidden aria-label="Christmas effects">
                                                 <div class="fury-seasonal-options-heading"><h4>Christmas effects</h4><button type="button" id="seasonal-preview">Preview theme</button></div>
@@ -5077,6 +5077,8 @@
         const ordinaryRevisions = new Map();
         const featureDrafts = new Map();
         const featureCommittedValues = new Map();
+        let renderedProfileRevision = '';
+        let profileApplyInFlight = false;
         function setLauncherStatus(message, kind) {
             const status = document.getElementById('save-status');
             for (const key of ['notificationTitle', 'notificationDetail', 'notificationKicker']) delete status.dataset[key];
@@ -5097,16 +5099,26 @@
             const note = document.getElementById('connection-save-status');
             if (note) note.textContent = restart ? 'Saved \u2014 restart proxy to apply' : 'Connection changes save automatically.';
             const button = document.getElementById('connection-restart');
+            const keyNote = document.querySelector('.da-api-save-note');
+            if (keyNote) {
+                const keyStates = ['key-hypixel','key-urchin','key-urchin-admin','key-aurora'].map(id => settingsSaveStates.get(id));
+                keyNote.textContent = keyStates.includes('Couldn\u2019t save') ? 'Couldn’t save your key. Try again.' : keyStates.includes('Saving\u2026') ? 'Saving your key…' : keyStates.includes('Editing\u2026') ? 'Finish editing to save your key.' : 'Keys save automatically on this computer.';
+                keyNote.setAttribute('role', 'status');
+            }
             if (button) { button.hidden = !restart; button.disabled = [...settingsSaveStates].some(([key,value]) => key !== 'restart' || value === 'Saving\u2026'); }
         }
         function saveOrdinaryPatch(patch, controls) {
             if (rendererClosing) return;
+            const expectedProfileRevision = renderedProfileRevision;
             const revisions = controls.map(el => { const revision=(ordinaryRevisions.get(el)||0)+1;ordinaryRevisions.set(el,revision);return revision; });
             controls.forEach(el => setSettingsSaveState(el.id, 'Saving\u2026'));
             settingsSaveInFlight = true;
             ordinarySaveChain = ordinarySaveChain.then(async () => {
                 try {
-                    await ipcRenderer.invoke('settings:save-patch', patch);
+                    const saved = await ipcRenderer.invoke('settings:save-patch', { ...patch, expectedProfileRevision });
+                    if (saved?.profileChanged) {
+                        setLauncherStatus('A profile changed your settings. Your pending changes were not saved.', 'warning');
+                    }
                     controls.forEach((el,index) => {
                         if (ordinaryRevisions.get(el) === revisions[index] && !ordinaryDrafts.has(el)) setSettingsSaveState(el.id, 'Saved');
                     });
@@ -6599,8 +6611,16 @@
         let featureSaveTimer = null;
         let featureSaveInFlight = false;
         let featureSaveQueued = false;
+        let featureSaveOperation = null;
 
-        function saveFeatureControlsNow() { return trackRendererSave(saveFeatureControls()); }
+        function saveFeatureControlsNow() {
+            if (featureSaveInFlight) {
+                featureSaveQueued = true;
+                return featureSaveOperation;
+            }
+            featureSaveOperation = trackRendererSave(saveFeatureControls());
+            return featureSaveOperation;
+        }
         async function saveFeatureControls() {
             if (featureSaveInFlight) {
                 featureSaveQueued = true;
@@ -6611,6 +6631,7 @@
             featureSaveInFlight = true;
             featureSaveQueued = false;
             let updated = false;
+            let profileChanged = false;
             const changedLabels = pendingFeatureChangeLabels.size
                 ? Array.from(pendingFeatureChangeLabels)
                 : ['Feature controls'];
@@ -6619,7 +6640,18 @@
             status.textContent = 'Updating feature...';
 
             try {
-                await ipcRenderer.invoke('settings:save-features', committedFeatureSettings());
+                const saved = await ipcRenderer.invoke('settings:save-features', {
+                    ...committedFeatureSettings(), expectedProfileRevision: renderedProfileRevision
+                });
+                if (saved?.profileChanged) {
+                    profileChanged = true; featureSaveQueued = false;
+                    clearTimeout(featureSaveTimer); featureSaveTimer = null;
+                    for (const control of featureDrafts.keys()) settingsSaveStates.delete(control.id);
+                    featureDrafts.clear(); featureCommittedValues.clear(); pendingFeatureChangeLabels.clear();
+                    setSettingsSaveState('features', 'Saved');
+                    setLauncherStatus('A profile changed your settings. Your pending changes were not saved.', 'warning');
+                    return false;
+                }
                 setSettingsSaveState('features', 'Saved');
                 updated = true;
                 status.dataset.notificationDetail = changedSettingsDetail(changedLabels, 'Feature controls synchronized.');
@@ -6636,10 +6668,10 @@
                 status.textContent = 'Feature update failed';
             } finally {
                 featureSaveInFlight = false;
+                if (profileChanged && !rendererClosing) await refresh();
                 if (featureSaveQueued) {
                     featureSaveQueued = false;
-                    saveFeatureControlsNow();
-                    return updated;
+                    return saveFeatureControls();
                 }
                 setTimeout(() => document.getElementById('save-status').textContent = 'Ready', 1400);
             }
@@ -7121,18 +7153,43 @@
             }, 0);
         }
 
-        async function applyLauncherProfile(name) {
-            if (!name) return;
-            const label = profileLabel(name);
-            document.getElementById('save-status').textContent = `Applying ${label}…`;
-            try {
-                const result = await ipcRenderer.invoke('profiles:apply', name);
-                showProfileToast(`${result.profile?.label || label} applied`, `${result.changes?.length || 0} settings updated`);
-                document.getElementById('save-status').textContent = 'Ready';
-                await refresh();
-            } catch (error) {
+        let profileApplyOperation = Promise.resolve();
+        function applyLauncherProfile(name) {
+            if (!name || rendererClosing) return Promise.resolve();
+            profileApplyOperation = profileApplyOperation.then(async () => {
+                if (rendererClosing) return;
+                const controls = [...featureControlIds, 'minFkdr', 'minStars', 'minSkywarsKdr', 'minSkywarsWlr', 'minSkywarsLevel']
+                    .map(key => ids[key]).filter(Boolean);
+                const disabled = controls.map(control => control.disabled);
+                profileApplyInFlight = true;
+                controls.forEach(control => { control.disabled = true; });
+                try {
+                    // The owned feature promise includes every queued follow-up
+                    // save, so no older form snapshot can run after this profile.
+                    if (featureSaveTimer) {
+                        clearTimeout(featureSaveTimer); featureSaveTimer = null;
+                        saveFeatureControlsNow();
+                    }
+                    await featureSaveOperation;
+                    await ordinarySaveChain;
+                    await furyDesign?.flushNickroll();
+                    if ([...settingsSaveStates.values()].some(value => ['Editing\u2026', 'Check value', 'Couldn\u2019t save'].includes(value))) {
+                        throw new Error('Finish or save your current settings edits before applying a profile.');
+                    }
+                    const label = profileLabel(name);
+                    document.getElementById('save-status').textContent = `Applying ${label}…`;
+                    const result = await ipcRenderer.invoke('profiles:apply', name);
+                    showProfileToast(`${result.profile?.label || label} applied`, `${result.changes?.length || 0} settings updated`);
+                    document.getElementById('save-status').textContent = 'Ready';
+                } finally {
+                    controls.forEach((control, index) => { control.disabled = disabled[index]; });
+                    profileApplyInFlight = false;
+                    await refresh();
+                }
+            }).catch(error => {
                 setLauncherStatus(error?.message || 'Profile could not be applied', 'error');
-            }
+            });
+            return trackRendererSave(profileApplyOperation);
         }
 
         function overlayOrder() {
@@ -7875,7 +7932,8 @@
         }
 
         function renderSettings(settings) {
-            if (settingsTouched || settingsSaveInFlight || featureDrafts.size || featureSaveTimer || featureSaveInFlight || settingsSaveStates.get('features') === 'Couldn\u2019t save') return false;
+            if (profileApplyInFlight || settingsTouched || settingsSaveInFlight || featureDrafts.size || featureSaveTimer || featureSaveInFlight || settingsSaveStates.get('features') === 'Couldn\u2019t save') return false;
+            renderedProfileRevision = settings.features?._profileRevision || '';
             ids.hypixel.value = settings.keys.hypixel || '';
             ids.urchin.value = settings.keys.urchin || '';
             ids.urchinadmin.value = settings.keys.urchinadmin || '';
@@ -8185,14 +8243,23 @@
             return 'warn';
         }
 
-        function renderApiKeyCardStatus(provider, item = {}) {
+        function renderApiKeyCardStatus(provider, item = {}, tested = false) {
             const status = document.querySelector(`[data-api-status="${provider}"]`);
             const detail = document.querySelector(`[data-api-detail="${provider}"]`);
+            const value = String(item.state || '').toLowerCase();
+            const labels = { 'missing key': provider === 'hypixel' ? 'No key added' : 'Not added', optional: 'Not added', configured: 'Key added', available: 'Working', checking: 'Checking…', 'invalid key': 'Invalid key', unreachable: 'Couldn’t connect', unavailable: 'Service unavailable', 'rate limited': 'Try again later' };
             if (status) {
-                status.textContent = item.state || 'Unknown';
-                status.className = `api-card-status ${apiCardTone(item.state)}`;
+                status.textContent = labels[value] || item.state || 'Unknown';
+                status.className = `api-card-status ${['missing key', 'optional'].includes(value) ? '' : apiCardTone(value)}`;
             }
-            if (detail) detail.textContent = item.detail || 'No status details available.';
+            if (detail) {
+                detail.textContent = item.detail || 'No status details available.';
+                detail.parentElement.hidden = !tested && ['missing key', 'optional', 'configured', 'available'].includes(value);
+                const card = detail.closest('[data-api-card]');
+                card.dataset.apiState = value;
+                const action = card.querySelector('.da-key-action-closed');
+                if (action) action.textContent = ids[provider]?.value ? 'Edit key' : 'Add key';
+            }
             const last = document.querySelector(`[data-api-last="${provider}"]`);
             const stored = localStorage.getItem(`fury-api-last-success-${provider}`);
             if (last && stored) last.textContent = `Last successful test: ${new Date(Number(stored)).toLocaleString()}`;
@@ -10493,7 +10560,9 @@
             if (nestedPane?.dataset.ingame) furyDesign?.showIngame(nestedPane.dataset.ingame);
             requestAnimationFrame(() => {
                 const target = entry.element || entry.control;
-                target?.closest('details')?.setAttribute('open', '');
+                for (let ancestor = target; ancestor; ancestor = ancestor.parentElement) {
+                    if (ancestor.matches('details')) ancestor.open = true;
+                }
                 target?.scrollIntoView({
                     behavior: document.documentElement.dataset.motion === 'reduced' ? 'auto' : 'smooth',
                     block: 'center'
@@ -10800,6 +10869,8 @@
                 const shouldShow = input.type === 'password';
                 input.type = shouldShow ? 'text' : 'password';
                 button.innerHTML = `${furySettingsIcon('eye', 'settings-button-art')}${shouldShow ? 'Hide' : 'Show'}`;
+                button.setAttribute('aria-pressed', String(shouldShow));
+                button.setAttribute('aria-label', `${shouldShow ? 'Hide' : 'Show'} ${input.getAttribute('aria-label') || 'API key'}`);
             });
         });
         document.querySelectorAll('[data-key-copy]').forEach((button) => {
@@ -10831,13 +10902,13 @@
                 const original = button.textContent;
                 button.disabled = true;
                 button.textContent = 'Testing…';
-                renderApiKeyCardStatus(provider, { state: 'checking', detail: 'Contacting provider…' });
+                renderApiKeyCardStatus(provider, { state: 'checking', detail: 'Contacting provider…' }, true);
                 try {
                     const result = await ipcRenderer.invoke('api-key:test', { provider, key: input?.value || '' });
                     if (result?.ok) localStorage.setItem(`fury-api-last-success-${provider}`, String(Date.now()));
-                    renderApiKeyCardStatus(provider, result || { state: 'unavailable', detail: 'No response received.' });
+                    renderApiKeyCardStatus(provider, result || { state: 'unavailable', detail: 'No response received.' }, true);
                 } catch (error) {
-                    renderApiKeyCardStatus(provider, { state: 'unreachable', detail: error?.message || 'Connection test failed.' });
+                    renderApiKeyCardStatus(provider, { state: 'unreachable', detail: error?.message || 'Connection test failed.' }, true);
                 } finally {
                     button.disabled = false;
                     button.textContent = original;
@@ -11737,7 +11808,7 @@
                 catch (error) { accountGeneration++; state = previous; await refresh(); throw error; }
             }
         });
-        designA = require('./src/launcher/renderer/launcher_design_a.js').mount({ document, navigate: activatePage, settingsPage: activateSettingsSubpage, getState: () => state, showIngame: key => furyDesign.showIngame(key), startProxy, stopProxy, checkDust: checkEnderDust, invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args) });
+        designA = require('./src/launcher/renderer/launcher_design_a.js').mount({ document, navigate: activatePage, settingsPage: activateSettingsSubpage, getState: () => state, showIngame: key => furyDesign.showIngame(key), startProxy, stopProxy, checkDust: checkEnderDust, invoke: (channel, ...args) => ipcRenderer.invoke(channel, ...args), settingsIcon: furySettingsIcon });
         [ids.tabStatsPreset, ids.tabStatsLabelStyle, ids.nametagTagDisplayMode, document.getElementById('nickroll-rank'), document.getElementById('nickroll-skinMode')].forEach(createCustomStatSelect);
         initializeGlobalSearch();
 

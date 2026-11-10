@@ -16,6 +16,72 @@ module.exports = async function verify({ page, output, profile }) {
     assert(await page.$eval('#hypixel-key-snooze', el => el.disabled));
     assert((await readText('#hypixel-key-reminder-status')).includes('Add a Hypixel'));
 
+    // The simplified page keeps the main form visible and optional controls reachable.
+    assert(await page.$eval('#key-hypixel', el => el.checkVisibility()));
+    assert(!await page.$eval('#key-urchin', el => el.checkVisibility()));
+    assert(!await page.$eval('#key-aurora', el => el.checkVisibility()));
+    assert(!await page.$eval('#api-kill-switch-enabled', el => el.checkVisibility()));
+    assert.strictEqual((await readText('[data-api-status="hypixel"]')).trim(), 'No key added');
+    assert(!await page.$eval('[data-api-card="hypixel"]>.api-key-card-body>.api-key-result', el => el.checkVisibility()));
+    await page.focus('[data-api-card="urchin"]>summary');
+    await page.keyboard.press('Enter');
+    await page.waitForSelector('#key-urchin', { visible: true });
+    await page.focus('[data-api-card="urchin"]>summary');
+    await page.keyboard.press('Space');
+    assert(!await page.$eval('#key-urchin', el => el.checkVisibility()));
+    await page.focus('.da-api-advanced>summary');
+    await page.keyboard.press('Enter');
+    assert(await page.$eval('#api-kill-switch-enabled', el => el.checkVisibility()));
+    assert(await page.$eval('.da-api-paused', el => el.checkVisibility()), 'Active API pause must remain visible in the Advanced summary');
+    await page.focus('#api-kill-switch-enabled');
+    await page.keyboard.press('Space');
+    await page.waitForFunction('state.settings.features.apiKillSwitchEnabled===false && !featureSaveInFlight');
+    assert(!await page.$eval('.da-api-paused', el => el.checkVisibility()));
+    await page.focus('#api-kill-switch-enabled');
+    await page.keyboard.press('Space');
+    await page.waitForFunction('state.settings.features.apiKillSwitchEnabled===true && !featureSaveInFlight');
+    await page.$eval('.da-api-advanced', el => { el.open = false; });
+    await page.evaluate("openGlobalSearchEntry({page:'settings',category:'api',control:document.getElementById('key-urchin-admin')})");
+    await page.waitForSelector('#key-urchin-admin', { visible: true });
+    assert(await page.$eval('.da-api-advanced', el => el.open));
+    await page.$eval('.da-api-advanced', el => { el.open = false; });
+
+    await click('[data-key-toggle="hypixel"]');
+    assert.strictEqual(await page.$eval('#key-hypixel', el => el.type), 'text');
+    assert.strictEqual(await page.$eval('[data-key-toggle="hypixel"]', el => el.getAttribute('aria-label')), 'Hide Hypixel API key');
+    await page.focus('[data-key-toggle="hypixel"]');
+    await page.keyboard.press('Enter');
+    assert.strictEqual(await page.$eval('#key-hypixel', el => el.type), 'password');
+    assert.strictEqual(await page.$eval('[data-key-toggle="hypixel"]', el => el.getAttribute('aria-pressed')), 'false');
+    await click('[data-api-test="hypixel"]');
+    await page.waitForFunction('!document.querySelector("[data-api-test=hypixel]").disabled');
+    assert.strictEqual((await readText('[data-api-detail="hypixel"]')).trim(), 'Enter a key before testing.');
+    assert(await page.$eval('[data-api-detail="hypixel"]', el => el.checkVisibility()));
+
+    // Drive the real test-button handler with deterministic provider replies.
+    await page.evaluate(() => {
+        window.realApiTestInvoke = ipcRenderer.invoke;
+        ipcRenderer.invoke = async (channel, ...args) => channel === 'api-key:test'
+            ? window.apiTestReply : window.realApiTestInvoke(channel, ...args);
+    });
+    try {
+        for (const [reply, label] of [
+            [{ ok: false, state: 'invalid key', detail: 'The provider rejected this API key.' }, 'Invalid key'],
+            [{ ok: false, state: 'unreachable', detail: 'Could not reach the provider.' }, 'Couldn’t connect'],
+            [{ ok: true, state: 'rate limited', detail: 'Try again later.' }, 'Try again later'],
+            [{ ok: true, state: 'available', detail: 'Hypixel accepted this API key.' }, 'Working']
+        ]) {
+            await page.evaluate(reply => { window.apiTestReply = reply; }, reply);
+            await click('[data-api-test="hypixel"]');
+            await page.waitForFunction('!document.querySelector("[data-api-test=hypixel]").disabled');
+            assert.strictEqual((await readText('[data-api-status="hypixel"]')).trim(), label);
+            assert(await page.$eval('[data-api-detail="hypixel"]', el => el.checkVisibility()));
+        }
+    } finally {
+        await page.evaluate('ipcRenderer.invoke=window.realApiTestInvoke; renderApiKeyCardStatus("hypixel",{state:"missing key"})');
+    }
+    console.log('PASS Focused API layout, optional/advanced keyboard disclosures, nested search, Show/Hide and key test feedback');
+
     // Copy uses the existing clipboard path without exposing or changing keys.
     assert.strictEqual(await page.$$eval('[data-key-replace]', els => els.length), 0);
     await page.evaluate(() => {
@@ -26,8 +92,8 @@ module.exports = async function verify({ page, output, profile }) {
         for (const [provider, id] of [['hypixel', 'key-hypixel'], ['urchin', 'key-urchin'], ['urchinadmin', 'key-urchin-admin'], ['aurora', 'key-aurora']]) {
             await page.evaluate((provider, id) => {
                 const card = document.querySelector(`[data-api-card="${provider}"]`);
-                if (provider === 'urchinadmin') document.querySelector('[data-api-card="urchin"]').open = true;
-                card.open = true;
+                for (let ancestor = card; ancestor; ancestor = ancestor.parentElement) if (ancestor.matches('details')) ancestor.open = true;
+                card.querySelector('.da-key-details').open = true;
                 const input = document.getElementById(id);
                 input.value = `fixture-${provider}`;
                 input.type = 'password';
@@ -95,9 +161,9 @@ module.exports = async function verify({ page, output, profile }) {
     await ageKey(47.5);
     assert((await readText('#hypixel-key-reminder-status')).includes('less than 1 hour'));
     assert((await readText('#hypixel-key-reminder-summary')).includes('less than 1 hour'));
-    await page.$eval('[data-api-card="hypixel"]', el => { el.open = false; });
-    assert(await page.$eval('#hypixel-key-reminder-summary', el => el.checkVisibility()), 'Expiry warning must remain visible when the card is collapsed');
-    await page.$eval('[data-api-card="hypixel"]', el => { el.open = true; });
+    await page.$eval('[data-api-card="hypixel"] .da-key-details', el => { el.open = false; });
+    assert(await page.$eval('#hypixel-key-reminder-summary', el => el.checkVisibility()), 'Expiry warning must remain visible when Key details is collapsed');
+    await page.$eval('[data-api-card="hypixel"] .da-key-details', el => { el.open = true; });
     const ageBeforeSnooze = await page.evaluate('state.settings.keyMeta.hypixelSavedAt');
     await page.focus('#hypixel-key-snooze');
     await page.keyboard.press('Enter');
@@ -131,5 +197,46 @@ module.exports = async function verify({ page, output, profile }) {
     await enterKey('');
     assert((await readText('#hypixel-key-reminder-status')).includes('Add a Hypixel'));
     assert(await page.$eval('#hypixel-key-snooze', el => el.disabled));
+
+    // All supported themes and both launcher sizes must keep fields and actions usable.
+    await page.evaluate(() => {
+        document.querySelector('.da-api-advanced').open = false;
+        document.querySelectorAll('.da-key-details,details[data-api-card]').forEach(el => { el.open = false; });
+    });
+    for (const theme of ['graphite','midnight','forest','light','obsidian','frost']) {
+        await page.evaluate(theme => NesterTheme.apply(theme, false), theme);
+        for (const [width,height] of [[1440,900],[1024,680]]) {
+            await page.setViewport({width,height,deviceScaleFactor:1});
+            await page.$eval('main', el => { el.scrollTop = 0; });
+            assert(await page.$eval('.da-api-page', el => el.scrollWidth <= el.clientWidth + 2));
+            for (const provider of ['hypixel','urchin','aurora']) {
+                if (provider !== 'hypixel') await page.$eval(`[data-api-card="${provider}"]`, el => { el.open = true; });
+                assert(await page.$eval(`[data-api-card="${provider}"]`, el => el.scrollWidth <= el.clientWidth + 2));
+                assert(await page.$eval(`[data-api-test="${provider}"]`, el => el.checkVisibility()));
+                if (provider !== 'hypixel') await page.$eval(`[data-api-card="${provider}"]`, el => { el.open = false; });
+            }
+            await page.screenshot({path:path.join(output,`api-focused-${theme}-${width}.png`)});
+            await page.evaluate(() => {
+                document.querySelector('.da-api-advanced').open = true;
+                document.querySelector('[data-api-card="urchinadmin"]').open = true;
+            });
+            assert(await page.$eval('[data-api-card="urchinadmin"]', el => el.scrollWidth <= el.clientWidth + 2));
+            assert(await page.$eval('#key-urchin-admin', el => el.checkVisibility()));
+            if (theme === 'graphite' && width === 1024) {
+                await page.$eval('#key-urchin-admin', el => el.scrollIntoView({block:'center'}));
+                await page.screenshot({path:path.join(output,'api-advanced-1024.png')});
+            }
+            await page.$eval('.da-api-advanced', el => { el.open = false; });
+        }
+    }
+    for (const [accent,color] of [['custom','#0022cc'],['sun','#f3c64e'],['custom','#767676'],['custom','#747474'],['custom','#ffffff'],['custom','#000000']]) {
+        await page.evaluate(({accent,color}) => NesterTheme.applyAccent(accent,false,color), {accent,color});
+        const colors = await page.$eval('[data-api-test="hypixel"]', el => ({foreground:getComputedStyle(el).color,background:getComputedStyle(el).backgroundColor}));
+        const luminance = value => value.match(/[\d.]+/g).slice(0,3).map(Number).map(x=>x/255).map(x=>x<=.04045?x/12.92:((x+.055)/1.055)**2.4).reduce((sum,x,i)=>sum+x*[.2126,.7152,.0722][i],0);
+        const values=[luminance(colors.foreground),luminance(colors.background)].sort((a,b)=>a-b);
+        assert((values[1]+.05)/(values[0]+.05)>=4.5,`Test key contrast must remain readable for ${accent}/${color}`);
+    }
+    await page.evaluate('NesterTheme.apply("graphite",false);NesterTheme.applyAccent("custom",false,"#0022cc")');
+    console.log('PASS Six themes at normal/minimum sizes and readable key-test text with dark/light/custom accents');
     console.log('PASS Key entry, phase changes, keyboard snooze, persisted metadata, dashboard and stale-key protection');
 };

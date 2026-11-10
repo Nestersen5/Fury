@@ -30,7 +30,7 @@ function mount({ document, invoke, openExternal, refresh, setStatus }) {
         };
         status.textContent = messages[reminder.phase];
         const alert = { soon: 'Key expires within 3 hours', urgent: 'Key expires in less than 1 hour', expired: 'Key reached its 48-hour expiry' }[reminder.phase];
-        summary.textContent = alert || 'Stats, guilds, status, and scans';
+        summary.textContent = alert || 'Player stats and scans';
         summary.dataset.reminderAlert = String(Boolean(alert));
         expiry.textContent = reminder.expiresAt
             ? `Expiry: ${new Date(reminder.expiresAt).toLocaleString()} · 48 hours after saving a new key.`

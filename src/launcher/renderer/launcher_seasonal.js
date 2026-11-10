@@ -3,7 +3,7 @@
 // Launcher appearance only. Shares NesterTheme's local preference ownership;
 // no account data, proxy state, network requests or polling are involved.
 const STORAGE_KEY='fury-seasonal-v1';
-const DEFAULTS=Object.freeze({theme:'none',snow:true,edges:true,lights:true,trail:true});
+const DEFAULTS=Object.freeze({theme:'christmas',snow:true,edges:true,lights:true,trail:true});
 const LOGO='assets/launcher-themes/fury-icon-christmas.png';
 const ART='assets/launcher-themes/christmas-row.png';
 const PROTECTED_CONTENT=new Set(['input','select','textarea','img','svg','canvas','video','iframe']);
@@ -17,8 +17,12 @@ function normalizePreferences(value){
 }
 
 function readPreferences(storage){
-    try{return normalizePreferences(JSON.parse(storage.getItem(STORAGE_KEY)));}
-    catch{return {...DEFAULTS};}
+    try{
+        const saved=storage.getItem(STORAGE_KEY);
+        // Invalid saved data stays off; only a missing entry uses the default.
+        return saved===null?{...DEFAULTS}:normalizePreferences(JSON.parse(saved));
+    }
+    catch{return normalizePreferences(null);}
 }
 
 function canAnimate({theme,focused,visible,motion,reduced,disposed}){

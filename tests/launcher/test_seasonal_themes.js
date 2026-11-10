@@ -3,18 +3,20 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const {normalizePreferences,readPreferences,canAnimate,isClear,STORAGE_KEY}=require('../../src/launcher/renderer/launcher_seasonal');
 
-test('seasonal preferences default off and explicitly allow only supported launcher fields',()=>{
+test('saved seasonal preferences fail closed and explicitly allow only supported launcher fields',()=>{
     const defaults={theme:'none',snow:true,edges:true,lights:true,trail:true};
     for(const value of [null,undefined,[],true,'christmas',{}])assert.deepEqual(normalizePreferences(value),defaults);
     assert.deepEqual(normalizePreferences({theme:'halloween',snow:'false',edges:0,lights:null,trail:[],account:'private'}),defaults);
     assert.deepEqual(normalizePreferences({theme:'christmas',snow:false,edges:false,lights:false,trail:false,themeColor:'red'}),{theme:'christmas',snow:false,edges:false,lights:false,trail:false});
 });
 
-test('missing, damaged or unavailable local preferences do not write or enable a theme',()=>{
-    for(const source of [null,'','{broken','null','["christmas"]','{"theme":"future"}']){
+test('missing preferences default to Christmas while saved choices and damaged-preference handling are preserved',()=>{
+    assert.deepEqual(readPreferences({getItem:key=>{assert.equal(key,STORAGE_KEY);return null;}}),{theme:'christmas',snow:true,edges:true,lights:true,trail:true});
+    for(const source of ['','{broken','null','["christmas"]','{"theme":"future"}']){
         assert.equal(readPreferences({getItem:key=>{assert.equal(key,STORAGE_KEY);return source;}}).theme,'none');
     }
     assert.equal(readPreferences({getItem(){throw Error('unavailable');}}).theme,'none');
+    assert.deepEqual(readPreferences({getItem:()=>'{"theme":"none","snow":false,"lights":false}'}),{theme:'none',snow:false,edges:true,lights:false,trail:true});
     assert.deepEqual(readPreferences({getItem:()=>'{"theme":"christmas","snow":false,"trail":false}'}),{theme:'christmas',snow:false,edges:true,lights:true,trail:false});
 });
 

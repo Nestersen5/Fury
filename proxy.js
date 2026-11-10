@@ -132,7 +132,7 @@ const {
 
 const { getRealNameFromSkin, getIdentityFromSkin } = require('./src/denick/skin_denicker.js');
 const express = require('express');
-const { paths: appConfigPaths, loadKeys, loadKeyMeta, saveKeys, loadScanSettings, saveScanSettings, loadFeatureSettings, saveFeatureSettings, loadChatTriggerSettings, saveChatTriggerSettings, loadServerSettings, normalizeTabStatsModeSetting, normalizeShareDestination, normalizeNametagScope } = require('./app_config.js');
+const { paths: appConfigPaths, loadKeys, loadKeyMeta, saveKeys, loadScanSettings, saveScanSettings, loadFeatureSettings, saveFeatureSettings, saveProfileSettings, loadChatTriggerSettings, saveChatTriggerSettings, loadServerSettings, normalizeTabStatsModeSetting, normalizeShareDestination, normalizeNametagScope } = require('./app_config.js');
 const {
     detectLobbyModeScoreboard,
     isBedwarsPregameScoreboard,
@@ -1242,25 +1242,14 @@ function applyPresetSettings(rawSettings) {
     const skipped = [];
     const allowedFeatures = { ...features };
     try {
-        if (Object.keys(allowedFeatures).length > 0) {
-            saveFeatureSettings({ ...loadFeatureSettings(), ...allowedFeatures });
-            loadFeatureConfig();
-        }
-
-        if (Object.keys(scan).length > 0) {
-            if (scan.scanMode !== undefined) state.scanMode = scan.scanMode;
-            PRESET_SETTING_KEYS.scan
-                .filter(key => key !== 'scanMode')
-                .forEach((key) => {
-                    if (scan[key] !== undefined) state.threatConfig[key] = scan[key];
-                });
-            saveScanConfig();
-        }
-
-        if (Array.isArray(chatTriggers.chatTriggers)) {
-            saveChatTriggerSettings({ triggers: chatTriggers.chatTriggers });
-            loadChatTriggerConfig();
-        }
+        saveProfileSettings({
+            ...(Object.keys(allowedFeatures).length ? { features: allowedFeatures } : {}),
+            ...(Object.keys(scan).length ? { scan: { ...loadScanSettings(), ...scan } } : {}),
+            ...(Array.isArray(chatTriggers.chatTriggers) ? { chatTriggers: { triggers: chatTriggers.chatTriggers } } : {})
+        });
+        if (Object.keys(allowedFeatures).length) loadFeatureConfig();
+        if (Object.keys(scan).length) loadScanConfig();
+        if (Array.isArray(chatTriggers.chatTriggers)) loadChatTriggerConfig();
 
         // Push the new values into the live connection (nametags, dodge
         // toggles, tab stats) the same way the launcher's settings save does.
@@ -12394,6 +12383,7 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
         });
 
         applyLiveFeatureSettings = () => {
+            autoDodger.revalidate();
             lobbySpam.syncSettings();
             dailyRewards.syncSettings();
             nicknameSharing.request();
@@ -12446,7 +12436,8 @@ function createProxyServer(port, targetHost, serverName, options = {}) {
 
         const autoDodger = createAutoDodger({
             sendChat: message => sendChat(client, message),
-            sendLeaveCommand: shouldSend => void sendHypixelCommand('/l', {
+            sendLeaveCommand: (shouldSend, options) => sendHypixelCommand('/l', {
+                ...options,
                 priority: 0,
                 dedupeKey: 'auto-dodge-leave',
                 dedupeMs: 1_000,

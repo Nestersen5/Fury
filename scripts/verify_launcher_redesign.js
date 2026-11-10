@@ -100,6 +100,11 @@ const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
             assert.deepStrictEqual(errors,[]);
             return;
         }
+        if(options['--focus']==='feature-reliability'){
+            await require('./verify_feature_reliability')({page,output,profile});
+            assert.deepStrictEqual(errors,[]);
+            return;
+        }
         if(options['--focus']==='reminder-previews'){
             await require('./verify_reminder_previews')({page,output,profile});
             assert.deepStrictEqual(errors,[]);
@@ -380,7 +385,7 @@ const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
         await eventually(async()=>assert.strictEqual(JSON.parse(fs.readFileSync(path.join(profile,'server_config.json'))).proxyCustomHost,'mc.hypixel.net'),'Restoring custom host');
         record('Connection fields save automatically when editing finishes');
         await page.evaluate(`activateSettingsSubpage('api',false);document.querySelector('[data-api-card="hypixel"]').open=true`);
-        assert.deepStrictEqual(await page.evaluate(()=>[...document.querySelectorAll('[data-api-card]')].map(card=>card.dataset.apiCard)),['hypixel','urchin','urchinadmin','aurora']);
+        assert.deepStrictEqual(await page.evaluate(()=>[...document.querySelectorAll('[data-api-card]')].map(card=>card.dataset.apiCard)),['hypixel','urchin','aurora','urchinadmin']);
         assert.strictEqual(await page.evaluate(()=>Object.hasOwn(collectSettings().keys,'seraph')),false);
         const retiredApiTest=await page.evaluate(()=>ipcRenderer.invoke('api-key:test',{provider:'seraph',key:'retired-fixture'}));
         assert.strictEqual(retiredApiTest.state,'unsupported');

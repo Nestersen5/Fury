@@ -12,6 +12,11 @@ const parts = require('../src/updates/updateNotifications').stableVersion(instal
 assert(parts, 'Stable Fury version required by this fixture');
 const latest = `${parts[0]}.${parts[1]}.${parts[2] + 1}`;
 const pageUrl = require('../src/updates/releaseConfig').downloadPageUrl;
+// Empty sections are hidden, so a release without new features shows two headings.
+const installedNotes = require('../src/updates/releaseNotes').bundled.releases.find(release => release.version === installed);
+assert(installedNotes, 'Bundled release notes required for the installed version');
+const installedHeadings = [['features', 'New features'], ['improvements', 'Improvements'], ['fixes', 'Bug fixes']]
+    .filter(([group]) => installedNotes[group].length).map(([, title]) => title).join(',');
 const children = [], sockets = new Set(), requests = [], held = new Map(), results = [];
 
 function waitForExit(child, timeoutMs) {
@@ -202,7 +207,7 @@ require(${JSON.stringify(path.join(root, 'launcher.js'))});
                 await page.click('.da-update-notice .fury-release-card-head>.fury-release-link');
                 await page.waitForSelector('.fury-release-dialog[open]');
                 assert.equal(await page.$eval('.fury-release-dialog .primary', el => el.hidden), true);
-                assert.equal(await page.$$eval('.fury-release-content h3', els => els.map(el => el.querySelector('span:not(.fury-change-icon)').textContent).join(',')), 'New features,Improvements,Bug fixes');
+                assert.equal(await page.$$eval('.fury-release-content h3', els => els.map(el => el.querySelector('span:not(.fury-change-icon)').textContent).join(',')), installedHeadings);
                 await page.screenshot({ path: path.join(output, 'welcome-changelog.png') });
                 await page.keyboard.press('Escape');
             }

@@ -153,6 +153,20 @@
         "Session stats keep counting when you turn API requests on or off.",
         "Draws count as games without adding a win or loss."
       ]
+    },
+    {
+      "version": "1.2.1",
+      "features": [],
+      "improvements": [
+        "API key settings are easier to follow, with optional services and extra details tucked away.",
+        "Christmas is now selected by default when you haven’t chosen a seasonal theme."
+      ],
+      "fixes": [
+        "Auto Dodge respects cancellation and changed rules while waiting to leave.",
+        "Profiles no longer get overwritten by pending saves or leave partial changes after a failed save.",
+        "Interrupted settings saves no longer reset your saved choices.",
+        "Dashboard keeps BedWars final kills, FKDR and beds visible in sessions that include other games."
+      ]
     }
   ]
 }

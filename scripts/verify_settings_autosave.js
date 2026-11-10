@@ -41,7 +41,8 @@ const target=require('./launcher_verification_target').verificationTarget('setti
   assert.equal(await page.evaluate('state.settings.scan.minFkdr'),7.5);
   assert.notEqual(await page.evaluate('state.settings.keys.hypixel'),'unfinished-key');
   assert.equal(await page.$eval('#key-hypixel',e=>e.value),'unfinished-key');
-  assert.deepEqual(await page.evaluate('saveTestCalls[0]'),{scan:{minFkdr:7.5}});
+  // Scan saves also carry the rendered profile revision so Main can reject a save from a replaced profile.
+  assert.deepEqual(await page.evaluate('saveTestCalls[0]'),{scan:{minFkdr:7.5},expectedProfileRevision:await page.evaluate('renderedProfileRevision')});
   await edit('key-hypixel','committed-key');await settled();
   assert.equal(await page.evaluate('state.settings.keys.hypixel'),'committed-key');
   await edit('min-fkdr','-1');

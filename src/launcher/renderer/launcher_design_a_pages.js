@@ -7,7 +7,7 @@ const {segmentsHtml}=require('./launcher_denick_format');
 
 // Design A owns composition. The existing controls retain validation, saving,
 // account ownership and game previews. No fixture data enters this renderer.
-function mount({document,navigate,getState,startProxy,stopProxy,checkDust,invoke}) {
+function mount({document,navigate,getState,startProxy,stopProxy,checkDust,invoke,settingsIcon}) {
  const $=(s,host=document)=>host.querySelector(s),$$=(s,host=document)=>[...host.querySelectorAll(s)];
  const make=(tag,cls,text='')=>{const e=document.createElement(tag);e.className=cls;e.textContent=text;return e;};
  const put=(host,...nodes)=>{nodes.filter(Boolean).forEach(n=>host.append(n));return host;};
@@ -124,11 +124,46 @@ function mount({document,navigate,getState,startProxy,stopProxy,checkDust,invoke
 
  // Recompose real connection rows and provider forms, keeping validation visible.
  $('.fury-connection-list').classList.add('da-card');
- $$('.api-key-card').forEach(c=>{c.classList.add('da-card');c.open=!c.parentElement.closest('.api-key-card');});
- for(const provider of $$('.fury-api-list >.api-key-card')){
-  const body=$('.api-key-card-body',provider),extra=make('details','da-key-details');extra.append(make('summary','','Key details'));
-  const rows=[...body.children].filter(n=>n.matches('.note'));
-  put(extra,...rows);if(rows.length)body.append(extra);
+ const api=page('api'),apiList=$('.fury-api-list');api.classList.add('da-api-page');
+ apiList.before(make('p','da-api-intro','Add keys for the features you use.'));
+ // Hypixel is the always-visible form; the optional services keep native disclosures.
+ const oldHypixel=$('[data-api-card="hypixel"]'),hypixel=make('section',oldHypixel.className);
+ hypixel.dataset.apiCard='hypixel';oldHypixel.replaceWith(hypixel);hypixel.append(...oldHypixel.childNodes);
+ const oldHead=$('.api-key-card-head',hypixel),head=make('div',oldHead.className);head.append(...oldHead.childNodes);oldHead.replaceWith(head);
+ $('.api-key-card-copy strong',head).id='api-hypixel-title';hypixel.setAttribute('aria-labelledby','api-hypixel-title');
+ $('.api-key-chevron',head).remove();
+ const optional=put(make('section','da-api-optional'),heading('Optional services'));
+ optional.append($('[data-api-card="urchin"]'),$('[data-api-card="aurora"]'));apiList.append(optional);
+ const advanced=make('details','da-api-advanced');advanced.append(make('summary','','Advanced settings'));
+ advanced.firstElementChild.append(make('span','da-api-paused','API requests paused'));
+ const admin=$('[data-api-card="urchinadmin"]');$('.api-key-card-copy strong',admin).textContent='Urchin admin key';
+ advanced.append(admin,$('.kill-switch-card'));apiList.after(advanced,make('p','da-api-save-note','Keys save automatically on this computer.'));
+ for(const provider of $$('[data-api-card]',api)){
+  provider.classList.add('da-card');if(provider.matches('details'))provider.open=false;
+  const name=provider.dataset.apiCard,body=$('.api-key-card-body',provider),input=$('.api-key-input input',provider);
+  const label={hypixel:'Hypixel',urchin:'Urchin',aurora:'Aurora',urchinadmin:'Urchin admin'}[name];
+  input.placeholder=`Paste your ${label} API key`;input.setAttribute('aria-label',`${label} API key`);input.autocomplete='off';input.spellcheck=false;
+  if(name!=='hypixel')$('.api-key-card-copy small',provider).textContent={urchin:'Player tags',aurora:'Help identify nicked players',urchinadmin:'Add or remove player tags'}[name];
+  const field=make('div','da-key-field');input.before(field);field.append(input,$('[data-key-toggle]',provider));
+  const toggle=$('[data-key-toggle]',provider);toggle.setAttribute('aria-label',`Show ${label} API key`);toggle.setAttribute('aria-pressed','false');
+  toggle.innerHTML=settingsIcon('eye','settings-button-art');
+  $('[data-api-test]',provider).textContent='Test key';
+  const extra=make('details','da-key-details');extra.append(make('summary','','Key details'));
+  const copy=$('[data-key-copy]',provider);copy.setAttribute('aria-label',`Copy ${label} API key`);extra.append(copy);
+  const last=$('[data-api-last]',provider);extra.append(last);
+  const result=$('.api-key-result',body);result.hidden=true;result.setAttribute('role','status');
+  for(const row of [...body.children].filter(n=>n.matches('.note,#hypixel-key-reminder')))extra.append(row);
+  if(name==='hypixel')extra.append($('#hypixel-key-snooze'));
+  const tools=make('div','da-key-tools');if(name==='hypixel'){
+   const dashboard=$('#hypixel-key-dashboard');dashboard.textContent='Get a Hypixel key ↗';tools.append(dashboard);
+  }
+  tools.append(extra);body.append(tools);
+  $$('.api-key-actions',body).filter(row=>!row.children.length).forEach(row=>row.remove());
+  if(provider.matches('details')){
+   $('.api-key-chevron',provider).remove();
+   const action=make('span','da-key-action');put(action,make('span','da-key-action-closed','Add key'),make('span','da-key-action-open','Close'));
+   $('.api-key-card-head',provider).append(action);
+  }
  }
  const reroll=$('#nickroll-controls');reroll.classList.add('da-columns');$$(':scope >.panel',reroll).forEach(c=>c.classList.add('da-card'));
  $$(':scope >.panel >p.note',reroll).forEach(quiet);
@@ -151,6 +186,13 @@ function mount({document,navigate,getState,startProxy,stopProxy,checkDust,invoke
  $('.denick-advanced-switch')?.classList.add('da-segments');
  let reminderKey='';
  const view=document.defaultView;
+ function updateApiAccent(color){
+  const channels=String(color).trim().replace('#','').match(/.{2}/g);
+  if(channels?.length!==3)return;
+  const [r,g,b]=channels.map(channel=>{const value=parseInt(channel,16)/255;return value<=.04045?value/12.92:((value+.055)/1.055)**2.4;});
+  api.style.setProperty('--da-key-ink',.2126*r+.7152*g+.0722*b>.179?'#000000':'#ffffff');
+ }
+ updateApiAccent(view.getComputedStyle(document.documentElement).getPropertyValue('--accent'));
  let reminderAccent=minecraftChat.setChatPrefixAccent(view.getComputedStyle(document.documentElement).getPropertyValue('--accent').trim());
  const chatHtml=message=>segmentsHtml(minecraftChat.applyChatPrefixAccent(minecraftChat.normalizeLegacyJsonComponent(message)).extra);
  function updateReminderPreviews(next){
@@ -163,7 +205,7 @@ function mount({document,navigate,getState,startProxy,stopProxy,checkDust,invoke
    georgePreview.innerHTML=chatHtml(GAMBLER_GEORGE_REMINDER_MESSAGE);
   }
  }
- const onReminderAccent=event=>{reminderAccent=minecraftChat.setChatPrefixAccent(event.detail.color);updateReminderPreviews(getState()||{});};
+ const onReminderAccent=event=>{reminderAccent=minecraftChat.setChatPrefixAccent(event.detail.color);updateApiAccent(event.detail.color);updateReminderPreviews(getState()||{});};
  const onReminderThreshold=()=>updateReminderPreviews(getState()||{});
  view.addEventListener('fury:accent-change',onReminderAccent);
  $('#ender-dust-reminder-threshold').addEventListener('input',onReminderThreshold);

@@ -54,6 +54,7 @@ const {
     saveAllSettings,
     saveScanSettings,
     saveFeatureSettings,
+    saveProfileSettings,
     loadFeatureSettings,
     saveChatTriggerSettings,
     snoozeHypixelKeyReminder,
@@ -1635,11 +1636,11 @@ async function applyProfile(name, { source = 'launcher' } = {}) {
         // Profiles are complete snapshots of the safe, live-changeable
         // preference surface. Non-profile settings (keys, ports, auth) stay
         // intact because they are deliberately omitted here.
-        saveFeatureSettings({ ...before.features, ...features });
-        saveScanSettings({ ...before.scan, ...scan });
-        if (Array.isArray(chatTriggers.chatTriggers)) {
-            saveChatTriggerSettings({ triggers: chatTriggers.chatTriggers });
-        }
+        saveProfileSettings({
+            features: { ...before.features, ...features },
+            scan: { ...before.scan, ...scan },
+            ...(Array.isArray(chatTriggers.chatTriggers) ? { chatTriggers: { triggers: chatTriggers.chatTriggers } } : {})
+        });
     } catch (error) {
         throw new Error(`Could not save profile settings: ${error.message}`);
     }
@@ -1971,6 +1972,8 @@ handleLauncherRequest('denick:lookup', (event, payload = {}) => {
 // Patch only the committed fields; another page may contain unfinished edits.
 handleLauncherRequest('settings:save-patch', async (event, patch) => {
     const before = loadAllSettings();
+    if (patch?.scan && patch.expectedProfileRevision !== undefined
+        && patch.expectedProfileRevision !== (before.features._profileRevision || '')) return { profileChanged: true };
     const merged = {};
     for (const group of ['keys', 'scan', 'server']) {
         if (!patch?.[group]) continue;
@@ -2030,6 +2033,8 @@ handleLauncherRequest('settings:save-chat-prefix-accent', async (event, accentHe
 });
 handleLauncherRequest('settings:save-features', async (event, settings) => {
     const before = loadAllSettings();
+    if (settings?.expectedProfileRevision !== undefined
+        && settings.expectedProfileRevision !== (before.features._profileRevision || '')) return { profileChanged: true };
     const nickSettings = require('./src/nick/settings');
     const nickRoll = settings?.features?.nickRoll === undefined ? before.features.nickRoll
         : nickSettings.validate({ ...nickSettings.normalizeSettings(before.features.nickRoll), ...settings.features.nickRoll });

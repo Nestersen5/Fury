@@ -56,7 +56,7 @@ module.exports=async function verify({page,output,profile,child,baseline=false,m
     await page.evaluate(()=>{window.NesterTheme.applyMotion(false,false);activatePage('dashboard');window.focus();});
     await delay(500);
     const report={at:new Date().toISOString(),baseline,runtime:await page.evaluate(()=>process.versions),viewport:page.viewport(),measurements:[]};
-    report.measurements.push(await measure(page,baseline?'before: existing launcher':'after: None'));
+    if(baseline)report.measurements.push(await measure(page,'before: existing launcher'));
     if(!baseline){
         const checks=[],views=[],errors=[];page.on('pageerror',e=>errors.push(e.message));
         const check=(name,value)=>{assert(value,name);checks.push(name);console.log('PASS '+name);};
@@ -70,7 +70,11 @@ module.exports=async function verify({page,output,profile,child,baseline=false,m
         const running=()=>page.waitForFunction(()=>document.documentElement.dataset.seasonalMotion==='running',{timeout:7000});
         const stopped=()=>page.waitForFunction(()=>document.documentElement.dataset.seasonalMotion==='paused',{polling:100,timeout:7000});
         await open();
-        check('Seasonal themes default to None with no canvas allocated',await page.evaluate(()=>document.querySelector('[name="fury-seasonal-theme"]:checked').value==='none'&&!document.querySelector('.fury-seasonal-layer')));
+        check('Christmas is selected when no seasonal preference is saved',await page.evaluate(()=>document.querySelector('[name="fury-seasonal-theme"]:checked').value==='christmas'&&document.documentElement.dataset.seasonalTheme==='christmas'&&!!document.querySelector('.fury-seasonal-layer')&&localStorage.getItem('fury-seasonal-v1')===null));
+        await shot('appearance-default-christmas');
+        await page.click('[name="fury-seasonal-theme"][value="none"]');await stopped();
+        check('Choosing None releases the canvas and saves the choice',await page.evaluate(()=>document.documentElement.dataset.seasonalTheme==='none'&&document.querySelector('.fury-seasonal-canvas').width===0&&JSON.parse(localStorage.getItem('fury-seasonal-v1')).theme==='none'));
+        report.measurements.push(await measure(page,'after: None'));
         await shot('appearance-none');
         const initialAppearance=await page.evaluate(()=>({theme:document.documentElement.dataset.theme,accent:document.documentElement.dataset.accent,color:getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()}));
         await page.evaluate(()=>{
@@ -167,6 +171,10 @@ module.exports=async function verify({page,output,profile,child,baseline=false,m
             return canvas.width===0&&canvas.height===0&&document.querySelector('.ds-brand .fury-mark img').getAttribute('src')==='assets/fury-icon.png'&&document.querySelector('.da-server-icon').getAttribute('src')==='assets/fury-server-icon.png';
         }));
         check('Turning Christmas off keeps its effect choices',(await saved()).lights===false);
+        const beforeNoneReload=await saved();await page.reload();
+        await page.waitForFunction(()=>document.documentElement.dataset.seasonalTheme==='none');
+        await open();
+        check('A saved None choice and its effects survive reload despite the Christmas default',JSON.stringify(await saved())===JSON.stringify(beforeNoneReload)&&await page.evaluate(()=>document.querySelector('[name="fury-seasonal-theme"]:checked').value==='none'&&!document.querySelector('.fury-seasonal-layer')));
         await page.evaluate(()=>{
             window.seasonalRealSetItem=Storage.prototype.setItem;
             Storage.prototype.setItem=function(key,value){if(key==='fury-seasonal-v1')throw new DOMException('full','QuotaExceededError');return window.seasonalRealSetItem.call(this,key,value);};

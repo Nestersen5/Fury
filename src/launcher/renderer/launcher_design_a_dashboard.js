@@ -82,7 +82,10 @@ function mount({document,navigate,getState,startProxy,stopProxy,checkDust,invoke
     const identity=make('div','da-recent-identity'),head=make('span','da-recent-avatar'),image=make('img','');image.alt='';image.hidden=true;image.dataset.accountUuid=latest.uuid||next.viewedAccount?.uuid||'';head.append(image);
     const copy=make('div','da-recent-copy');copy.append(make('strong','',next.viewedAccount?.name||latest.name),make('span','',latest.active?`Live session · Started ${cards.time(latest.startedAt)}`:`Last session · ${cards.date(latest.startedAt)}`));
     const open=button('Open',()=>navigate('sessions'),'da-text-button');open.append(svg(paths.arrow));identity.append(head,copy,open);
-    const modes=latest.modes||[],sum=key=>modes.length&&modes.every(m=>m[key]!=null&&Number.isFinite(Number(m[key])))?modes.reduce((n,m)=>n+Number(m[key]),0):null;
+    const modes=latest.modes||[],sum=key=>{
+     const applicable=['finals','finalDeaths','beds'].includes(key)?modes.filter(m=>m.mode==='BEDWARS'):modes;
+     return applicable.length&&applicable.every(m=>m[key]!=null&&Number.isFinite(Number(m[key])))?applicable.reduce((n,m)=>n+Number(m[key]),0):null;
+    };
     const finals=sum('finals'),deaths=sum('finalDeaths'),metrics=make('div','da-session-metrics'),fkdr=finals==null||deaths==null?null:deaths?finals/deaths:finals;
     for(const [label,value,decimals]of [['Duration',cards.duration(latest.durationMs)],['Wins',sum('wins'),0],['Final kills',finals,0],['FKDR',fkdr,2],['Beds broken',sum('beds'),0]]){
      const node=make('strong','',value==null?'—':typeof value==='number'?value.toFixed(decimals):value);if(typeof value==='number')counters.push({node,value,decimals});const stat=make('div','');stat.append(make('span','',label),node);metrics.append(stat);

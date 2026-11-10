@@ -29,8 +29,8 @@ function makeHarness(overrides = {}) {
         // "Xs left" tests flaky whenever a millisecond ticks between calls.
         now: overrides.now || (() => 100000),
         sendChat: msg => sent.push(msg),
-        sendLeaveCommand: shouldSend => {
-            if (overrides.sendLeaveCommand) overrides.sendLeaveCommand(shouldSend);
+        sendLeaveCommand: (shouldSend, options) => {
+            if (overrides.sendLeaveCommand) return overrides.sendLeaveCommand(shouldSend, options);
             else leaveSent += 1;
         },
         isPregameActive: () => state.pregame,
@@ -408,7 +408,7 @@ for (const known of [null, knownDenick]) {
     let member = false, dispatchGuard = null;
     const h = makeHarness({
         isPartyMember: () => member,
-        sendLeaveCommand: shouldSend => { dispatchGuard = shouldSend; }
+        sendLeaveCommand: shouldSend => { dispatchGuard = shouldSend; return new Promise(() => {}); }
     });
     const timer = captureDodgeTimer(() => h.dodger.maybeSchedule('fyechris', taggedProfile));
     timer.callback();
@@ -593,6 +593,44 @@ for (const gameStartsBeforeDispatch of [false, true]) withFakeClock(clock => {
     assert.deepStrictEqual(sent.map(item => item.command), gameStartsBeforeDispatch ? ['/p list'] : ['/p list', '/l']);
     if (!gameStartsBeforeDispatch) assert.strictEqual(sent[1].at, 100400, 'leave dispatch still has 600ms before start');
     queue.close();
+});
+
+// Cancel/reset/rule changes must still own a leave waiting in the real queue.
+for (const action of ['cancel', 'reset', 'off', 'include', 'threshold', 'live-settings']) withFakeClock(clock => {
+    const { createHypixelCommandQueue } = require('../../src/net/hypixelCommandQueue');
+    const sent = [];
+    const queue = createHypixelCommandQueue({ now: clock.now, send: command => sent.push(command) });
+    const h = makeHarness({ now: clock.now, leaveMode: 'instant',
+        taggedPlayers: action !== 'threshold', statThreats: action === 'threshold',
+        sendLeaveCommand: (shouldSend, options) => queue.enqueue('/l', { ...options, priority: 0, shouldSend }) });
+    void queue.enqueue('/p list');
+    h.dodger.maybeSchedule('QueuedThreat', action === 'threshold' ? statThreatProfile : taggedProfile);
+    clock.advance(0);
+    assert.equal(queue.snapshot().queued, 1, action + ': leave is waiting for command pacing');
+    if (action === 'cancel') assert.equal(h.dodger.cancel('manual'), true);
+    else if (action === 'reset') h.dodger.reset();
+    else if (action === 'off') h.dodger.handleCommand(['/dodge', 'off']);
+    else if (action === 'include') h.dodger.handleCommand(['/dodge', 'include', 'all', 'off']);
+    else if (action === 'threshold') {
+        h.cfg.minStars = 100000; h.cfg.minFkdr = 100000; h.dodger.revalidate();
+    } else {
+        h.cfg.taggedPlayers = false; h.dodger.revalidate();
+        h.cfg.taggedPlayers = true; // a cancelled plan must not revive
+    }
+    assert.equal(queue.snapshot().queued, 0, action + ': cancelled entry leaves the queue immediately');
+    clock.advance(400);
+    assert.deepEqual(sent, ['/p list'], action + ': never sends the cancelled leave');
+    assert.equal(h.dodger.getDebugState().pendingDodge, 'none');
+    queue.close();
+});
+
+// Direct settings changes are checked again even without a reload notification.
+withFakeClock(clock => {
+    const h = makeHarness({ now: clock.now });
+    h.dodger.maybeSchedule('NoLongerTagged', taggedProfile);
+    h.cfg.taggedPlayers = false;
+    clock.advance(20000);
+    assert.equal(h.getLeaveSent(), 0);
 });
 
 // 14. End-to-end timing: real timer fires and sends /l before game start.
